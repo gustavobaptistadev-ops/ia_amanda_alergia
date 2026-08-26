@@ -15,7 +15,9 @@ async def get_instance_status():
         try:
             response = await client.get(url, headers=get_headers())
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            logger.info(f"Status Response: {data}")
+            return data
         except httpx.HTTPError as e:
             logger.error(f"Erro ao buscar status da instância: {e}")
             raise HTTPException(status_code=500, detail="Erro ao se comunicar com a Evolution GO")
