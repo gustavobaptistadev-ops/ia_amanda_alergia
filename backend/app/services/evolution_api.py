@@ -17,7 +17,7 @@ def get_headers():
 
 async def send_text_message(number: str, text: str):
     """Envia uma mensagem de texto via EvolutionAPI."""
-    url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE_NAME}"
+    url = f"{EVOLUTION_API_URL}/send/text"
     payload = {
         "number": number,
         "text": text,
