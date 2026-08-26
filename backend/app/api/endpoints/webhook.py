@@ -1,45 +1,45 @@
-from fastapi import APIRouter, Request, BackgroundTasks, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Request, BackgroundTasks
 import logging
-
 from app.services.evolution_api import send_text_message
-from app.database import get_db
 from app.core.orchestrator import process_user_message
 from app.core.guardrails import validar_resposta
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-async def process_and_respond(db: AsyncSession, remote_jid: str, text: str, push_name: str):
+async def process_and_respond(remote_jid: str, text: str, push_name: str):
     """Executa a lógica pesada de IA e envia a resposta."""
     try:
         if text.strip().lower() == "ping":
             await send_text_message(remote_jid, "Pong! O sistema IA Amanda está online e lendo suas mensagens!")
             return
 
-        # Chama a IA
+        # Chamada ao orquestrador (LangGraph) usando o JID como Thread ID (memória)
         ai_response = await process_user_message(thread_id=remote_jid, message=text)
         
-        # Guardrails
+        # Validador Final de Segurança (Guardrails)
         is_safe = validar_resposta(ai_response)
+        
         if not is_safe:
-            ai_response = "Desculpe, por segurança e de acordo com a LGPD e o Conselho de Medicina, não posso abordar esse assunto por aqui. Aguarde a transferência para nossa equipe."
+            ai_response = "Desculpe, por segurança e para estarmos de acordo com a LGPD e o Conselho de Medicina, não posso abordar esse assunto por aqui. Por favor, aguarde que irei transferir você para nossa equipe médica ou ligue para a clínica."
 
+        # Enviar a resposta de volta ao WhatsApp
         await send_text_message(remote_jid, ai_response)
 
     except Exception as e:
         print(f">>> [ERROR] Falha ao processar e responder: {e}", flush=True)
 
 
-async def process_message(data: dict, db: AsyncSession, background_tasks: BackgroundTasks):
+async def process_message(data: dict):
     """
-    Recebe os webhooks da Evolution API (Ghosthub), processa a mensagem e agenda a resposta.
+    Recebe os webhooks da Evolution API (Ghosthub), extrai os dados da mensagem
+    e faz o envio da IA (ou pong) se não for enviada por nós mesmos.
     """
     event_type = data.get("event")
     
-    # O Ghosthub dispara o evento "Message" para novas mensagens (na Evolution v1/v2 normal seria "messages.upsert")
+    # O Ghosthub dispara o evento "Message" para novas mensagens (na Evolution normal seria "messages.upsert")
     if event_type != "messages.upsert" and event_type != "Message":
-        return {"status": "ignored", "reason": f"Event type '{event_type}' not processed"}
+        return
     
     try:
         from_me = False
@@ -54,7 +54,7 @@ async def process_message(data: dict, db: AsyncSession, background_tasks: Backgr
             
             # Não processa mensagens enviadas pelo próprio bot ou atualizações de status
             if message_type == "appendMessage" or message_type == "protocolMessage":
-                 return {"status": "ignored", "reason": "System message"}
+                 return
                  
             message_obj = message_data.get("message", {})
             remote_jid = message_data.get("key", {}).get("remoteJid", "")
@@ -82,7 +82,7 @@ async def process_message(data: dict, db: AsyncSession, background_tasks: Backgr
             
             # Ignora mensagens de grupos por enquanto
             if info.get("IsGroup", False):
-                 return {"status": "ignored", "reason": "Group message"}
+                 return
                  
             if "conversation" in msg_obj:
                 text = msg_obj["conversation"]
@@ -93,36 +93,33 @@ async def process_message(data: dict, db: AsyncSession, background_tasks: Backgr
 
         # Ignorar se foi a gente mesmo que enviou
         if from_me:
-             return {"status": "ignored", "reason": "Message from self"}
+             return
              
         if not text or not remote_jid:
-             return {"status": "ignored", "reason": "Empty text or missing remote_jid"}
+             return
 
         # Ignorar status de leitura e atualizações do whatsapp
         if "status@broadcast" in remote_jid:
-             return {"status": "ignored", "reason": "Status broadcast"}
+             return
 
         print(f">>> [DEBUG] Processando Mensagem de {remote_jid}: {text}", flush=True)
 
-        # Disparar background task para responder
-        background_tasks.add_task(process_and_respond, db, remote_jid, text, push_name)
+        # Chama a função de IA de forma assíncrona
+        await process_and_respond(remote_jid, text, push_name)
         
-        return {"status": "success", "message": "Message queued for processing"}
-
     except Exception as e:
-        print(f"Error processing webhook: {e}", flush=True)
-        return {"status": "error", "message": str(e)}
+        print(f"Error processing webhook msg: {e}", flush=True)
 
 
 @router.post("/evolution")
-async def evolution_webhook(request: Request, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
+async def evolution_webhook(request: Request, background_tasks: BackgroundTasks):
     """Webhook para receber eventos da EvolutionAPI / Ghosthub."""
     try:
         data = await request.json()
         print(f">>> [DEBUG] Webhook Payload: {data}", flush=True)
         
         # Processar a mensagem em background para não travar o recebimento do webhook
-        await process_message(data, db, background_tasks)
+        background_tasks.add_task(process_message, data)
         return {"status": "ok"}
     except Exception as e:
         print(f"Erro no webhook: {e}", flush=True)
