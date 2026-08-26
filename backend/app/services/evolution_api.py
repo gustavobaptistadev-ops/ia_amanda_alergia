@@ -11,8 +11,9 @@ EVOLUTION_INSTANCE_NAME = os.getenv("EVOLUTION_INSTANCE_NAME", "ia_amanda")
 def get_headers():
     return {
         "apikey": EVOLUTION_API_KEY,
+        "Authorization": f"Bearer {EVOLUTION_API_KEY}",
         "Content-Type": "application/json",
-        "instance": EVOLUTION_INSTANCE_NAME # Algumas versões exigem o nome da instância no header
+        "instance": EVOLUTION_INSTANCE_NAME # Mantido por segurana, mas provavelmente ignorado
     }
 
 async def send_text_message(number: str, text: str):
