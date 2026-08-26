@@ -29,10 +29,14 @@ export default function Configuracoes() {
       const qrRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/qr`);
       if (qrRes.ok) {
         const qrData = await qrRes.json();
-        if (qrData.base64) {
+        if (qrData.error) {
+          setErrorMsg(qrData.message || "Erro retornado pela provedora ao gerar QR.");
+        } else if (qrData.base64) {
           setQrCodeBase64(qrData.base64);
         } else if (qrData.qrcode) {
           setQrCodeBase64(qrData.qrcode);
+        } else {
+          setErrorMsg("QR Code veio vazio da provedora.");
         }
       } else {
         setErrorMsg("Não foi possível carregar o QR Code.");
