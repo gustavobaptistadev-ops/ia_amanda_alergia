@@ -17,7 +17,8 @@ export default function Configuracoes() {
       const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/status`);
       if (statusRes.ok) {
         const statusData = await statusRes.json();
-        if (statusData.state === "open" || statusData.state === "CONNECTED") {
+        const state = statusData.state || statusData.instance?.state || statusData.instance?.status;
+        if (state === "open" || state === "CONNECTED" || state === "connected") {
           setSuccess(true);
           setLoading(false);
           return;

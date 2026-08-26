@@ -16,7 +16,7 @@ async def get_instance_status():
             response = await client.get(url, headers=get_headers())
             response.raise_for_status()
             data = response.json()
-            logger.info(f"Status Response: {data}")
+            print(f">>> [DEBUG] Status Response: {data}", flush=True)
             return data
         except httpx.HTTPError as e:
             logger.error(f"Erro ao buscar status da instância: {e}")
@@ -33,6 +33,12 @@ async def get_instance_qr():
             response.raise_for_status()
             data = response.json()
             return data
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                # 400 usually means it's already connected or not ready
+                return {"error": "already_connected_or_invalid", "message": "Instância já conectada ou erro no QR Code"}
+            logger.error(f"Erro HTTP {e.response.status_code} ao buscar QR Code: {e}")
+            raise HTTPException(status_code=500, detail="Erro ao gerar QR Code (Bad Request/Not Found)")
         except httpx.HTTPError as e:
-            logger.error(f"Erro ao buscar QR Code da instância: {e}")
+            logger.error(f"Erro de comunicação ao buscar QR Code: {e}")
             raise HTTPException(status_code=500, detail="Erro ao gerar QR Code")

@@ -60,7 +60,7 @@ async def evolution_webhook(request: Request, background_tasks: BackgroundTasks)
     """Webhook para receber eventos da EvolutionAPI."""
     try:
         data = await request.json()
-        logger.info(f"Webhook Payload: {data}")
+        print(f">>> [DEBUG] Webhook Payload: {data}", flush=True)
         
         # Processar a mensagem em background para liberar o webhook rapidamente
         background_tasks.add_task(process_message, data)
