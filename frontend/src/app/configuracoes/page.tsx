@@ -18,7 +18,9 @@ export default function Configuracoes() {
       if (statusRes.ok) {
         const statusData = await statusRes.json();
         const state = statusData.state || statusData.instance?.state || statusData.instance?.status;
-        if (state === "open" || state === "CONNECTED" || state === "connected") {
+        const ghosthubLoggedIn = statusData.data?.LoggedIn;
+        
+        if (state === "open" || state === "CONNECTED" || state === "connected" || ghosthubLoggedIn === true) {
           setSuccess(true);
           setLoading(false);
           return;
@@ -35,6 +37,8 @@ export default function Configuracoes() {
           setQrCodeBase64(qrData.base64);
         } else if (qrData.qrcode) {
           setQrCodeBase64(qrData.qrcode);
+        } else if (qrData.data?.Qrcode) {
+          setQrCodeBase64(qrData.data.Qrcode);
         } else {
           setErrorMsg("QR Code veio vazio da provedora.");
         }
