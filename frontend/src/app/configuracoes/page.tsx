@@ -86,7 +86,7 @@ export default function Configuracoes() {
                     if (!confirm("Reiniciar a conexão?")) return;
                     setLoading(true);
                     try {
-                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/restart`, { method: "PUT" });
+                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/reconnect`, { method: "POST" });
                       setTimeout(() => fetchStatusAndQr(), 3000);
                     } catch (e) {
                       alert("Erro ao reiniciar.");
@@ -148,6 +148,46 @@ export default function Configuracoes() {
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 {loading ? "Carregando..." : "Gerar QR Code"}
               </button>
+
+              <div className="flex gap-2 w-full mt-2">
+                <button
+                  onClick={async () => {
+                    if (!confirm("Reiniciar a conexão na provedora?")) return;
+                    setLoading(true);
+                    try {
+                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/reconnect`, { method: "POST" });
+                      setTimeout(() => fetchStatusAndQr(), 3000);
+                    } catch (e) {
+                      alert("Erro ao reiniciar.");
+                    }
+                    setLoading(false);
+                  }}
+                  disabled={loading}
+                  className="flex-1 flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 px-3 py-2 rounded-lg font-medium shadow-sm text-[13px]"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                  Reiniciar
+                </button>
+                
+                <button
+                  onClick={async () => {
+                    if (!confirm("Desconectar o WhatsApp?")) return;
+                    setLoading(true);
+                    try {
+                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/logout`, { method: "DELETE" });
+                      setTimeout(() => fetchStatusAndQr(), 2000);
+                    } catch (e) {
+                      alert("Erro ao desconectar.");
+                    }
+                    setLoading(false);
+                  }}
+                  disabled={loading}
+                  className="flex-1 flex items-center justify-center gap-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 px-3 py-2 rounded-lg font-medium shadow-sm text-[13px]"
+                >
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  Desconectar
+                </button>
+              </div>
               <p className="text-[11px] text-slate-500 mt-4 text-center">
                 Vá em Aparelhos Conectados no seu celular.
               </p>
