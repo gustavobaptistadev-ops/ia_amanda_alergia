@@ -8,7 +8,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores.pgvector import PGVector
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from app.database import async_session_maker
+from app.database import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -40,7 +40,7 @@ async def update_rag_context(data: RagData):
             f.write(data.content)
             
         # 2. Apagar todos os vetores antigos do banco
-        async with async_session_maker() as session:
+        async with AsyncSessionLocal() as session:
             # O pgvector cria tabelas langchain_pg_embedding e langchain_pg_collection
             # Podemos apagar os embeddings associados à nossa collection
             query = text("""
