@@ -76,38 +76,81 @@ export default function Configuracoes() {
           
           <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-xl border-2 border-dashed border-slate-200 min-h-[300px]">
             {success ? (
-              <div className="flex flex-col items-center animate-in zoom-in duration-300">
-                <CheckCircle2 className="w-32 h-32 text-emerald-500 mb-4" />
+              <div className="flex flex-col items-center animate-in zoom-in duration-300 w-full">
+                <CheckCircle2 className="w-24 h-24 text-emerald-500 mb-4" />
                 <p className="text-slate-700 font-medium text-lg">WhatsApp Conectado!</p>
-                <p className="text-sm text-slate-400 mt-1 text-center">A IA Amanda já pode responder seus pacientes.</p>
+                <p className="text-sm text-slate-400 mt-1 text-center mb-8">A IA Amanda já pode responder seus pacientes.</p>
+                
+                <div className="flex gap-4 w-full justify-center border-t border-slate-200 pt-6">
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Tem certeza que deseja reiniciar a conexão?")) return;
+                      setLoading(true);
+                      try {
+                        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/restart`, { method: "PUT" });
+                        setTimeout(() => fetchStatusAndQr(), 3000); // aguarda um pouco e recarrega
+                      } catch (e) {
+                        alert("Erro ao reiniciar a conexão.");
+                      }
+                      setLoading(false);
+                    }}
+                    disabled={loading}
+                    className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:cursor-not-allowed px-5 py-2 rounded-xl font-medium transition-colors shadow-sm text-sm"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                    Reiniciar
+                  </button>
+                  
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Tem certeza que deseja desconectar o WhatsApp? Você precisará ler o QR Code novamente.")) return;
+                      setLoading(true);
+                      try {
+                        await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/logout`, { method: "DELETE" });
+                        setTimeout(() => fetchStatusAndQr(), 2000);
+                      } catch (e) {
+                        alert("Erro ao desconectar o WhatsApp.");
+                      }
+                      setLoading(false);
+                    }}
+                    disabled={loading}
+                    className="flex items-center gap-2 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 disabled:bg-slate-100 disabled:cursor-not-allowed px-5 py-2 rounded-xl font-medium transition-colors shadow-sm text-sm"
+                  >
+                    <AlertCircle className="w-4 h-4" />
+                    Desconectar
+                  </button>
+                </div>
               </div>
             ) : (
               <>
                 {qrCodeBase64 ? (
-                  <div className="mb-4 bg-white p-2 rounded-xl shadow-sm">
-                    <Image src={qrCodeBase64} alt="QR Code WhatsApp" width={180} height={180} className="rounded-lg" />
+                  <div className="mb-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+                    <Image src={qrCodeBase64} alt="QR Code WhatsApp" width={220} height={220} className="rounded-lg" />
                   </div>
                 ) : (
-                  <QrCode className="w-40 h-40 text-slate-300 mb-4" />
+                  <div className="flex flex-col items-center justify-center bg-slate-100/50 rounded-2xl w-48 h-48 mb-6 border border-slate-200/50">
+                    <QrCode className="w-16 h-16 text-slate-300 mb-2" />
+                    <span className="text-xs text-slate-400 font-medium">Aguardando QR Code</span>
+                  </div>
                 )}
                 
                 {errorMsg && (
-                  <div className="flex items-center gap-2 text-rose-500 text-sm mb-4">
-                    <AlertCircle className="w-4 h-4" />
-                    <p>{errorMsg}</p>
+                  <div className="flex items-center gap-2 text-rose-600 bg-rose-50 px-4 py-3 rounded-xl text-sm mb-6 w-full justify-center border border-rose-100">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <p className="font-medium">{errorMsg}</p>
                   </div>
                 )}
 
                 <button 
                   onClick={handleGenerateQR}
                   disabled={loading}
-                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-full font-medium transition-colors"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-medium transition-all shadow-sm shadow-blue-600/20 active:scale-95"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                  <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
                   {loading ? "Carregando..." : "Gerar QR Code"}
                 </button>
-                <p className="text-xs text-slate-400 mt-4 text-center">
-                  Abra o WhatsApp no seu celular, vá em Aparelhos Conectados e aponte a câmera.
+                <p className="text-sm text-slate-500 mt-6 text-center max-w-xs leading-relaxed">
+                  Abra o WhatsApp no seu celular, vá em <span className="font-semibold text-slate-700">Aparelhos Conectados</span> e aponte a câmera.
                 </p>
               </>
             )}
