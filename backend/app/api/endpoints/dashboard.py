@@ -1,8 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 import redis.asyncio as redis
 import os
 import json
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from app.database import get_db
+from app.models.chat import Contact
 
 router = APIRouter()
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -42,11 +46,31 @@ async def get_conversations():
     ]
 
 @router.get("/kanban")
-async def get_kanban_patients():
+async def get_kanban_patients(db: AsyncSession = Depends(get_db)):
     """Retorna a lista de pacientes dividida nas colunas do Kanban."""
+    result = await db.execute(select(Contact))
+    contacts = result.scalars().all()
+    
+    kanban = {
+        "novo_contato": [],
+        "em_andamento": [],
+        "agendado": [],
+        "atendimento_humano": []
+    }
+    
+    for c in contacts:
+        nome = c.name or c.phone_number
+        if not c.bot_active:
+            kanban["atendimento_humano"].append(nome)
+        else:
+            if c.stage in kanban:
+                kanban[c.stage].append(nome)
+            else:
+                kanban["novo_contato"].append(nome)
+                
     return [
-        {"title": "Novo Contato (IA)", "color": "bg-blue-500", "patients": ["Carlos Silva", "Fernanda Lima"]},
-        {"title": "Em Anamnese", "color": "bg-amber-500", "patients": ["João Pedro"]},
-        {"title": "Agendado", "color": "bg-emerald-500", "patients": ["Maria Oliveira", "Roberto Souza", "Ana Costa"]},
-        {"title": "Atendimento Humano", "color": "bg-rose-500", "patients": []}
+        {"title": "Novo Contato (IA)", "color": "bg-blue-500", "patients": kanban["novo_contato"]},
+        {"title": "Em Andamento (IA)", "color": "bg-amber-500", "patients": kanban["em_andamento"]},
+        {"title": "Agendado", "color": "bg-emerald-500", "patients": kanban["agendado"]},
+        {"title": "Atendimento Humano", "color": "bg-rose-500", "patients": kanban["atendimento_humano"]}
     ]

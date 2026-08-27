@@ -11,6 +11,7 @@ class Contact(Base):
     phone_number = Column(String, unique=True, index=True, nullable=False) # The JID
     name = Column(String, nullable=True)
     bot_active = Column(Boolean, default=True) # Se a IA deve responder automaticamente
+    stage = Column(String, default="novo_contato") # 'novo_contato', 'em_andamento', 'agendado'
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
