@@ -75,9 +75,8 @@ async def reset_conversation(phone_number: str, db: AsyncSession = Depends(get_d
         contact.bot_active = True
         await db.commit()
         
-        # Apaga a memória em cache do LangGraph
-        from app.core.orchestrator import memory
-        memory.storage.pop(phone_number, None)
+        # A memória do LangGraph agora é puxada dinamicamente do banco de dados (que acabamos de deletar),
+        # então não há necessidade de limpar cache em memória!
         
         return {"status": "ok", "message": "Conversa resetada"}
     return {"status": "error", "message": "Contato não encontrado"}

@@ -110,14 +110,39 @@ workflow.add_conditional_edges(
 # Após a ferramenta rodar, devolva para a LLM gerar a resposta final com o resultado
 workflow.add_edge("tools", "generate_response")
 
-# Compila o grafo usando o checkpointer global de memória
-app_graph = workflow.compile(checkpointer=memory)
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, AIMessage
+
+# Removido: memory = MemorySaver()
+# Compila o grafo SEM checkpointer (memória será injetada manualmente do Postgres)
+app_graph = workflow.compile()
 
 async def process_user_message(thread_id: str, message: str) -> str:
-    config = {"configurable": {"thread_id": thread_id}}
-    input_state = {"messages": [HumanMessage(content=message)]}
+    from app.services.db_service import get_chat_history
     
-    logger.info(f"LangGraph processando thread {thread_id} com nova arquitetura de Nodes e Tools.")
-    final_state = await app_graph.ainvoke(input_state, config=config)
+    # Busca histórico real do banco de dados (últimas 15 mensagens)
+    db_messages = await get_chat_history(thread_id, limit=15)
+    
+    langchain_messages = []
+    for m in db_messages:
+        if m.sender == 'paciente':
+            # Ignora a última mensagem do banco porque vamos adicioná-la abaixo
+            # Ops, a última já é essa?
+            # O webhook salva a msg do paciente ANTES de chamar process_user_message.
+            # Então a mensagem atual JÁ ESTÁ em db_messages.
+            # Para o LangGraph não processar duplicado, pegamos tudo do banco.
+            langchain_messages.append(HumanMessage(content=m.text))
+        else:
+            langchain_messages.append(AIMessage(content=m.text))
+            
+    # Se por acaso a mensagem atual ainda não foi salva (fallback de segurança)
+    if not langchain_messages or langchain_messages[-1].content != message:
+        langchain_messages.append(HumanMessage(content=message))
+    
+    input_state = {"messages": langchain_messages}
+    
+    logger.info(f"LangGraph processando thread {thread_id} puxando {len(langchain_messages)} msgs do Postgres.")
+    
+    # Executa sem 'config' de thread_id, já que não usamos checkpointer interno
+    final_state = await app_graph.ainvoke(input_state)
     
     return final_state['messages'][-1].content

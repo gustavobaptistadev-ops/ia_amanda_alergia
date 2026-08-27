@@ -35,3 +35,18 @@ async def save_message(phone_number: str, text: str, sender: str, name: str = No
         )
         session.add(msg)
         await session.commit()
+
+async def get_chat_history(phone_number: str, limit: int = 15):
+    """
+    Recupera o histórico recente de mensagens do banco.
+    """
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Message)
+            .join(Contact)
+            .where(Contact.phone_number == phone_number)
+            .order_by(Message.created_at.desc())
+            .limit(limit)
+        )
+        messages = result.scalars().all()
+        return list(reversed(messages)) # Retorna na ordem cronológica
