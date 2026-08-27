@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import httpx
 import logging
-from app.services.evolution_api import EVOLUTION_API_URL, get_headers
+from app.services.evolution_api import EVOLUTION_API_URL, EVOLUTION_INSTANCE_NAME, get_headers
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -42,3 +42,32 @@ async def get_instance_qr():
         except httpx.HTTPError as e:
             logger.error(f"Erro de comunicação ao buscar QR Code: {e}")
             raise HTTPException(status_code=500, detail="Erro ao gerar QR Code")
+
+@router.delete("/logout")
+async def logout_instance():
+    """Desconecta o WhatsApp da instância."""
+    url = f"{EVOLUTION_API_URL}/instance/logout"
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.delete(url, headers=get_headers())
+            response.raise_for_status()
+            return {"status": "ok", "message": "Instância desconectada com sucesso"}
+        except httpx.HTTPError as e:
+            logger.error(f"Erro ao desconectar instância: {e}")
+            raise HTTPException(status_code=500, detail="Erro ao desconectar a instância")
+
+@router.put("/restart")
+async def restart_instance():
+    """Reinicia a instância na provedora."""
+    url = f"{EVOLUTION_API_URL}/instance/reconnect"
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            # According to the Swagger, it is POST /instance/reconnect
+            response = await client.post(url, headers=get_headers())
+            response.raise_for_status()
+            return {"status": "ok", "message": "Instância reiniciada com sucesso"}
+        except httpx.HTTPError as e:
+            logger.error(f"Erro ao reiniciar instância: {e}")
+            raise HTTPException(status_code=500, detail="Erro ao reiniciar a instância")
