@@ -7,14 +7,15 @@ from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import AMANDA_PERSONA_PROMPT
 
-import redis.asyncio as redis
-from langgraph.checkpoint.redis import AsyncRedisSaver
+from langgraph.checkpoint.memory import MemorySaver
 import operator
 from app.services.google_calendar import check_availability, create_event
 from langgraph.prebuilt import ToolNode
 
 logger = logging.getLogger(__name__)
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+# Checkpointer global para manter a memória enquanto o servidor estiver rodando
+memory = MemorySaver()
 
 class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
@@ -109,15 +110,14 @@ workflow.add_conditional_edges(
 # Após a ferramenta rodar, devolva para a LLM gerar a resposta final com o resultado
 workflow.add_edge("tools", "generate_response")
 
+# Compila o grafo usando o checkpointer global de memória
+app_graph = workflow.compile(checkpointer=memory)
+
 async def process_user_message(thread_id: str, message: str) -> str:
-    async with redis.Redis.from_url(REDIS_URL) as redis_conn:
-        checkpointer = AsyncRedisSaver(redis_conn)
-        app_graph = workflow.compile(checkpointer=checkpointer)
-        
-        config = {"configurable": {"thread_id": thread_id}}
-        input_state = {"messages": [HumanMessage(content=message)]}
-        
-        logger.info(f"LangGraph processando thread {thread_id} com nova arquitetura de Nodes.")
-        final_state = await app_graph.ainvoke(input_state, config=config)
-        
-        return final_state['messages'][-1].content
+    config = {"configurable": {"thread_id": thread_id}}
+    input_state = {"messages": [HumanMessage(content=message)]}
+    
+    logger.info(f"LangGraph processando thread {thread_id} com nova arquitetura de Nodes e Tools.")
+    final_state = await app_graph.ainvoke(input_state, config=config)
+    
+    return final_state['messages'][-1].content
