@@ -53,9 +53,10 @@ def check_availability(date_str: str) -> str:
         return f"Os seguintes horários estão livres para o dia {date_str}: 09:00, 10:30, 14:00 e 15:30. (Modo Simulação)"
 
     try:
-        # Define início e fim do dia para a busca
-        start_time = datetime.datetime.strptime(date_str, "%Y-%m-%d").isoformat() + 'T00:00:00Z'
-        end_time = datetime.datetime.strptime(date_str, "%Y-%m-%d").isoformat() + 'T23:59:59Z'
+        # Define início e fim do dia (America/Sao_Paulo timezone -3)
+        # Formato ISO correto para API do Google Calendar: 2026-08-27T00:00:00-03:00
+        start_time = f"{date_str}T00:00:00-03:00"
+        end_time = f"{date_str}T23:59:59-03:00"
 
         events_result = service.events().list(
             calendarId=CALENDAR_ID,
@@ -67,13 +68,19 @@ def check_availability(date_str: str) -> str:
         
         events = events_result.get('items', [])
         
-        # Lógica simplificada: se tem poucos eventos, assumimos horários livres
-        # No mundo real, faríamos a subtração dos horários ocupados contra a grade de trabalho.
-        horarios_trabalho = ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00", "17:00"]
+        # Grade de horários de trabalho (1 hora cada)
+        horarios_trabalho = [
+            "09:00", "10:00", "11:00", 
+            # Almoço 12:00 as 14:00
+            "14:00", "15:00", "16:00", "17:00"
+        ]
+        
         ocupados = []
         for event in events:
+            # Pegamos o horário de início do evento
             start = event['start'].get('dateTime', event['start'].get('date'))
             if 'T' in start:
+                # O formato retorna algo como 2026-08-27T09:00:00-03:00
                 hora = start.split('T')[1][:5]
                 ocupados.append(hora)
         
@@ -116,6 +123,32 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
         }
 
         created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        
+        # Atualizar a fase do Kanban para agendado!
+        if phone:
+            from app.database import async_session_maker
+            from app.models.chat import Contact
+            from sqlalchemy.future import select
+            import asyncio
+            
+            async def update_stage():
+                async with async_session_maker() as session:
+                    # O JID geralmente vem como DDI+DDD+numero@s.whatsapp.net. 
+                    # Como o 'phone' pode ser só o número ou o JID, procuramos com 'like' ou exato.
+                    stmt = select(Contact).where(Contact.phone_number.contains(phone))
+                    result = await session.execute(stmt)
+                    contact = result.scalar_one_or_none()
+                    if contact:
+                        contact.stage = "agendado"
+                        await session.commit()
+                        
+            # Roda a função de forma fire-and-forget
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(update_stage())
+            except RuntimeError:
+                asyncio.run(update_stage())
+
         return f"Agendamento confirmado no Google Calendar! Link: {created_event.get('htmlLink')}"
 
     except Exception as e:
