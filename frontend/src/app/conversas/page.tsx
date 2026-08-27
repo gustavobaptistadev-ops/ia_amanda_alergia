@@ -3,11 +3,11 @@ import { Search, Bot, User, CheckCircle2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 export default function Conversas() {
-  const [contacts, setContacts] = useState([]);
-  const [selectedContact, setSelectedContact] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [selectedContact, setSelectedContact] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState("");
-  const messagesEndRef = useRef(null);
+  const messagesEndRef = useRef<any>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
   const wsUrl = apiUrl.replace("http", "ws");
@@ -23,7 +23,7 @@ export default function Conversas() {
     }
   };
 
-  const fetchMessages = async (phone) => {
+  const fetchMessages = async (phone: string) => {
     try {
       const res = await fetch(`${apiUrl}/api/v1/chats/${phone}/messages`);
       const data = await res.json();
