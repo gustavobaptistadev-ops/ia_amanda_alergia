@@ -65,8 +65,11 @@ def generate_response_node(state: AgentState):
     messages = state['messages']
     context = state.get('context', '')
     
+    from datetime import datetime
+    hoje = datetime.now().strftime("%Y-%m-%d")
+    
     system_prompt = AMANDA_PERSONA_PROMPT.format(
-        rag_context=context,
+        rag_context=f"DATA DE HOJE: {hoje}\n" + context,
         chat_history="O LangGraph gerencia este histórico.",
         user_message="[Leia o histórico acima para entender o fluxo atual e continuar a conversa.]"
     )
