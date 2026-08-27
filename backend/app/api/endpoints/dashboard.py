@@ -52,9 +52,10 @@ async def get_kanban_patients(db: AsyncSession = Depends(get_db)):
     contacts = result.scalars().all()
     
     kanban = {
-        "novo_contato": [],
-        "em_andamento": [],
+        "triagem": [],
         "agendado": [],
+        "pos_consulta": [],
+        "retorno": [],
         "atendimento_humano": []
     }
     
@@ -65,12 +66,16 @@ async def get_kanban_patients(db: AsyncSession = Depends(get_db)):
         else:
             if c.stage in kanban:
                 kanban[c.stage].append(nome)
+            elif c.stage == "novo_contato" or not c.stage:
+                kanban["triagem"].append(nome)
             else:
-                kanban["novo_contato"].append(nome)
+                # Fallback to triagem if stage not found
+                kanban["triagem"].append(nome)
                 
     return [
-        {"title": "Novo Contato (IA)", "color": "bg-blue-500", "patients": kanban["novo_contato"]},
-        {"title": "Em Andamento (IA)", "color": "bg-amber-500", "patients": kanban["em_andamento"]},
-        {"title": "Agendado", "color": "bg-emerald-500", "patients": kanban["agendado"]},
+        {"title": "Novo Contato / Triagem", "color": "bg-blue-500", "patients": kanban["triagem"]},
+        {"title": "Agendamento Confirmado", "color": "bg-emerald-500", "patients": kanban["agendado"]},
+        {"title": "Pós-consulta / Feedback", "color": "bg-purple-500", "patients": kanban["pos_consulta"]},
+        {"title": "Retorno de Paciente", "color": "bg-amber-500", "patients": kanban["retorno"]},
         {"title": "Atendimento Humano", "color": "bg-rose-500", "patients": kanban["atendimento_humano"]}
     ]
