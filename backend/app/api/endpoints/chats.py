@@ -60,6 +60,28 @@ async def get_messages(phone_number: str, db: AsyncSession = Depends(get_db)):
     messages = result.scalars().all()
     return messages
 
+@router.delete("/{phone_number}/reset")
+async def reset_conversation(phone_number: str, db: AsyncSession = Depends(get_db)):
+    """Reseta todo o histórico e memória de um contato"""
+    result = await db.execute(select(Contact).where(Contact.phone_number == phone_number))
+    contact = result.scalar_one_or_none()
+    if contact:
+        from sqlalchemy import delete
+        # Apaga todas as mensagens desse contato no banco relacional
+        await db.execute(delete(Message).where(Message.contact_id == contact.id))
+        
+        # Reseta o contato para estágio inicial e ativa o bot
+        contact.stage = "novo_contato"
+        contact.bot_active = True
+        await db.commit()
+        
+        # Apaga a memória em cache do LangGraph
+        from app.core.orchestrator import memory
+        memory.storage.pop(phone_number, None)
+        
+        return {"status": "ok", "message": "Conversa resetada"}
+    return {"status": "error", "message": "Contato não encontrado"}
+
 @router.post("/{phone_number}/toggle_bot")
 async def toggle_bot(phone_number: str, db: AsyncSession = Depends(get_db)):
     """Alterna o status do bot para este contato"""

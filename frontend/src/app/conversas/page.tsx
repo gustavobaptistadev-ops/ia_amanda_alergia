@@ -1,5 +1,5 @@
 "use client";
-import { Search, Bot, User, CheckCircle2 } from "lucide-react";
+import { Search, Bot, User, CheckCircle2, Trash2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 export default function Conversas() {
@@ -92,6 +92,22 @@ export default function Conversas() {
     }
   };
 
+  const resetConversation = async () => {
+    if (!selectedContact) return;
+    if (window.confirm("Atenção! Isso apagará TODO o histórico de mensagens, resetará o Kanban para Novo Contato e limpará a memória da IA para este número. Continuar?")) {
+      try {
+        await fetch(`${apiUrl}/api/v1/chats/${selectedContact.phone_number}/reset`, {
+          method: "DELETE"
+        });
+        setMessages([]);
+        fetchContacts();
+        setSelectedContact({ ...selectedContact, bot_active: true }); // Assume that backend reset sets bot_active = True
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-6 animate-in fade-in duration-500">
       <div>
@@ -141,22 +157,31 @@ export default function Conversas() {
                     {!selectedContact.bot_active ? "Atendimento Manual (Você)" : "Sendo atendido pela IA"}
                   </p>
                 </div>
-                {selectedContact.bot_active && (
-                  <button 
-                    onClick={toggleBot}
-                    className="text-sm font-medium text-rose-600 bg-rose-50 px-4 py-2 rounded-full hover:bg-rose-100 transition-colors"
+                <div className="flex gap-2">
+                  <button
+                    onClick={resetConversation}
+                    title="Resetar conversa e apagar memória"
+                    className="text-sm font-medium text-slate-400 bg-slate-50 px-3 py-2 rounded-full hover:bg-slate-100 hover:text-red-500 transition-colors flex items-center justify-center"
                   >
-                    Assumir Atendimento
+                    <Trash2 className="w-4 h-4" />
                   </button>
-                )}
-                {!selectedContact.bot_active && (
-                  <button 
-                    onClick={toggleBot}
-                    className="text-sm font-medium text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full hover:bg-emerald-100 transition-colors flex items-center gap-1"
-                  >
-                    <CheckCircle2 className="w-4 h-4" /> Devolver para IA
-                  </button>
-                )}
+                  {selectedContact.bot_active && (
+                    <button 
+                      onClick={toggleBot}
+                      className="text-sm font-medium text-rose-600 bg-rose-50 px-4 py-2 rounded-full hover:bg-rose-100 transition-colors"
+                    >
+                      Assumir Atendimento
+                    </button>
+                  )}
+                  {!selectedContact.bot_active && (
+                    <button 
+                      onClick={toggleBot}
+                      className="text-sm font-medium text-emerald-600 bg-emerald-50 px-4 py-2 rounded-full hover:bg-emerald-100 transition-colors flex items-center gap-1"
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Devolver para IA
+                    </button>
+                  )}
+                </div>
               </div>
               
               <div className="flex-1 p-6 overflow-y-auto space-y-6">
