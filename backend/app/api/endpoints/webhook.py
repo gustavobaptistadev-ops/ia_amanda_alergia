@@ -3,6 +3,7 @@ import logging
 from app.services.evolution_api import send_text_message
 from app.core.orchestrator import process_user_message
 from app.core.guardrails import validar_resposta
+from app.services.db_service import save_message, get_or_create_contact
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -10,8 +11,22 @@ router = APIRouter()
 async def process_and_respond(remote_jid: str, text: str, push_name: str):
     """Executa a lógica pesada de IA e envia a resposta."""
     try:
+        # Salva a mensagem recebida no banco
+        await save_message(remote_jid, text, sender='paciente', name=push_name)
+        
+        from app.api.endpoints.chats import manager
+        await manager.broadcast("update")
+        
+        # Checar se a IA está ativa para este contato
+        contact = await get_or_create_contact(remote_jid, push_name)
+        if not contact.bot_active:
+            print(f">>> [DEBUG] IA ignorou {remote_jid} pois bot_active=False")
+            return
+            
         if text.strip().lower() == "ping":
-            await send_text_message(remote_jid, "Pong! O sistema IA Amanda está online e lendo suas mensagens!")
+            resp = "Pong! O sistema IA Amanda está online e lendo suas mensagens!"
+            await send_text_message(remote_jid, resp)
+            await save_message(remote_jid, resp, sender='ia')
             return
 
         # Chamada ao orquestrador (LangGraph) usando o JID como Thread ID (memória)
@@ -25,6 +40,13 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str):
 
         # Enviar a resposta de volta ao WhatsApp
         await send_text_message(remote_jid, ai_response)
+        
+        # Salva a resposta enviada no banco
+        await save_message(remote_jid, ai_response, sender='ia')
+        
+        # Avisa o frontend via WebSocket
+        from app.api.endpoints.chats import manager
+        await manager.broadcast("update")
 
     except Exception as e:
         print(f">>> [ERROR] Falha ao processar e responder: {e}", flush=True)
