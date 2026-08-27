@@ -1,8 +1,10 @@
 import os
 import datetime
+import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import logging
+from langchain_core.tools import tool
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +18,31 @@ CALENDAR_ID = os.getenv("GOOGLE_CALENDAR_ID", "primary")
 
 def get_calendar_service():
     """Autentica e retorna o serviço da API do Google Calendar."""
-    if not os.path.exists(SERVICE_ACCOUNT_FILE):
-        logger.warning("Arquivo credentials.json não encontrado. Integração com Google Calendar desativada.")
+    creds = None
+    if os.getenv("GOOGLE_CREDENTIALS_JSON"):
+        try:
+            creds_info = json.loads(os.getenv("GOOGLE_CREDENTIALS_JSON"))
+            creds = service_account.Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+        except Exception as e:
+            logger.error(f"Erro ao ler GOOGLE_CREDENTIALS_JSON: {e}")
+    elif os.path.exists(SERVICE_ACCOUNT_FILE):
+        try:
+            creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        except Exception as e:
+            logger.error(f"Erro ao ler credentials.json: {e}")
+            
+    if not creds:
+        logger.warning("Credenciais do Google não encontradas. Integração com Google Calendar operando em modo Simulação.")
         return None
 
     try:
-        creds = service_account.Credentials.from_service_account_file(
-            SERVICE_ACCOUNT_FILE, scopes=SCOPES)
         service = build('calendar', 'v3', credentials=creds)
         return service
     except Exception as e:
         logger.error(f"Erro ao inicializar Google Calendar: {e}")
         return None
 
+@tool
 def check_availability(date_str: str) -> str:
     """
     Checa a disponibilidade na agenda para uma data específica (YYYY-MM-DD).
@@ -74,6 +88,7 @@ def check_availability(date_str: str) -> str:
         logger.error(f"Erro ao consultar disponibilidade: {e}")
         return "Erro ao consultar agenda."
 
+@tool
 def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "") -> str:
     """
     Cria um agendamento na agenda do Google.
