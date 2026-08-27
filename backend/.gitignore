@@ -18,3 +18,8 @@ __pycache__/
 # SO
 .DS_Store
 Thumbs.db
+
+# Credenciais do Google Calendar e outras chaves
+credentials*.json
+token.json
+client_secret*.json

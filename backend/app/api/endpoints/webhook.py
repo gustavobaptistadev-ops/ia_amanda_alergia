@@ -133,15 +133,39 @@ async def process_message(data: dict):
         print(f"Error processing webhook msg: {e}", flush=True)
 
 
+from arq import create_pool
+from arq.connections import RedisSettings
+import os
+import urllib.parse
+
+# Criação do pool global do Redis para o arq
+_redis_pool = None
+
+async def get_redis_pool():
+    global _redis_pool
+    if _redis_pool is None:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        parsed = urllib.parse.urlparse(redis_url)
+        host = parsed.hostname or 'localhost'
+        port = parsed.port or 6379
+        password = parsed.password
+        database = int(parsed.path.replace('/', '')) if parsed.path and parsed.path != '/' else 0
+        redis_settings = RedisSettings(host=host, port=port, password=password, database=database)
+        _redis_pool = await create_pool(redis_settings)
+    return _redis_pool
+
 @router.post("/evolution")
-async def evolution_webhook(request: Request, background_tasks: BackgroundTasks):
+async def evolution_webhook(request: Request):
     """Webhook para receber eventos da EvolutionAPI / Ghosthub."""
     try:
         data = await request.json()
         print(f">>> [DEBUG] Webhook Payload: {data}", flush=True)
         
-        # Processar a mensagem em background para não travar o recebimento do webhook
-        background_tasks.add_task(process_message, data)
+        # Enviar o processamento para a fila do Redis (arq) ao invés da memória RAM local
+        # Isso garante que não vamos perder mensagens se o servidor reiniciar
+        pool = await get_redis_pool()
+        await pool.enqueue_job("process_message_job", data)
+        
         return {"status": "ok"}
     except Exception as e:
         print(f"Erro no webhook: {e}", flush=True)

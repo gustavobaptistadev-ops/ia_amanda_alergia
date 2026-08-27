@@ -107,42 +107,45 @@ workflow.add_conditional_edges(
     "generate_response",
     route_after_generation
 )
-# Após a ferramenta rodar, devolva para a LLM gerar a resposta final com o resultado
-workflow.add_edge("tools", "generate_response")
-
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, AIMessage
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+import os
 
-# Removido: memory = MemorySaver()
-# Compila o grafo SEM checkpointer (memória será injetada manualmente do Postgres)
-app_graph = workflow.compile()
+# Database URL for checkpointer
+db_url = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ia_amanda")
+if "+asyncpg" in db_url:
+    db_url = db_url.replace("+asyncpg", "")
+
+# Configura o Checkpointer do Postgres (Será inicializado na primeira chamada)
+_checkpointer = None
+app_graph = None
+
+async def init_checkpointer():
+    global _checkpointer, app_graph
+    if _checkpointer is None:
+        from psycopg_pool import AsyncConnectionPool
+        # Precisamos de um pool de conexão assíncrono para o AsyncPostgresSaver
+        pool = AsyncConnectionPool(db_url, max_size=10)
+        _checkpointer = AsyncPostgresSaver(pool)
+        await _checkpointer.setup() # Cria as tabelas necessárias no banco
+        
+        # Compila o grafo usando o checkpointer nativo do LangGraph
+        workflow.add_edge("tools", "generate_response")
+        app_graph = workflow.compile(checkpointer=_checkpointer)
 
 async def process_user_message(thread_id: str, message: str) -> str:
-    from app.services.db_service import get_chat_history
+    # Garante que o checkpointer e o grafo estão inicializados
+    if app_graph is None:
+        await init_checkpointer()
+        
+    config = {"configurable": {"thread_id": thread_id}}
     
-    # Busca histórico real do banco de dados (últimas 15 mensagens)
-    db_messages = await get_chat_history(thread_id, limit=15)
+    # Com o checkpointer oficial, não precisamos carregar o histórico manualmente do banco de dados (tabela messages)
+    # O próprio LangGraph vai gerenciar o histórico nas tabelas `checkpoints`!
+    input_state = {"messages": [HumanMessage(content=message)]}
     
-    langchain_messages = []
-    for m in db_messages:
-        if m.sender == 'paciente':
-            # Ignora a última mensagem do banco porque vamos adicioná-la abaixo
-            # Ops, a última já é essa?
-            # O webhook salva a msg do paciente ANTES de chamar process_user_message.
-            # Então a mensagem atual JÁ ESTÁ em db_messages.
-            # Para o LangGraph não processar duplicado, pegamos tudo do banco.
-            langchain_messages.append(HumanMessage(content=m.text))
-        else:
-            langchain_messages.append(AIMessage(content=m.text))
-            
-    # Se por acaso a mensagem atual ainda não foi salva (fallback de segurança)
-    if not langchain_messages or langchain_messages[-1].content != message:
-        langchain_messages.append(HumanMessage(content=message))
+    logger.info(f"LangGraph processando thread {thread_id} com AsyncPostgresSaver.")
     
-    input_state = {"messages": langchain_messages}
-    
-    logger.info(f"LangGraph processando thread {thread_id} puxando {len(langchain_messages)} msgs do Postgres.")
-    
-    # Executa sem 'config' de thread_id, já que não usamos checkpointer interno
-    final_state = await app_graph.ainvoke(input_state)
+    final_state = await app_graph.ainvoke(input_state, config=config)
     
     return final_state['messages'][-1].content

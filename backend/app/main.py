@@ -9,10 +9,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Inicializar as tabelas do banco de dados no startup
-    logger.info("Criando tabelas no banco de dados...")
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # As tabelas agora são gerenciadas via Alembic
+    logger.info("Iniciando aplicação (Migrações via Alembic)...")
     yield
     # Cleanup se necessário
 
