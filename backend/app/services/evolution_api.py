@@ -20,30 +20,51 @@ def get_headers():
     }
 
 async def auto_create_instance():
-    """Tenta criar a instância na inicialização usando a Global Key."""
-    url = f"{EVOLUTION_API_URL}/instance/create"
-    headers = {
-        "apikey": EVOLUTION_GLOBAL_KEY,
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "name": EVOLUTION_INSTANCE_NAME,
-        "token": EVOLUTION_API_KEY,
-        "qrcode": True
-    }
+    """Tenta criar a instância na inicialização usando a Global Key, para todos os tenants no banco."""
+    from app.database import AsyncSessionLocal
+    from app.models.tenant import Tenant
+    from sqlalchemy import select
     
+    url = f"{EVOLUTION_API_URL}/instance/create"
+    
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Tenant).where(Tenant.is_active == True))
+        tenants = result.scalars().all()
+        
+        # Fallback de retrocompatibilidade (para o bot ia_amanda inicial se a tabela estiver vazia)
+        if not tenants:
+            logger.info("Nenhum tenant encontrado no banco. Criando tenant padrão.")
+            default_tenant = Tenant(
+                name="Clínica Alergia Matriz",
+                instance_name=EVOLUTION_INSTANCE_NAME,
+                instance_token=EVOLUTION_API_KEY
+            )
+            db.add(default_tenant)
+            await db.commit()
+            tenants = [default_tenant]
+            
     async with httpx.AsyncClient() as client:
-        try:
-            logger.info(f"Verificando/Criando instância '{EVOLUTION_INSTANCE_NAME}' via Global Key...")
-            res = await client.post(url, headers=headers, json=payload)
-            if res.status_code == 200:
-                logger.info(f"Instância '{EVOLUTION_INSTANCE_NAME}' criada com sucesso!")
-            elif res.status_code == 500 and "already exists" in res.text.lower():
-                logger.info(f"Instância '{EVOLUTION_INSTANCE_NAME}' já existe. Usando a existente.")
-            else:
-                logger.warning(f"Aviso ao criar instância: {res.status_code} - {res.text}")
-        except Exception as e:
-            logger.error(f"Erro ao tentar criar instância automaticamente: {e}")
+        for tenant in tenants:
+            headers = {
+                "apikey": EVOLUTION_GLOBAL_KEY,
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "name": tenant.instance_name,
+                "token": tenant.instance_token,
+                "qrcode": True
+            }
+            try:
+                logger.info(f"Verificando/Criando instância '{tenant.instance_name}' via Global Key...")
+                res = await client.post(url, headers=headers, json=payload)
+                if res.status_code == 200:
+                    logger.info(f"Instância '{tenant.instance_name}' criada com sucesso!")
+                elif res.status_code == 500 and "already exists" in res.text.lower():
+                    logger.info(f"Instância '{tenant.instance_name}' já existe. Usando a existente.")
+                else:
+                    logger.warning(f"Aviso ao criar instância: {res.status_code} - {res.text}")
+            except Exception as e:
+                logger.error(f"Erro ao tentar criar instância '{tenant.instance_name}': {e}")
 
 async def send_text_message(number: str, text: str):
     """Envia uma mensagem de texto via EvolutionAPI."""

@@ -26,10 +26,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+import os
+frontend_url = os.getenv("NEXT_PUBLIC_FRONTEND_URL", "https://ia-amanda-frontend.up.railway.app")
+
 # Configuração de CORS para o painel de controle (Next.js)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Na produção, substituir pelo domínio do frontend
+    allow_origins=[frontend_url, "http://localhost:3000"], # Restrito por segurança (Etapa 1)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

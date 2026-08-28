@@ -8,12 +8,15 @@ class Contact(Base):
     __tablename__ = "contacts"
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, ForeignKey("tenants.id"), index=True, nullable=True) # nullable temporariamente para não quebrar dados antigos
     phone_number = Column(String, unique=True, index=True, nullable=False) # The JID
     name = Column(String, nullable=True)
     bot_active = Column(Boolean, default=True) # Se a IA deve responder automaticamente
     stage = Column(String, default="novo_contato") # 'novo_contato', 'em_andamento', 'agendado'
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    tenant = relationship("Tenant")
 
     messages = relationship("Message", back_populates="contact", cascade="all, delete-orphan")
 
