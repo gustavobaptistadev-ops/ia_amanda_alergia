@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.api_router import api_router
 from app.database import engine, Base
 import logging
+from app.services.evolution_api import auto_create_instance
 from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
@@ -11,6 +12,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # As tabelas agora são gerenciadas via Alembic
     logger.info("Iniciando aplicação (Migrações via Alembic)...")
+    
+    # Auto-create the instance in Evolution GO using the Global Key
+    await auto_create_instance()
+    
     yield
     # Cleanup se necessário
 
