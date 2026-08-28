@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 async def process_and_respond(remote_jid: str, text: str, push_name: str):
-    "\""Executa a logica pesada de IA e envia a resposta."\""
+    """Executa a logica pesada de IA e envia a resposta."""
     try:
         await save_message(remote_jid, text, sender='paciente', name=push_name)
         
@@ -41,7 +41,7 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str):
         print(f">>> [ERROR] Falha ao processar e responder: {e}", flush=True)
 
 async def process_message(data: dict):
-    "\""Extrai os dados da mensagem do payload Ghosthub e aciona o process_and_respond"\""
+    """Extrai os dados da mensagem do payload Ghosthub e aciona o process_and_respond"""
     event_type = data.get("event")
     
     if event_type != "messages.upsert" and event_type != "Message":

@@ -35,7 +35,7 @@ async def get_redis_pool():
 
 @router.post("/evolution")
 async def evolution_webhook(request: Request, token: str = Security(verify_webhook_token)):
-    "\""Webhook para receber eventos da EvolutionAPI / Ghosthub."\""
+    """Webhook para receber eventos da EvolutionAPI / Ghosthub."""
     try:
         data = await request.json()
         print(f">>> [DEBUG] Webhook Payload: {data}", flush=True)
