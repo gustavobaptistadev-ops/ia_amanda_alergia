@@ -37,4 +37,7 @@ class WorkerSettings:
     redis_settings = redis_settings
     # Quantidade de jobs simultâneos
     max_jobs = 10
+    # Políticas de Retry e Timeout para falhas de LLM / Rede
+    max_tries = 3
+    job_timeout = 300
     # Opcional: configurar startup e shutdown callbacks se necessário

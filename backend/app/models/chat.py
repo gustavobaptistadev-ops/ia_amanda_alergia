@@ -21,7 +21,7 @@ class Message(Base):
     __tablename__ = "messages"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    contact_id = Column(String, ForeignKey("contacts.id"), nullable=False)
+    contact_id = Column(String, ForeignKey("contacts.id"), index=True, nullable=False)
     text = Column(Text, nullable=False)
     sender = Column(String, nullable=False) # 'paciente', 'ia', 'humano'
     created_at = Column(DateTime, default=datetime.utcnow)
