@@ -2,7 +2,7 @@ import os
 import logging
 from typing import TypedDict, Annotated, Sequence, Literal
 from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, RemoveMessage
 from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import AMANDA_PERSONA_PROMPT
@@ -81,12 +81,21 @@ def generate_response_node(state: AgentState):
     response = llm_with_tools.invoke(conversation)
     return {"messages": [response]}
 
-def route_after_generation(state: AgentState) -> Literal["tools", "__end__"]:
-    """Se a LLM chamou uma tool, vá para o nó de tools. Caso contrário, fim."""
+def route_after_generation(state: AgentState) -> Literal["tools", "prune_history"]:
+    """Se a LLM chamou uma tool, vá para o nó de tools. Caso contrário, vá para poda do histórico."""
     last_message = state['messages'][-1]
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
         return "tools"
-    return "__end__"
+    return "prune_history"
+
+def prune_history_node(state: AgentState):
+    """Nó 4: Poda o histórico antigo (mantém as últimas 10 mensagens) para evitar estouro da janela de contexto."""
+    messages = state['messages']
+    if len(messages) > 10:
+        # Pega todas as mensagens antigas, deixando apenas as 10 mais recentes
+        messages_to_remove = messages[:-10]
+        return {"messages": [RemoveMessage(id=m.id) for m in messages_to_remove if m.id is not None]}
+    return {}
 
 # Montagem do Grafo Avançado
 workflow = StateGraph(AgentState)
@@ -97,6 +106,7 @@ workflow.add_node("fetch_context", fetch_context_node)
 workflow.add_node("schedule_flow", schedule_flow_node)
 workflow.add_node("generate_response", generate_response_node)
 workflow.add_node("tools", tool_node)
+workflow.add_node("prune_history", prune_history_node)
 
 workflow.add_edge(START, "extract_intent")
 workflow.add_conditional_edges("extract_intent", route_intent)
@@ -107,6 +117,8 @@ workflow.add_conditional_edges(
     "generate_response",
     route_after_generation
 )
+workflow.add_edge("prune_history", END)
+
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, AIMessage
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 import os

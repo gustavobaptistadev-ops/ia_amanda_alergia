@@ -37,6 +37,10 @@ def ingest_docs(file_path: str):
     
     logger.info(f"Ingerindo {len(docs)} fragmentos (chunks) no PostgreSQL (pgvector)...")
     
+    # Previne duplicidade limpando a coleção antes de inserir os novos
+    store = get_vectorstore()
+    store.delete_collection()
+    
     PGVector.from_documents(
         embedding=get_embeddings(),
         documents=docs,
