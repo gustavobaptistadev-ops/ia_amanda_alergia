@@ -1,4 +1,6 @@
 "use client";
+import { fetchWithAuth } from '../../lib/api';
+
 import { QrCode, Smartphone, RefreshCw, Key, CheckCircle2, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import Image from "next/image";
@@ -14,7 +16,7 @@ export default function Configuracoes() {
     setErrorMsg(null);
     try {
       // Verifica o status
-      const statusRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/status`);
+      const statusRes = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/status`);
       if (statusRes.ok) {
         const statusData = await statusRes.json();
         const state = statusData.state || statusData.instance?.state || statusData.instance?.status;
@@ -28,7 +30,7 @@ export default function Configuracoes() {
       }
 
       // Se não está conectado, busca o QR Code
-      const qrRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/qr`);
+      const qrRes = await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/qr`);
       if (qrRes.ok) {
         const qrData = await qrRes.json();
         if (qrData.error) {
@@ -86,7 +88,7 @@ export default function Configuracoes() {
                     if (!confirm("Reiniciar a conexão?")) return;
                     setLoading(true);
                     try {
-                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/reconnect`, { method: "POST" });
+                      await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/reconnect`, { method: "POST" });
                       setTimeout(() => fetchStatusAndQr(), 3000);
                     } catch (e) {
                       alert("Erro ao reiniciar.");
@@ -105,7 +107,7 @@ export default function Configuracoes() {
                     if (!confirm("Desconectar o WhatsApp?")) return;
                     setLoading(true);
                     try {
-                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/logout`, { method: "DELETE" });
+                      await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/logout`, { method: "DELETE" });
                       setTimeout(() => fetchStatusAndQr(), 2000);
                     } catch (e) {
                       alert("Erro ao desconectar.");
@@ -155,7 +157,7 @@ export default function Configuracoes() {
                     if (!confirm("Reiniciar a conexão na provedora?")) return;
                     setLoading(true);
                     try {
-                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/reconnect`, { method: "POST" });
+                      await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/reconnect`, { method: "POST" });
                       setTimeout(() => fetchStatusAndQr(), 3000);
                     } catch (e) {
                       alert("Erro ao reiniciar.");
@@ -174,7 +176,7 @@ export default function Configuracoes() {
                     if (!confirm("Desconectar o WhatsApp?")) return;
                     setLoading(true);
                     try {
-                      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/logout`, { method: "DELETE" });
+                      await fetchWithAuth(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/v1/evolution/logout`, { method: "DELETE" });
                       setTimeout(() => fetchStatusAndQr(), 2000);
                     } catch (e) {
                       alert("Erro ao desconectar.");

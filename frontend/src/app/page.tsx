@@ -1,4 +1,6 @@
 "use client";
+import { fetchWithAuth } from '../lib/api';
+
 import { Users, Calendar, MessageCircle, ArrowUpRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -7,7 +9,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    fetch(`${apiUrl}/api/v1/dashboard/stats`)
+    fetchWithAuth(`${apiUrl}/api/v1/dashboard/stats`)
       .then(res => res.json())
       .then((json) => setData(json))
       .catch((err) => console.error("Erro ao buscar dados da API:", err));

@@ -1,4 +1,6 @@
 "use client";
+import { fetchWithAuth } from '../../lib/api';
+
 import { Database, Save, Loader2, FileText, CheckCircle2 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -12,7 +14,7 @@ export default function Conhecimento() {
     const fetchRag = async () => {
       try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-        const res = await fetch(`${apiUrl}/api/v1/rag/`);
+        const res = await fetchWithAuth(`${apiUrl}/api/v1/rag/`);
         if (res.ok) {
           const data = await res.json();
           setContent(data.content);
@@ -31,7 +33,7 @@ export default function Conhecimento() {
     setSuccess(false);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-      const res = await fetch(`${apiUrl}/api/v1/rag/`, {
+      const res = await fetchWithAuth(`${apiUrl}/api/v1/rag/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

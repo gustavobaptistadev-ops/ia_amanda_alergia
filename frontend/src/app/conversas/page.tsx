@@ -1,4 +1,6 @@
 "use client";
+import { fetchWithAuth } from '../../lib/api';
+
 import { Search, Bot, User, CheckCircle2, Trash2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -15,7 +17,7 @@ export default function Conversas() {
   // Fetch initial data
   const fetchContacts = async () => {
     try {
-      const res = await fetch(`${apiUrl}/api/v1/chats/`);
+      const res = await fetchWithAuth(`${apiUrl}/api/v1/chats/`);
       const data = await res.json();
       setContacts(data);
     } catch (e) {
@@ -25,7 +27,7 @@ export default function Conversas() {
 
   const fetchMessages = async (phone: string) => {
     try {
-      const res = await fetch(`${apiUrl}/api/v1/chats/${phone}/messages`);
+      const res = await fetchWithAuth(`${apiUrl}/api/v1/chats/${phone}/messages`);
       const data = await res.json();
       setMessages(data);
     } catch (e) {
@@ -66,7 +68,7 @@ export default function Conversas() {
   const toggleBot = async () => {
     if (!selectedContact) return;
     try {
-      const res = await fetch(`${apiUrl}/api/v1/chats/${selectedContact.phone_number}/toggle_bot`, {
+      const res = await fetchWithAuth(`${apiUrl}/api/v1/chats/${selectedContact.phone_number}/toggle_bot`, {
         method: "POST"
       });
       const data = await res.json();
@@ -80,7 +82,7 @@ export default function Conversas() {
   const sendMessage = async () => {
     if (!inputText.trim() || !selectedContact) return;
     try {
-      await fetch(`${apiUrl}/api/v1/chats/${selectedContact.phone_number}/send`, {
+      await fetchWithAuth(`${apiUrl}/api/v1/chats/${selectedContact.phone_number}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: inputText })
@@ -96,7 +98,7 @@ export default function Conversas() {
     if (!selectedContact) return;
     if (window.confirm("Atenção! Isso apagará TODO o histórico de mensagens, resetará o Kanban para Novo Contato e limpará a memória da IA para este número. Continuar?")) {
       try {
-        await fetch(`${apiUrl}/api/v1/chats/${selectedContact.phone_number}/reset`, {
+        await fetchWithAuth(`${apiUrl}/api/v1/chats/${selectedContact.phone_number}/reset`, {
           method: "DELETE"
         });
         setMessages([]);

@@ -1,4 +1,6 @@
 "use client";
+import { fetchWithAuth } from '../../lib/api';
+
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -13,7 +15,7 @@ export default function Kanban() {
 
   useEffect(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    fetch(`${apiUrl}/api/v1/dashboard/kanban`)
+    fetchWithAuth(`${apiUrl}/api/v1/dashboard/kanban`)
       .then((res) => res.json())
       .then((data) => setColumns(data))
       .catch((err) => console.error("Erro ao carregar kanban:", err));
