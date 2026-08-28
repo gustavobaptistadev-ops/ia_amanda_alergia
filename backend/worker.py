@@ -16,7 +16,7 @@ logger = logging.getLogger("worker")
 async def process_message_job(ctx, data: dict):
     logger.info(f"Worker recebeu job de webhook. Iniciando processamento...")
     # Importar aqui para evitar circular imports e garantir que carrega pós-fork
-    from app.api.endpoints.webhook import process_message
+    from app.services.message_processor import process_message
     await process_message(data)
     logger.info("Worker finalizou o job.")
 
