@@ -4,26 +4,35 @@ from app.core.guardrails import validar_resposta
 from app.services.db_service import save_message, get_or_create_contact
 import logging
 
+import asyncio
+
 logger = logging.getLogger(__name__)
 
+# Lock sequencial por contato para prevenir race conditions de mensagens rápidas
+_patient_locks = {}
+
 async def process_and_respond(remote_jid: str, text: str, push_name: str, is_audio: bool = False):
-    """Executa a logica pesada de IA e envia a resposta."""
-    try:
-        await save_message(remote_jid, text, sender='paciente', name=push_name)
-        
-        from app.api.endpoints.chats import manager
-        await manager.broadcast("update")
-        
-        contact = await get_or_create_contact(remote_jid, push_name)
-        if not contact.bot_active:
-            print(f">>> [DEBUG] IA ignorou {remote_jid} pois bot_active=False")
-            return
+    """Executa a logica pesada de IA e envia a resposta de forma estritamente sequencial."""
+    if remote_jid not in _patient_locks:
+        _patient_locks[remote_jid] = asyncio.Lock()
+
+    async with _patient_locks[remote_jid]:
+        try:
+            await save_message(remote_jid, text, sender='paciente', name=push_name)
             
-        if text.strip().lower() == "ping":
-            resp = "Pong! O sistema IA Amanda esto online e lendo suas mensagens!"
-            await send_text_message(remote_jid, resp)
-            await save_message(remote_jid, resp, sender='ia')
-            return
+            from app.api.endpoints.chats import manager
+            await manager.broadcast("update")
+            
+            contact = await get_or_create_contact(remote_jid, push_name)
+            if not contact.bot_active:
+                print(f">>> [DEBUG] IA ignorou {remote_jid} pois bot_active=False")
+                return
+                
+            if text.strip().lower() == "ping":
+                resp = "Pong! O sistema IA Amanda esto online e lendo suas mensagens!"
+                await send_text_message(remote_jid, resp)
+                await save_message(remote_jid, resp, sender='ia')
+                return
 
         ai_response = await process_user_message(thread_id=remote_jid, message=text)
         is_safe = validar_resposta(ai_response)
