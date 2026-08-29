@@ -143,29 +143,36 @@ async def get_base64_from_media(message_id: str, remote_jid: str = "", message_o
         f"{EVOLUTION_API_URL}/messages/getBase64"
     ]
     
-    payload = {
-        "message": {
-            "key": {
-                "id": message_id,
-                "remoteJid": remote_jid
-            }
+    payloads = [
+        {
+            "message": {
+                "key": {
+                    "id": message_id,
+                    "remoteJid": remote_jid
+                }
+            },
+            "convertToMp4": False
         },
-        "convertToMp4": False
-    }
+        {
+            "id": message_id,
+            "remoteJid": remote_jid
+        }
+    ]
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         for url in endpoints:
-            try:
-                res = await client.post(url, json=payload, headers=headers)
-                if res.status_code == 200:
-                    data = res.json()
-                    b64_str = data.get("base64") or data.get("media") or data.get("data") or ""
-                    if b64_str:
-                        if "," in b64_str:
-                            b64_str = b64_str.split(",")[1]
-                        logger.info(f"Mídia recuperada com sucesso via {url}")
-                        return base64.b64decode(b64_str)
-            except Exception as e:
-                logger.warning(f"Tentativa de busca de áudio falhou em {url}: {e}")
+            for p in payloads:
+                try:
+                    res = await client.post(url, json=p, headers=headers)
+                    if res.status_code == 200:
+                        data = res.json()
+                        b64_str = data.get("base64") or data.get("media") or data.get("data") or ""
+                        if b64_str:
+                            if "," in b64_str:
+                                b64_str = b64_str.split(",")[1]
+                            logger.info(f"Mídia recuperada e descriptografada com sucesso via {url}")
+                            return base64.b64decode(b64_str)
+                except Exception as e:
+                    pass
 
     return None

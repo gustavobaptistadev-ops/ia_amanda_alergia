@@ -158,36 +158,31 @@ async def process_message(data: dict):
                 audio_data = msg_obj.get("audioMessage") or msg_obj.get("pttMessage") or msg_obj
                 raw_audio = None
                 
-                if isinstance(audio_data, dict):
-                    # Tenta todas as variações de chaves de base64
-                    b64_val = audio_data.get("base64") or audio_data.get("Base64") or audio_data.get("media") or ""
-                    url_val = audio_data.get("URL") or audio_data.get("url") or audio_data.get("file") or audio_data.get("directPath") or ""
+                # 1. Primeiro checa se o payload já trouxe o base64 descompactado
+                b64_val = audio_data.get("base64") or audio_data.get("Base64") or audio_data.get("media") if isinstance(audio_data, dict) else ""
+                if b64_val:
+                    if "," in b64_val:
+                        b64_val = b64_val.split(",")[1]
+                    raw_audio = base64.b64decode(b64_val)
 
-                    if b64_val:
-                        raw_audio = base64.b64decode(b64_val)
-                    elif url_val:
-                        if url_val.startswith("http"):
-                            raw_audio = await download_audio_from_url(url_val)
-                        elif url_val.startswith("data:audio"):
-                            raw_audio = await download_audio_from_url(url_val)
-                        else:
-                            try:
-                                raw_audio = base64.b64decode(url_val)
-                            except Exception:
-                                pass
-                elif isinstance(audio_data, str) and (audio_data.startswith("http") or audio_data.startswith("data:audio")):
-                    raw_audio = await download_audio_from_url(audio_data)
-
+                # 2. Se não veio base64, busca diretamente na Evolution/Ghosthub pelo Message ID (que descriptografa o .enc)
                 if not raw_audio:
                     msg_id = info.get("Id") or info.get("ID") or info.get("id") or ""
                     if msg_id:
                         from app.services.evolution_api import get_base64_from_media
+                        logger.info(f"Buscando áudio descriptografado para msg_id {msg_id} na Evolution/Ghosthub...")
                         raw_audio = await get_base64_from_media(msg_id, remote_jid)
+
+                # 3. Fallback: Se for URL pública não-criptografada (não termina em .enc)
+                if not raw_audio and isinstance(audio_data, dict):
+                    url_val = audio_data.get("URL") or audio_data.get("url") or audio_data.get("file") or ""
+                    if url_val and not ".enc" in url_val:
+                        raw_audio = await download_audio_from_url(url_val)
 
                 if raw_audio:
                     text = await transcribe_audio_from_base64_or_url(raw_audio)
                 else:
-                    logger.warning(f"Não foi possível obter os bytes do áudio no payload (Message): {audio_data}")
+                    logger.warning(f"Não foi possível obter os bytes descriptografados do áudio: {audio_data}")
 
         if from_me:
              return
