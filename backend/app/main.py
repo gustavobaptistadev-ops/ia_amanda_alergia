@@ -7,6 +7,11 @@ from app.services.evolution_api import auto_create_instance
 from contextlib import asynccontextmanager
 
 from app.core.limiter import limiter, RateLimitExceeded, _rate_limit_exceeded_handler
+from app.core.logger_filter import PIIMaskingFilter
+
+logging.basicConfig(level=logging.INFO)
+for handler in logging.getLogger().handlers:
+    handler.addFilter(PIIMaskingFilter())
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +47,7 @@ app.add_middleware(
         "https://tranquil-encouragement-production-52cf.up.railway.app"
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
     allow_headers=["*"],
 )
 
@@ -51,13 +56,23 @@ from starlette.responses import Response
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    """Injeta headers de segurança bancária em todas as respostas HTTP."""
+    """Injeta headers de segurança nível bancário/militar em todas as respostas HTTP."""
     response: Response = await call_next(request)
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https: blob:; "
+        "connect-src 'self' https: wss: ws:; "
+        "font-src 'self' data: https:; "
+        "frame-ancestors 'none';"
+    )
     return response
 
 @app.get("/")

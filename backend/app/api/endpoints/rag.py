@@ -16,9 +16,11 @@ router = APIRouter()
 KNOWLEDGE_DIR = os.path.join(os.path.dirname(__file__), '../../../docs/knowledge_base')
 os.makedirs(KNOWLEDGE_DIR, exist_ok=True)
 
+from pydantic import BaseModel, Field
+
 class RagData(BaseModel):
-    filename: str
-    content: str
+    filename: str = Field(..., max_length=100)
+    content: str = Field(..., max_length=500_000) # Máximo 500 KB por documento RAG
 
 @router.get("/")
 async def list_rag_files():
