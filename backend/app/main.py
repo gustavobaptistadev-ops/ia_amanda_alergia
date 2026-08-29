@@ -32,7 +32,11 @@ frontend_url = os.getenv("NEXT_PUBLIC_FRONTEND_URL", "https://ia-amanda-frontend
 # Configuração de CORS para o painel de controle (Next.js)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url, "http://localhost:3000"], # Restrito por segurança (Etapa 1)
+    allow_origins=[
+        frontend_url, 
+        "http://localhost:3000",
+        "https://tranquil-encouragement-production-52cf.up.railway.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
