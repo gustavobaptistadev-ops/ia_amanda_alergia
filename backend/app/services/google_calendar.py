@@ -120,7 +120,7 @@ def check_availability(date_str: str) -> str:
         return "Erro ao consultar agenda."
 
 @tool
-def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "") -> str:
+def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "", cpf: str = "", dob: str = "") -> str:
     """
     Cria um agendamento na agenda do Google.
     """
@@ -132,10 +132,16 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
         # Criando datetime de inicio e fim (duração de 1 hora)
         start_dt = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         end_dt = start_dt + datetime.timedelta(hours=1)
+        
+        desc = f"Telefone: {phone}"
+        if cpf:
+            desc += f"\nCPF: {cpf}"
+        if dob:
+            desc += f"\nData de Nascimento: {dob}"
 
         event = {
             'summary': f'Consulta - {patient_name}',
-            'description': f'Telefone: {phone}',
+            'description': desc,
             'start': {
                 'dateTime': start_dt.isoformat(),
                 'timeZone': 'America/Sao_Paulo',
