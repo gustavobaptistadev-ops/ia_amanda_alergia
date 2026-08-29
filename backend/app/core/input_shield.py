@@ -1,4 +1,4 @@
-﻿import re
+import re
 import base64
 import unicodedata
 import logging
@@ -72,20 +72,35 @@ def detect_adversarial_attempt(text: str) -> bool:
             
     return False
 
+def mask_sensitive_financial_data(text: str) -> str:
+    """Filtro DLP (Data Loss Prevention): Mascara cartões de crédito e senhas digitados no chat."""
+    if not text:
+        return ""
+    # Mascara números de cartão de crédito (13 a 19 dígitos formatados ou contínuos)
+    cc_pattern = r"\b(?:\d[ -]*?){13,19}\b"
+    text = re.sub(cc_pattern, "[DADO FINANCEIRO MASCARADO]", text)
+    # Mascara senhas explícitas enviadas (ex: senha: 1234, password: abc)
+    pwd_pattern = r"(?i)\b(senha|password|cvv|cvc)\s*[:=]\s*\S+"
+    text = re.sub(pwd_pattern, r"\1: [SUPRIMIDO POR SEGURANÇA]", text)
+    return text
+
 def sanitize_and_wrap_user_input(text: str, max_chars: int = 1500) -> str:
     """
     Envelopa o input do paciente dentro de tags delimitadoras seguras XML (<user_message>),
-    limitando o comprimento máximo a 1500 caracteres (Anti-Token Flooding)
-    e neutralizando tentativas de injeção de delimitadores de sistema.
+    limitando o comprimento máximo a 1500 caracteres (Anti-Token Flooding),
+    mascarando dados financeiros (DLP) e neutralizando tentativas de injeção de delimitadores.
     """
     if not text:
         return ""
 
-    # Trava de tamanho máximo contra DDoS Semântico
+    # 1. Trava de tamanho máximo contra DDoS Semântico
     truncated = text[:max_chars].strip()
 
-    # Neutraliza falsas tags de sistema que o usuário possa ter digitado
-    sanitized = truncated.replace("<system>", "&lt;system&gt;").replace("</system>", "&lt;/system&gt;")
+    # 2. Mascaramento DLP de Dados Financeiros
+    safe_text = mask_sensitive_financial_data(truncated)
+
+    # 3. Neutraliza falsas tags de sistema que o usuário possa ter digitado
+    sanitized = safe_text.replace("<system>", "&lt;system&gt;").replace("</system>", "&lt;/system&gt;")
     sanitized = sanitized.replace("[INST]", "").replace("[/INST]", "")
     sanitized = sanitized.replace("### System:", "").replace("--- BEGIN SYSTEM ---", "")
 

@@ -49,11 +49,23 @@ def ingest_docs(file_path: str):
     )
     logger.info("Ingestão concluída com sucesso.")
 
+def sanitize_rag_chunk(text: str) -> str:
+    """Higieniza fragmentos recuperados da base para impedir injeções indiretas de prompt."""
+    if not text:
+        return ""
+    import re
+    # Remove comandos de sistema e tags maliciosas que possam ter sido injetadas em arquivos .md
+    clean = re.sub(r"(?i)\[system\]|\<system\>|\#\#\#\s*system|\[inst\]", "", text)
+    clean = re.sub(r"(?i)\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b", "", clean)
+    clean = re.sub(r"(?i)\besque[cç]a\s+(todas\s+as\s+)?regras\b", "", clean)
+    return clean.strip()
+
 def retrieve_context(query: str) -> str:
-    """Busca o contexto mais relevante para a pergunta."""
+    """Busca o contexto mais relevante para a pergunta aplicando filtro defensivo Zero-Trust."""
     store = get_vectorstore()
     retriever = store.as_retriever(search_kwargs={"k": 3})
     docs = retriever.invoke(query)
     
-    context = "\n\n".join([doc.page_content for doc in docs])
+    clean_chunks = [sanitize_rag_chunk(doc.page_content) for doc in docs if doc.page_content]
+    context = "\n\n".join(clean_chunks)
     return context

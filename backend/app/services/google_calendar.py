@@ -126,9 +126,12 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
     """
     from app.core.validators import validate_cpf, sanitize_text
 
-    # 1. Validação Algorítmica de Segurança do CPF
-    if cpf and not validate_cpf(cpf):
-        return f"Atenção: O CPF '{cpf}' informado é inválido de acordo com a validação oficial. Por favor, solicite ao paciente que confirme os 11 dígitos corretos do CPF."
+    # 1. Trava Zero-Trust: Obrigatoriedade de Nome e CPF Válido
+    if not patient_name or len(patient_name.strip()) < 3:
+        return "Erro de validação: O nome completo do paciente é obrigatório para agendamento. Por favor, solicite o nome completo."
+
+    if not cpf or not validate_cpf(cpf):
+        return f"Erro de validação de segurança: O CPF '{cpf or 'não informado'}' é inválido. É obrigatório coletar e validar o CPF oficial do paciente antes de registrar a consulta na agenda médica."
 
     # 2. Sanitização Estrita de Inputs (Anti-Injection)
     patient_name = sanitize_text(patient_name, max_length=100)
