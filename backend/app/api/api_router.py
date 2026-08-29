@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.api.endpoints import webhook, dashboard, evolution, chats, rag, settings, auth, analytics
+from app.api.endpoints import webhook, dashboard, evolution, chats, rag, settings, auth, analytics, appointments
 from app.core.security import get_api_key
 
 api_router = APIRouter()
@@ -11,6 +11,7 @@ api_router.include_router(auth.router, prefix="/auth", tags=["Autenticação & R
 # Demais rotas protegidas pelo INTERNAL_API_KEY
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"], dependencies=[Depends(get_api_key)])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics de Saúde"], dependencies=[Depends(get_api_key)])
+api_router.include_router(appointments.router, prefix="/appointments", tags=["Agenda Médica"], dependencies=[Depends(get_api_key)])
 api_router.include_router(evolution.router, prefix="/evolution", tags=["Evolution API"], dependencies=[Depends(get_api_key)])
 api_router.include_router(chats.router, prefix="/chats", tags=["Chats Omnichannel"], dependencies=[Depends(get_api_key)])
 api_router.include_router(rag.router, prefix="/rag", tags=["RAG (Base de Conhecimento)"], dependencies=[Depends(get_api_key)])

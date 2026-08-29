@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, MessageSquare, Settings, Activity, Database } from "lucide-react";
+import { LayoutDashboard, Users, MessageSquare, Settings, Activity, Database, Calendar } from "lucide-react";
 import clsx from "clsx";
 
 export default function Sidebar() {
@@ -10,6 +10,7 @@ export default function Sidebar() {
 
   const menus = [
     { name: "Dashboard", href: "/", icon: LayoutDashboard },
+    { name: "Agenda Médica", href: "/agenda", icon: Calendar },
     { name: "Pacientes", href: "/kanban", icon: Users },
     { name: "Conversas", href: "/conversas", icon: MessageSquare },
     { name: "Conhecimento", href: "/conhecimento", icon: Database },
