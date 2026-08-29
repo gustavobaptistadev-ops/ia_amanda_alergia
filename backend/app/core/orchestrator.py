@@ -136,10 +136,19 @@ async def init_checkpointer():
     global _checkpointer, app_graph
     if _checkpointer is None:
         from psycopg_pool import AsyncConnectionPool
-        # Precisamos de um pool de conexão assíncrono para o AsyncPostgresSaver
-        pool = AsyncConnectionPool(db_url, max_size=10)
+        import psycopg
+        
+        # Cria as tabelas necessárias no banco usando uma conexão com autocommit=True 
+        # para evitar o erro "CREATE INDEX CONCURRENTLY cannot run inside a transaction block"
+        async with await psycopg.AsyncConnection.connect(db_url, autocommit=True) as conn:
+            temp_saver = AsyncPostgresSaver(conn)
+            await temp_saver.setup()
+            
+        # Agora inicializa o pool e o checkpointer final
+        pool = AsyncConnectionPool(db_url, max_size=10, open=False)
+        await pool.open()
+        
         _checkpointer = AsyncPostgresSaver(pool)
-        await _checkpointer.setup() # Cria as tabelas necessárias no banco
         
         # Compila o grafo usando o checkpointer nativo do LangGraph
         workflow.add_edge("tools", "generate_response")
