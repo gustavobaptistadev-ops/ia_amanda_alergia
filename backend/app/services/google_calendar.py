@@ -122,8 +122,20 @@ def check_availability(date_str: str) -> str:
 @tool
 def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "", cpf: str = "", dob: str = "") -> str:
     """
-    Cria um agendamento na agenda do Google.
+    Cria um agendamento na agenda do Google com validação estrita de dados e idempotência.
     """
+    from app.core.validators import validate_cpf, sanitize_text
+
+    # 1. Validação Algorítmica de Segurança do CPF
+    if cpf and not validate_cpf(cpf):
+        return f"Atenção: O CPF '{cpf}' informado é inválido de acordo com a validação oficial. Por favor, solicite ao paciente que confirme os 11 dígitos corretos do CPF."
+
+    # 2. Sanitização Estrita de Inputs (Anti-Injection)
+    patient_name = sanitize_text(patient_name, max_length=100)
+    phone = sanitize_text(phone, max_length=30)
+    cpf = sanitize_text(cpf, max_length=20)
+    dob = sanitize_text(dob, max_length=20)
+
     service = get_calendar_service()
     if not service:
         return f"Agendamento de {patient_name} confirmado para {date_str} às {time_str} (Modo Simulação)"
@@ -154,7 +166,7 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
 
         created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
         
-        # Atualizar a fase do Kanban para agendado e salvar Appointment
+        # Atualizar a fase do Kanban para agendado e salvar Appointment (com idempotência)
         if phone:
             from app.database import AsyncSessionLocal
             from app.models.chat import Contact, Appointment
@@ -163,23 +175,27 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
             
             async def update_stage_and_save_appointment():
                 async with AsyncSessionLocal() as session:
-                    # O JID geralmente vem como DDI+DDD+numero@s.whatsapp.net. 
-                    # Como o 'phone' pode ser só o número ou o JID, procuramos com 'like' ou exato.
                     stmt = select(Contact).where(Contact.phone_number.contains(phone))
                     result = await session.execute(stmt)
                     contact = result.scalars().first()
                     if contact:
                         contact.stage = "agendado"
                         
-                        # Salva o agendamento no banco de dados para os lembretes automáticos
-                        new_appt = Appointment(
-                            contact_id=contact.id,
-                            patient_name=patient_name,
-                            appointment_time=start_dt,
-                            status="agendado"
+                        # Idempotência: Checa se já não existe consulta no mesmo horário para este contato
+                        existing_stmt = select(Appointment).where(
+                            Appointment.contact_id == contact.id,
+                            Appointment.appointment_time == start_dt
                         )
-                        session.add(new_appt)
-                        await session.commit()
+                        existing_res = await session.execute(existing_stmt)
+                        if not existing_res.scalars().first():
+                            new_appt = Appointment(
+                                contact_id=contact.id,
+                                patient_name=patient_name,
+                                appointment_time=start_dt,
+                                status="agendado"
+                            )
+                            session.add(new_appt)
+                            await session.commit()
                         
             # Roda a função de forma fire-and-forget
             try:
