@@ -111,27 +111,34 @@ async def process_message(data: dict):
             elif "audioMessage" in message_obj or "pttMessage" in message_obj or message_type in ["audioMessage", "pttMessage"]:
                 is_audio = True
                 logger.info("Detectada mensagem de áudio (messages.upsert). Iniciando transcrição com Whisper...")
-                from app.services.audio_service import transcribe_audio_from_base64_or_url, download_audio_from_url
+                from app.services.audio_service import transcribe_audio_from_base64_or_url, download_audio_from_url, decrypt_whatsapp_media
                 import base64
                 
                 audio_data = message_obj.get("audioMessage") or message_obj.get("pttMessage") or message_obj
                 raw_audio = None
                 
                 if isinstance(audio_data, dict):
-                    if "base64" in audio_data and audio_data["base64"]:
-                        raw_audio = base64.b64decode(audio_data["base64"])
-                    elif "url" in audio_data and audio_data["url"]:
-                        from app.services.evolution_api import get_headers
-                        raw_audio = await download_audio_from_url(audio_data["url"], headers=get_headers())
-                    elif "directPath" in audio_data and "mediaKey" in audio_data:
-                        logger.info("Tentando baixar áudio via URL de mídia do WhatsApp...")
+                    b64_val = audio_data.get("base64") or audio_data.get("Base64") or audio_data.get("media") or ""
+                    media_key = audio_data.get("mediaKey")
+                    media_url = audio_data.get("url") or audio_data.get("URL") or ""
+
+                    if b64_val:
+                        if "," in b64_val:
+                            b64_val = b64_val.split(",")[1]
+                        raw_audio = base64.b64decode(b64_val)
+                    elif media_url and media_key:
+                        enc_bytes = await download_audio_from_url(media_url)
+                        if enc_bytes:
+                            raw_audio = decrypt_whatsapp_media(enc_bytes, media_key, media_type="audio")
+                    elif media_url and not ".enc" in media_url:
+                        raw_audio = await download_audio_from_url(media_url)
                 elif isinstance(audio_data, str) and (audio_data.startswith("http") or audio_data.startswith("data:audio")):
                     raw_audio = await download_audio_from_url(audio_data)
 
                 if raw_audio:
                     text = await transcribe_audio_from_base64_or_url(raw_audio)
                 else:
-                    logger.warning(f"Não foi possível obter os bytes do áudio no payload: {audio_data}")
+                    logger.warning(f"Não foi possível obter os bytes do áudio no payload (upsert): {audio_data}")
 
         elif event_type == "Message":
             info = data.get("data", {}).get("Info", {})
@@ -165,19 +172,31 @@ async def process_message(data: dict):
                         b64_val = b64_val.split(",")[1]
                     raw_audio = base64.b64decode(b64_val)
 
-                # 2. Se não veio base64, busca diretamente na Evolution/Ghosthub pelo Message ID (que descriptografa o .enc)
-                if not raw_audio:
-                    msg_id = info.get("Id") or info.get("ID") or info.get("id") or ""
-                    if msg_id:
-                        from app.services.evolution_api import get_base64_from_media
-                        logger.info(f"Buscando áudio descriptografado para msg_id {msg_id} na Evolution/Ghosthub...")
-                        raw_audio = await get_base64_from_media(msg_id, remote_jid)
+                # 2. Descriptografia Nativa WhatsApp (E2EE WhatsApp Media Decryption)
+                # Se temos a URL do arquivo .enc e a chave 'mediaKey', fazemos o download e descriptografamos via HKDF/AES-CBC
+                if not raw_audio and isinstance(audio_data, dict):
+                    media_key = audio_data.get("mediaKey")
+                    media_url = audio_data.get("URL") or audio_data.get("url") or ""
+                    
+                    if media_url and media_key:
+                        from app.services.audio_service import decrypt_whatsapp_media
+                        logger.info("Baixando arquivo .enc do WhatsApp e descriptografando via chave E2EE (mediaKey)...")
+                        enc_bytes = await download_audio_from_url(media_url)
+                        if enc_bytes:
+                            raw_audio = decrypt_whatsapp_media(enc_bytes, media_key, media_type="audio")
 
-                # 3. Fallback: Se for URL pública não-criptografada (não termina em .enc)
+                # 3. Fallback: Se for URL pública direta (não-criptografada)
                 if not raw_audio and isinstance(audio_data, dict):
                     url_val = audio_data.get("URL") or audio_data.get("url") or audio_data.get("file") or ""
                     if url_val and not ".enc" in url_val:
                         raw_audio = await download_audio_from_url(url_val)
+
+                # 4. Fallback final via API da instância (Message ID)
+                if not raw_audio:
+                    msg_id = info.get("Id") or info.get("ID") or info.get("id") or ""
+                    if msg_id:
+                        from app.services.evolution_api import get_base64_from_media
+                        raw_audio = await get_base64_from_media(msg_id, remote_jid)
 
                 if raw_audio:
                     text = await transcribe_audio_from_base64_or_url(raw_audio)
