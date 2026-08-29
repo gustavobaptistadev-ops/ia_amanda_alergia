@@ -16,6 +16,11 @@ class Contact(Base):
     name = Column(String, nullable=True)
     bot_active = Column(Boolean, default=True) # Se a IA deve responder automaticamente
     stage = Column(String, default="novo_contato") # 'novo_contato', 'em_andamento', 'agendado'
+    insurance_operator = Column(String, nullable=True) # Ex: Unimed, Bradesco, Amil, SulAmérica
+    insurance_card_number = Column(String, nullable=True) # Matrícula do plano
+    insurance_plan_name = Column(String, nullable=True) # Nome da categoria / plano
+    insurance_coverage = Column(String, nullable=True) # Abrangência (Nacional, Estadual)
+    insurance_accommodation = Column(String, nullable=True) # Apartamento, Enfermaria
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

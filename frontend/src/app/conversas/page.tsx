@@ -311,25 +311,47 @@ export default function Conversas() {
               </div>
             </div>
 
-            {/* Informações de Convênio & Cadastro */}
+            {/* Informações de Convênio & Carteirinha Lida por IA */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-slate-500" /> Dados Cadastrais (LGPD)
+                <ShieldCheck className="w-4 h-4 text-slate-500" /> Plano de Saúde & Carteirinha
               </h4>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Convênio:</span>
-                  <span className="font-semibold text-slate-800">Unimed / Particular</span>
+                  <span className="text-slate-500">Operadora:</span>
+                  <span className="font-semibold text-slate-800">
+                    {selectedContact.insurance_operator || "Particular / Não informada"}
+                  </span>
                 </div>
-                <div className="flex justify-between">
+                {selectedContact.insurance_card_number && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Matrícula:</span>
+                    <span className="font-mono font-semibold text-slate-800">
+                      {selectedContact.insurance_card_number}
+                    </span>
+                  </div>
+                )}
+                {selectedContact.insurance_plan_name && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Plano / Categoria:</span>
+                    <span className="font-medium text-slate-700">
+                      {selectedContact.insurance_plan_name}
+                    </span>
+                  </div>
+                )}
+                {selectedContact.insurance_accommodation && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Acomodação:</span>
+                    <span className="font-medium text-slate-700">
+                      {selectedContact.insurance_accommodation}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between pt-1 border-t border-slate-200/60">
                   <span className="text-slate-500">Etapa do Funil:</span>
                   <span className="font-semibold text-blue-600 capitalize">
                     {selectedContact.stage ? selectedContact.stage.replace('_', ' ') : 'Triagem'}
                   </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Origem:</span>
-                  <span className="font-semibold text-slate-800">WhatsApp Direto</span>
                 </div>
               </div>
             </div>
