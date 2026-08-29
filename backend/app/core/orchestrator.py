@@ -88,13 +88,13 @@ def schedule_flow_node(state: AgentState):
     context = retrieve_context("convênios e preços")
     return {"context": context}
 
-def generate_response_node(state: AgentState):
-    """Nó 3: Gera a resposta da IA com suporte a tools."""
-    messages = state['messages']
+async def generate_response_node(state: AgentState):
+    """Nó 3: Gera a resposta da Amanda com base no contexto, intenção e histórico seguro."""
+    intent = state.get('intent', 'duvidas_clinica')
     context = state.get('context', '')
+    messages = state['messages']
     
-    from datetime import datetime
-    hoje = datetime.now().strftime("%Y-%m-%d")
+    hoje = datetime.date.today().strftime("%d/%m/%Y")
     
     system_prompt = AMANDA_PERSONA_PROMPT.format(
         rag_context=f"DATA DE HOJE: {hoje}\n" + context,
@@ -139,7 +139,7 @@ def generate_response_node(state: AgentState):
     conversation = [SystemMessage(content=system_prompt)] + final_messages
     logger.info("Gerando resposta da LLM (Amanda) com tools...")
     llm_with_tools = get_llm().bind_tools(tools)
-    response = llm_with_tools.invoke(conversation)
+    response = await llm_with_tools.ainvoke(conversation)
     return {"messages": [response]}
 
 def route_after_generation(state: AgentState) -> Literal["tools", "prune_history"]:
@@ -153,7 +153,6 @@ def prune_history_node(state: AgentState):
     """Nó 4: Poda o histórico antigo (mantém as últimas 10 mensagens) para evitar estouro da janela de contexto."""
     messages = state['messages']
     if len(messages) > 10:
-        # Pega todas as mensagens antigas, deixando apenas as 10 mais recentes
         messages_to_remove = messages[:-10]
         return {"messages": [RemoveMessage(id=m.id) for m in messages_to_remove if m.id is not None]}
     return {}
@@ -180,6 +179,7 @@ workflow.add_conditional_edges(
     "generate_response",
     route_after_generation
 )
+workflow.add_edge("tools", "generate_response")
 workflow.add_edge("prune_history", END)
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, AIMessage
@@ -201,20 +201,14 @@ async def init_checkpointer():
         from psycopg_pool import AsyncConnectionPool
         import psycopg
         
-        # Cria as tabelas necessárias no banco usando uma conexão com autocommit=True 
-        # para evitar o erro "CREATE INDEX CONCURRENTLY cannot run inside a transaction block"
         async with await psycopg.AsyncConnection.connect(db_url, autocommit=True) as conn:
             temp_saver = AsyncPostgresSaver(conn)
             await temp_saver.setup()
             
-        # Agora inicializa o pool e o checkpointer final
         pool = AsyncConnectionPool(db_url, max_size=10, open=False)
         await pool.open()
         
         _checkpointer = AsyncPostgresSaver(pool)
-        
-        # Compila o grafo usando o checkpointer nativo do LangGraph
-        workflow.add_edge("tools", "generate_response")
         app_graph = workflow.compile(checkpointer=_checkpointer)
 
 async def process_user_message(thread_id: str, message: str) -> str:
