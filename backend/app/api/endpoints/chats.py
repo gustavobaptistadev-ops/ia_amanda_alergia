@@ -68,27 +68,37 @@ async def get_messages(phone_number: str, db: AsyncSession = Depends(get_db), x_
 
 @router.delete("/{phone_number}/reset")
 async def reset_conversation(phone_number: str, db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
-    """Reseta todo o histórico e memória de um contato"""
+    """Reseta todo o histórico e memória de um contato (PostgreSQL + Checkpoints LangGraph)"""
     query = select(Contact).where(Contact.phone_number == phone_number)
     if x_tenant_id:
         query = query.where(Contact.tenant_id == x_tenant_id)
         
     result = await db.execute(query)
-    contact = result.scalars().first() # Use first instead of scalar_one_or_none for retro-compatibility
+    contact = result.scalars().first()
     if contact:
-        from sqlalchemy import delete
-        # Apaga todas as mensagens desse contato no banco relacional
+        from sqlalchemy import delete, text
+        # 1. Apaga todas as mensagens desse contato no banco relacional
         await db.execute(delete(Message).where(Message.contact_id == contact.id))
         
-        # Reseta o contato para estágio inicial e ativa o bot
+        # 2. Reseta o contato para estágio inicial e ativa o bot
         contact.stage = "novo_contato"
         contact.bot_active = True
         await db.commit()
         
-        # A memória do LangGraph agora é puxada dinamicamente do banco de dados (que acabamos de deletar),
-        # então não há necessidade de limpar cache em memória!
+        # 3. Limpa a memória de estado/checkpoints do LangGraph no Postgres para este thread_id (phone_number)
+        try:
+            await db.execute(text("DELETE FROM checkpoints WHERE thread_id = :tid"), {"tid": phone_number})
+            await db.execute(text("DELETE FROM checkpoint_blobs WHERE thread_id = :tid"), {"tid": phone_number})
+            await db.execute(text("DELETE FROM checkpoint_writes WHERE thread_id = :tid"), {"tid": phone_number})
+            await db.commit()
+        except Exception as e:
+            # Caso as tabelas ainda não existam ou erro pontual
+            pass
         
-        return {"status": "ok", "message": "Conversa resetada"}
+        # Notifica o frontend via websocket
+        await manager.broadcast("update")
+        
+        return {"status": "ok", "message": "Conversa e memória da IA resetadas com sucesso!"}
     return {"status": "error", "message": "Contato não encontrado"}
 
 @router.post("/{phone_number}/toggle_bot")
