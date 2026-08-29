@@ -106,10 +106,16 @@ async def toggle_bot(phone_number: str, db: AsyncSession = Depends(get_db), x_te
         return {"status": "ok", "bot_active": contact.bot_active}
     return {"status": "error", "message": "Contato não encontrado"}
 
+from app.core.limiter import limiter
+from app.core.validators import sanitize_html
+from fastapi import Request
+
 @router.post("/{phone_number}/send")
-async def send_human_message(phone_number: str, request: SendMessageRequest, db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
-    """Envia uma mensagem humana (atendente) e salva no banco"""
-    await send_text_message(phone_number, request.text)
+@limiter.limit("30/minute")
+async def send_human_message(request: Request, phone_number: str, payload: SendMessageRequest, db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
+    """Envia uma mensagem humana (atendente) com sanitização anti-XSS e rate limiting."""
+    clean_text = sanitize_html(payload.text)
+    await send_text_message(phone_number, clean_text)
     
     # Save to db
     query = select(Contact).where(Contact.phone_number == phone_number)
@@ -121,7 +127,7 @@ async def send_human_message(phone_number: str, request: SendMessageRequest, db:
     if contact:
         msg = Message(
             contact_id=contact.id,
-            text=request.text,
+            text=clean_text,
             sender='humano'
         )
         db.add(msg)
