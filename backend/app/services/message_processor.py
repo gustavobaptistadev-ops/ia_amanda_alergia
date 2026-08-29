@@ -153,6 +153,11 @@ async def process_message(data: dict):
         if "status@broadcast" in remote_jid:
              return
 
+        # [SEGURANÇA] Trava estrita contra DDoS Semântico e Token Flooding (Max 1.500 caracteres)
+        if len(text) > 1500:
+            logger.warning(f"Mensagem de {remote_jid} excedeu 1.500 caracteres ({len(text)}). Truncando com segurança.")
+            text = text[:1500]
+
         logger.info(f"Processando Mensagem do paciente terminada em ...{remote_jid[-4:]} | Tamanho do texto: {len(text)} caracteres")
         await process_and_respond(remote_jid, text, push_name, is_audio=is_audio)
         
