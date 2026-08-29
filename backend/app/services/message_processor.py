@@ -159,24 +159,27 @@ async def process_message(data: dict):
                 raw_audio = None
                 
                 if isinstance(audio_data, dict):
-                    if "base64" in audio_data and audio_data["base64"]:
-                        raw_audio = base64.b64decode(audio_data["base64"])
-                    elif "url" in audio_data and audio_data["url"]:
-                        from app.services.evolution_api import get_headers
-                        raw_audio = await download_audio_from_url(audio_data["url"], headers=get_headers())
-                    elif "file" in audio_data and audio_data["file"]:
-                        if audio_data["file"].startswith("http"):
-                            raw_audio = await download_audio_from_url(audio_data["file"])
+                    # Tenta todas as variações de chaves de base64
+                    b64_val = audio_data.get("base64") or audio_data.get("Base64") or audio_data.get("media") or ""
+                    url_val = audio_data.get("URL") or audio_data.get("url") or audio_data.get("file") or audio_data.get("directPath") or ""
+
+                    if b64_val:
+                        raw_audio = base64.b64decode(b64_val)
+                    elif url_val:
+                        if url_val.startswith("http"):
+                            raw_audio = await download_audio_from_url(url_val)
+                        elif url_val.startswith("data:audio"):
+                            raw_audio = await download_audio_from_url(url_val)
                         else:
                             try:
-                                raw_audio = base64.b64decode(audio_data["file"])
+                                raw_audio = base64.b64decode(url_val)
                             except Exception:
                                 pass
                 elif isinstance(audio_data, str) and (audio_data.startswith("http") or audio_data.startswith("data:audio")):
                     raw_audio = await download_audio_from_url(audio_data)
 
                 if not raw_audio:
-                    msg_id = info.get("Id") or info.get("ID") or ""
+                    msg_id = info.get("Id") or info.get("ID") or info.get("id") or ""
                     if msg_id:
                         from app.services.evolution_api import get_base64_from_media
                         raw_audio = await get_base64_from_media(msg_id, remote_jid)

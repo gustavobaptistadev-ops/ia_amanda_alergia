@@ -128,10 +128,21 @@ async def send_voice_audio_message(number: str, audio_bytes: bytes):
             logger.error(f"Erro ao enviar áudio para {number}: {e}")
             return None
 
-async def get_base64_from_media(message_id: str, remote_jid: str = "") -> bytes:
+async def get_base64_from_media(message_id: str, remote_jid: str = "", message_obj: dict = None) -> bytes:
     """Busca o base64 de uma mensagem de mídia na EvolutionAPI / Ghosthub."""
     import base64
-    url = f"{EVOLUTION_API_URL}/chat/getBase64FromMediaMessage"
+    if not message_id and not message_obj:
+        return None
+
+    headers = get_headers()
+    
+    # Lista de endpoints suportados por diferentes versões da Evolution / Ghosthub
+    endpoints = [
+        f"{EVOLUTION_API_URL}/chat/getBase64FromMediaMessage",
+        f"{EVOLUTION_API_URL}/message/getBase64FromMediaMessage",
+        f"{EVOLUTION_API_URL}/messages/getBase64"
+    ]
+    
     payload = {
         "message": {
             "key": {
@@ -141,16 +152,20 @@ async def get_base64_from_media(message_id: str, remote_jid: str = "") -> bytes:
         },
         "convertToMp4": False
     }
+
     async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            res = await client.post(url, json=payload, headers=get_headers())
-            if res.status_code == 200:
-                data = res.json()
-                b64_str = data.get("base64") or data.get("media") or ""
-                if b64_str:
-                    if "," in b64_str:
-                        b64_str = b64_str.split(",")[1]
-                    return base64.b64decode(b64_str)
-        except Exception as e:
-            logger.error(f"Erro ao buscar base64 da mídia via Evolution: {e}")
+        for url in endpoints:
+            try:
+                res = await client.post(url, json=payload, headers=headers)
+                if res.status_code == 200:
+                    data = res.json()
+                    b64_str = data.get("base64") or data.get("media") or data.get("data") or ""
+                    if b64_str:
+                        if "," in b64_str:
+                            b64_str = b64_str.split(",")[1]
+                        logger.info(f"Mídia recuperada com sucesso via {url}")
+                        return base64.b64decode(b64_str)
+            except Exception as e:
+                logger.warning(f"Tentativa de busca de áudio falhou em {url}: {e}")
+
     return None
