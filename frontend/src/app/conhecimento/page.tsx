@@ -1,12 +1,54 @@
 "use client";
 import { fetchWithAuth } from '../../lib/api';
-import { Database, Save, Loader2, FileText, CheckCircle2, Plus, Trash2, Zap } from "lucide-react";
+import { Database, Save, Loader2, FileText, CheckCircle2, Plus, Trash2, Zap, Building2, CreditCard, Stethoscope, UserCheck, HelpCircle, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 
 interface RagFile {
   filename: string;
   content: string;
 }
+
+const TEMPLATES = [
+  {
+    name: "Novo Convênio",
+    icon: CreditCard,
+    filename: "novo_convenio.md",
+    template: `### [Nome do Convênio]
+- **Planos Cobertos:** (Ex: Nacional, Executivo, Especial)
+- **Cobertura:** Consultas de Alergia, Testes Prick/Patch e Espirometria
+- **Regras:** Não exige autorização prévia para consulta básica.
+`
+  },
+  {
+    name: "Novo Exame / Preço",
+    icon: Stethoscope,
+    filename: "novo_exame.md",
+    template: `### [Nome do Exame/Procedimento]
+- **Indicação:** (Ex: Diagnóstico de asma, alergias alimentares)
+- **Preparo:** (Ex: Suspender antialérgicos orais 5 dias antes)
+- **Valor Particular:** R$ 0,00
+- **Tempo de Resultado:** Imediato / 20 minutos
+`
+  },
+  {
+    name: "Novo Médico Especialista",
+    icon: UserCheck,
+    filename: "novo_medico.md",
+    template: `### Dr(a). [Nome do Médico] (CRM-SP [Número] / RQE [Número])
+- **Especialidade:** Alergia e Imunologia Clínica
+- **Foco de Atendimento:** (Ex: Alergia Pediátrica, Asma Grave)
+- **Dias e Horários:** Terças e Quintas (08h às 18h)
+`
+  },
+  {
+    name: "Nova Pergunta Frequente (FAQ)",
+    icon: HelpCircle,
+    filename: "novo_faq.md",
+    template: `### Dúvida: [Pergunta do Paciente]
+- **Resposta Acolhedora:** [Explicação clara, gentil e sem jargões para a Amanda responder]
+`
+  }
+];
 
 export default function Conhecimento() {
   const [files, setFiles] = useState<RagFile[]>([]);
@@ -57,6 +99,8 @@ export default function Conhecimento() {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
         await fetchFiles();
+        // Auto-indexação inteligente no banco vetorial
+        fetchWithAuth(`${apiUrl}/api/v1/rag/train`, { method: "POST" });
       } else {
         alert("Erro ao salvar o documento.");
       }
@@ -87,10 +131,11 @@ export default function Conhecimento() {
     }
   };
 
-  const handleCreateFile = () => {
-    const filename = prompt("Digite o nome do novo documento (ex: precos_exames.md):");
+  const handleApplyTemplate = (tmpl: typeof TEMPLATES[0]) => {
+    const filename = prompt(`Nome do arquivo para ${tmpl.name}:`, tmpl.filename);
     if (!filename) return;
-    const newFile = { filename: filename.endsWith('.md') ? filename : `${filename}.md`, content: "# Novo Documento\n" };
+    const finalName = filename.endsWith('.md') ? filename : `${filename}.md`;
+    const newFile = { filename: finalName, content: tmpl.template };
     setFiles([...files, newFile]);
     setActiveFile(newFile);
   };
@@ -112,16 +157,24 @@ export default function Conhecimento() {
     }
   };
 
+  const getFileIcon = (name: string) => {
+    if (name.includes("sobre") || name.includes("clinica")) return Building2;
+    if (name.includes("convenio") || name.includes("plano")) return CreditCard;
+    if (name.includes("exame") || name.includes("preco")) return Stethoscope;
+    if (name.includes("medico") || name.includes("corpo")) return UserCheck;
+    return HelpCircle;
+  };
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-6 animate-in fade-in duration-500">
       <div className="flex justify-between items-end">
         <div>
           <h2 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
             <Database className="w-8 h-8 text-blue-600" />
-            Base de Conhecimento (RAG)
+            Base de Conhecimento Enterprise (RAG)
           </h2>
-          <p className="text-slate-500 mt-2 max-w-2xl">
-            Gerencie os documentos que a IA lê. Adicione regras, preços e protocolos. Após editar os arquivos, clique em Treinar IA.
+          <p className="text-slate-500 mt-2 max-w-2xl text-sm">
+            Gerencie o cérebro institucional da IA Amanda por módulos categorizados. Adicione novos convênios, exames ou médicos com templates guiados.
           </p>
         </div>
         <button 
@@ -130,48 +183,74 @@ export default function Conhecimento() {
           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md hover:shadow-lg"
         >
           {training ? (
-            <><Loader2 className="w-5 h-5 animate-spin" /> Treinando...</>
+            <><Loader2 className="w-5 h-5 animate-spin" /> Indexando Vetores...</>
           ) : trainSuccess ? (
-            <><CheckCircle2 className="w-5 h-5" /> IA Treinada!</>
+            <><CheckCircle2 className="w-5 h-5" /> Base 100% Sincronizada!</>
           ) : (
-            <><Zap className="w-5 h-5" /> Treinar IA Agora</>
+            <><Zap className="w-5 h-5" /> Sincronizar Tudo Agora</>
           )}
         </button>
       </div>
 
+      {/* Barra de Templates Rápidos No-Code */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/80 p-4 rounded-2xl flex items-center justify-between">
+        <div className="flex items-center gap-2 text-blue-800 font-semibold text-sm">
+          <Sparkles className="w-5 h-5 text-blue-600" />
+          <span>Templates Rápidos (Inserir sem escrever prompt):</span>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {TEMPLATES.map((tmpl) => {
+            const Icon = tmpl.icon;
+            return (
+              <button
+                key={tmpl.name}
+                onClick={() => handleApplyTemplate(tmpl)}
+                className="flex items-center gap-1.5 bg-white hover:bg-blue-600 hover:text-white text-slate-700 border border-slate-200 hover:border-blue-600 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-sm transition-all"
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {tmpl.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 flex overflow-hidden">
-        {/* Sidebar de Arquivos */}
-        <div className="w-64 border-r border-slate-100 flex flex-col bg-slate-50/50">
+        {/* Sidebar de Arquivos Categorizados */}
+        <div className="w-72 border-r border-slate-100 flex flex-col bg-slate-50/50">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-100/50">
-            <span className="font-semibold text-slate-700 text-sm">Documentos</span>
-            <button onClick={handleCreateFile} className="p-1.5 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors">
-              <Plus className="w-4 h-4" />
-            </button>
+            <span className="font-bold text-slate-700 text-sm">Módulos da Clínica</span>
+            <span className="text-[11px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">
+              {files.length} {files.length === 1 ? 'doc' : 'docs'}
+            </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {loading ? (
               <div className="flex justify-center p-4"><Loader2 className="w-5 h-5 text-slate-400 animate-spin" /></div>
-            ) : files.map((file) => (
-              <div 
-                key={file.filename}
-                onClick={() => setActiveFile(file)}
-                className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${activeFile?.filename === file.filename ? 'bg-white shadow-sm border border-slate-200 text-blue-600 font-medium' : 'hover:bg-slate-100 text-slate-600 border border-transparent'}`}
-              >
-                <div className="flex items-center gap-2 overflow-hidden">
-                  <FileText className="w-4 h-4 flex-shrink-0" />
-                  <span className="text-sm truncate">{file.filename}</span>
-                </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleDeleteFile(file.filename); }}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all"
+            ) : files.map((file) => {
+              const FileIcon = getFileIcon(file.filename);
+              const isSelected = activeFile?.filename === file.filename;
+              return (
+                <div 
+                  key={file.filename}
+                  onClick={() => setActiveFile(file)}
+                  className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${isSelected ? 'bg-white shadow-sm border border-slate-200 text-blue-600 font-semibold' : 'hover:bg-slate-100 text-slate-600 border border-transparent'}`}
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-            {files.length === 0 && !loading && (
-              <p className="text-xs text-center text-slate-400 p-4">Nenhum documento.</p>
-            )}
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <div className={`p-1.5 rounded-lg ${isSelected ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <FileIcon className="w-4 h-4" />
+                    </div>
+                    <span className="text-xs truncate">{file.filename}</span>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDeleteFile(file.filename); }}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -180,39 +259,41 @@ export default function Conhecimento() {
           {activeFile ? (
             <>
               <div className="bg-white px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <div className="flex items-center gap-2 text-slate-800 font-semibold">
-                  <FileText className="w-5 h-5 text-blue-500" />
+                <div className="flex items-center gap-3 text-slate-800 font-bold text-sm">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                    <FileText className="w-4 h-4" />
+                  </div>
                   {activeFile.filename}
                 </div>
                 
                 <button 
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 disabled:bg-slate-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm"
                 >
                   {saving ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
                   ) : success ? (
-                    <><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Salvo</>
+                    <><CheckCircle2 className="w-4 h-4 text-emerald-300" /> Salvo & Sincronizado!</>
                   ) : (
-                    <><Save className="w-4 h-4" /> Salvar Arquivo</>
+                    <><Save className="w-4 h-4" /> Salvar & Indexar</>
                   )}
                 </button>
               </div>
               
-              <div className="flex-1 p-6 relative bg-slate-50">
+              <div className="flex-1 p-6 relative bg-slate-50/50">
                 <textarea
                   value={activeFile.content}
                   onChange={(e) => setActiveFile({ ...activeFile, content: e.target.value })}
-                  placeholder="Escreva o conteúdo markdown aqui..."
-                  className="w-full h-full resize-none outline-none text-slate-700 text-base leading-relaxed bg-transparent font-mono"
+                  placeholder="Escreva as regras do documento aqui..."
+                  className="w-full h-full resize-none outline-none text-slate-700 text-sm leading-relaxed bg-transparent font-sans border-0 focus:ring-0"
                 />
               </div>
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-4 bg-slate-50">
               <FileText className="w-12 h-12 text-slate-200" />
-              <p>Selecione ou crie um documento para editar.</p>
+              <p className="text-sm font-medium">Selecione ou crie um módulo acima para editar.</p>
             </div>
           )}
         </div>
