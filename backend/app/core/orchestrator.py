@@ -17,8 +17,10 @@ logger = logging.getLogger(__name__)
 # Checkpointer global para manter a memória enquanto o servidor estiver rodando
 memory = MemorySaver()
 
+from langgraph.graph.message import add_messages
+
 class AgentState(TypedDict):
-    messages: Annotated[Sequence[BaseMessage], operator.add]
+    messages: Annotated[Sequence[BaseMessage], add_messages]
     context: str
     intent: str
 
@@ -75,8 +77,11 @@ def generate_response_node(state: AgentState):
         user_message="[Leia o histórico acima para entender o fluxo atual e continuar a conversa.]"
     )
     
+    # Filtra mensagens problemáticas que possam ter ficado no histórico
+    valid_messages = [m for m in messages if not isinstance(m, RemoveMessage)]
+    
     # Adicionando a instrução do sistema no topo
-    conversation = [SystemMessage(content=system_prompt)] + list(messages)
+    conversation = [SystemMessage(content=system_prompt)] + valid_messages
     logger.info("Gerando resposta da LLM (Amanda) com tools...")
     response = llm_with_tools.invoke(conversation)
     return {"messages": [response]}
