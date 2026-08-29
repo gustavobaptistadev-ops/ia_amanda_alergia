@@ -34,50 +34,50 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
                 await save_message(remote_jid, resp, sender='ia')
                 return
 
-        ai_response = await process_user_message(thread_id=remote_jid, message=text)
-        is_safe = validar_resposta(ai_response)
-        
-        if not is_safe:
-            ai_response = "Desculpe, por segurança e para estarmos de acordo com a LGPD e o Conselho de Medicina, não posso abordar esse assunto por aqui. Por favor, aguarde que irei transferir você para nossa equipe médica ou ligue para a clínica."
-
-        if "⚠️ Identifiquei que você pode estar passando por uma situação de urgência" in ai_response:
-            logger.warning(f"Urgência detectada para {remote_jid}. Pausando IA e escalando para atendimento humano...")
-            from app.database import AsyncSessionLocal
-            from app.models.chat import Contact
-            from sqlalchemy.future import select
+            ai_response = await process_user_message(thread_id=remote_jid, message=text)
+            is_safe = validar_resposta(ai_response)
             
-            async with AsyncSessionLocal() as session:
-                res = await session.execute(select(Contact).where(Contact.phone_number == remote_jid))
-                c = res.scalars().first()
-                if c:
-                    c.bot_active = False
-                    c.stage = "atendimento_humano"
-                    await session.commit()
+            if not is_safe:
+                ai_response = "Desculpe, por segurança e para estarmos de acordo com a LGPD e o Conselho de Medicina, não posso abordar esse assunto por aqui. Por favor, aguarde que irei transferir você para nossa equipe médica ou ligue para a clínica."
 
-        # [MULTIMODAL] Se o paciente mandou áudio e a opção de voz estiver ligada, responder com áudio TTS
-        from app.api.endpoints.settings import load_config
-        cfg = load_config()
-        voice_enabled = cfg.get("voice_reply_enabled", False)
+            if "⚠️ Identifiquei que você pode estar passando por uma situação de urgência" in ai_response:
+                logger.warning(f"Urgência detectada para {remote_jid}. Pausando IA e escalando para atendimento humano...")
+                from app.database import AsyncSessionLocal
+                from app.models.chat import Contact
+                from sqlalchemy.future import select
+                
+                async with AsyncSessionLocal() as session:
+                    res = await session.execute(select(Contact).where(Contact.phone_number == remote_jid))
+                    c = res.scalars().first()
+                    if c:
+                        c.bot_active = False
+                        c.stage = "atendimento_humano"
+                        await session.commit()
 
-        if is_audio and voice_enabled:
-            from app.services.tts_service import generate_speech_audio
-            from app.services.evolution_api import send_voice_audio_message
-            voice_name = cfg.get("voice_name", "nova")
-            audio_bytes = await generate_speech_audio(ai_response, voice=voice_name)
-            if audio_bytes:
-                await send_voice_audio_message(remote_jid, audio_bytes)
+            # [MULTIMODAL] Se o paciente mandou áudio e a opção de voz estiver ligada, responder com áudio TTS
+            from app.api.endpoints.settings import load_config
+            cfg = load_config()
+            voice_enabled = cfg.get("voice_reply_enabled", False)
+
+            if is_audio and voice_enabled:
+                from app.services.tts_service import generate_speech_audio
+                from app.services.evolution_api import send_voice_audio_message
+                voice_name = cfg.get("voice_name", "nova")
+                audio_bytes = await generate_speech_audio(ai_response, voice=voice_name)
+                if audio_bytes:
+                    await send_voice_audio_message(remote_jid, audio_bytes)
+                else:
+                    await send_text_message(remote_jid, ai_response)
             else:
                 await send_text_message(remote_jid, ai_response)
-        else:
-            await send_text_message(remote_jid, ai_response)
 
-        await save_message(remote_jid, ai_response, sender='ia')
-        
-        from app.api.endpoints.chats import manager
-        await manager.broadcast("update")
+            await save_message(remote_jid, ai_response, sender='ia')
+            
+            from app.api.endpoints.chats import manager
+            await manager.broadcast("update")
 
-    except Exception as e:
-        print(f">>> [ERROR] Falha ao processar e responder: {e}", flush=True)
+        except Exception as e:
+            print(f">>> [ERROR] Falha ao processar e responder: {e}", flush=True)
 
 async def process_message(data: dict):
     """Extrai os dados da mensagem do payload Ghosthub e aciona o process_and_respond"""
