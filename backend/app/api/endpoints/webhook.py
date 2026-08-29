@@ -15,7 +15,7 @@ api_key_query = APIKeyQuery(name="token", auto_error=False)
 import secrets
 
 def verify_webhook_token(token: str = Security(api_key_query)):
-    if not secrets.compare_digest(token, WEBHOOK_SECRET):
+    if not token or not secrets.compare_digest(token, WEBHOOK_SECRET):
         logger.warning("Tentativa de webhook negada. Token inválido/incompatível.")
         raise HTTPException(status_code=403, detail="Invalid Webhook Secret")
     return token
