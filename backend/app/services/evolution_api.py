@@ -127,3 +127,30 @@ async def send_voice_audio_message(number: str, audio_bytes: bytes):
         except Exception as e:
             logger.error(f"Erro ao enviar áudio para {number}: {e}")
             return None
+
+async def get_base64_from_media(message_id: str, remote_jid: str = "") -> bytes:
+    """Busca o base64 de uma mensagem de mídia na EvolutionAPI / Ghosthub."""
+    import base64
+    url = f"{EVOLUTION_API_URL}/chat/getBase64FromMediaMessage"
+    payload = {
+        "message": {
+            "key": {
+                "id": message_id,
+                "remoteJid": remote_jid
+            }
+        },
+        "convertToMp4": False
+    }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            res = await client.post(url, json=payload, headers=get_headers())
+            if res.status_code == 200:
+                data = res.json()
+                b64_str = data.get("base64") or data.get("media") or ""
+                if b64_str:
+                    if "," in b64_str:
+                        b64_str = b64_str.split(",")[1]
+                    return base64.b64decode(b64_str)
+        except Exception as e:
+            logger.error(f"Erro ao buscar base64 da mídia via Evolution: {e}")
+    return None

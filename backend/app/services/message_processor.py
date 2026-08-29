@@ -175,6 +175,12 @@ async def process_message(data: dict):
                 elif isinstance(audio_data, str) and (audio_data.startswith("http") or audio_data.startswith("data:audio")):
                     raw_audio = await download_audio_from_url(audio_data)
 
+                if not raw_audio:
+                    msg_id = info.get("Id") or info.get("ID") or ""
+                    if msg_id:
+                        from app.services.evolution_api import get_base64_from_media
+                        raw_audio = await get_base64_from_media(msg_id, remote_jid)
+
                 if raw_audio:
                     text = await transcribe_audio_from_base64_or_url(raw_audio)
                 else:
