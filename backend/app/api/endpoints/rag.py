@@ -13,36 +13,65 @@ from app.database import AsyncSessionLocal
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-KNOWLEDGE_FILE = os.path.join(os.path.dirname(__file__), '../../../docs/clinica_alergia_contexto.md')
+KNOWLEDGE_DIR = os.path.join(os.path.dirname(__file__), '../../../docs/knowledge_base')
+os.makedirs(KNOWLEDGE_DIR, exist_ok=True)
 
 class RagData(BaseModel):
+    filename: str
     content: str
 
 @router.get("/")
-async def get_rag_context():
-    """Retorna o texto atual da base de conhecimento (arquivo .md)."""
+async def list_rag_files():
+    """Retorna a lista de arquivos da base de conhecimento."""
     try:
-        if os.path.exists(KNOWLEDGE_FILE):
-            with open(KNOWLEDGE_FILE, 'r', encoding='utf-8') as f:
-                return {"content": f.read()}
-        return {"content": ""}
+        files_data = []
+        for filename in os.listdir(KNOWLEDGE_DIR):
+            if filename.endswith(".md"):
+                filepath = os.path.join(KNOWLEDGE_DIR, filename)
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    files_data.append({
+                        "filename": filename,
+                        "content": f.read()
+                    })
+        return files_data
     except Exception as e:
         logger.error(f"Erro ao ler base de conhecimento: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao ler o documento")
+        raise HTTPException(status_code=500, detail="Erro ao ler os documentos")
 
 @router.post("/")
-async def update_rag_context(data: RagData):
-    """Atualiza o arquivo .md e re-ingere no PGVector."""
+async def save_rag_file(data: RagData):
+    """Salva um arquivo .md específico."""
     try:
-        # 1. Salvar no arquivo
-        os.makedirs(os.path.dirname(KNOWLEDGE_FILE), exist_ok=True)
-        with open(KNOWLEDGE_FILE, 'w', encoding='utf-8') as f:
+        if not data.filename.endswith('.md'):
+            data.filename += '.md'
+            
+        filepath = os.path.join(KNOWLEDGE_DIR, data.filename)
+        with open(filepath, 'w', encoding='utf-8') as f:
             f.write(data.content)
             
-        # 2. Apagar todos os vetores antigos do banco
+        return {"status": "ok", "message": "Arquivo salvo com sucesso!"}
+    except Exception as e:
+        logger.error(f"Erro ao salvar arquivo RAG: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{filename}")
+async def delete_rag_file(filename: str):
+    """Deleta um arquivo .md específico."""
+    try:
+        filepath = os.path.join(KNOWLEDGE_DIR, filename)
+        if os.path.exists(filepath):
+            os.remove(filepath)
+        return {"status": "ok", "message": "Arquivo deletado."}
+    except Exception as e:
+        logger.error(f"Erro ao deletar arquivo RAG: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/train")
+async def train_rag():
+    """Re-ingere todos os arquivos .md no PGVector."""
+    try:
+        # 1. Apagar todos os vetores antigos
         async with AsyncSessionLocal() as session:
-            # O pgvector cria tabelas langchain_pg_embedding e langchain_pg_collection
-            # Podemos apagar os embeddings associados à nossa collection
             query = text("""
                 DELETE FROM langchain_pg_embedding 
                 WHERE collection_id = (SELECT uuid FROM langchain_pg_collection WHERE name = :c_name)
@@ -50,21 +79,29 @@ async def update_rag_context(data: RagData):
             await session.execute(query, {"c_name": collection_name})
             await session.commit()
             
-        # 3. Gerar novos vetores
-        doc = Document(page_content=data.content)
+        # 2. Ler e processar todos os arquivos
+        docs = []
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-        docs = text_splitter.split_documents([doc])
         
-        # 4. Inserir os novos vetores (como a collection já existe, o pgvector_from_documents só adiciona)
-        # Importante: from_documents é síncrono no langchain_community PGVector
-        PGVector.from_documents(
-            embedding=get_embeddings(),
-            documents=docs,
-            collection_name=collection_name,
-            connection_string=db_url,
-        )
+        for filename in os.listdir(KNOWLEDGE_DIR):
+            if filename.endswith(".md"):
+                filepath = os.path.join(KNOWLEDGE_DIR, filename)
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    if content.strip():
+                        doc = Document(page_content=content, metadata={"source": filename})
+                        docs.extend(text_splitter.split_documents([doc]))
         
-        return {"status": "ok", "message": "Base de conhecimento atualizada com sucesso!"}
+        # 3. Inserir no banco
+        if docs:
+            PGVector.from_documents(
+                embedding=get_embeddings(),
+                documents=docs,
+                collection_name=collection_name,
+                connection_string=db_url,
+            )
+        
+        return {"status": "ok", "message": "Treinamento concluído com sucesso!"}
     except Exception as e:
-        logger.error(f"Erro ao atualizar RAG: {e}")
+        logger.error(f"Erro ao treinar RAG: {e}")
         raise HTTPException(status_code=500, detail=str(e))
