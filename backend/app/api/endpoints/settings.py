@@ -16,6 +16,7 @@ class AIConfig(BaseModel):
     persona_name: str = "Amanda"
     voice_reply_enabled: bool = False
     voice_name: str = "nova"
+    semantic_cache_enabled: bool = True
 
 def load_config() -> dict:
     default_cfg = {
@@ -24,7 +25,8 @@ def load_config() -> dict:
         "max_tokens": 1000,
         "persona_name": "Amanda",
         "voice_reply_enabled": False,
-        "voice_name": "nova"
+        "voice_name": "nova",
+        "semantic_cache_enabled": True
     }
     if os.path.exists(CONFIG_FILE):
         try:

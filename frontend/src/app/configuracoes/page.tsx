@@ -27,6 +27,7 @@ export default function Configuracoes() {
   const [personaName, setPersonaName] = useState("Amanda");
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
   const [voiceName, setVoiceName] = useState("nova");
+  const [semanticCacheEnabled, setSemanticCacheEnabled] = useState(true);
   const [savingAi, setSavingAi] = useState(false);
   const [aiSuccessMsg, setAiSuccessMsg] = useState(false);
 
@@ -102,6 +103,7 @@ export default function Configuracoes() {
         if (data.persona_name) setPersonaName(data.persona_name);
         if (data.voice_reply_enabled !== undefined) setVoiceReplyEnabled(data.voice_reply_enabled);
         if (data.voice_name) setVoiceName(data.voice_name);
+        if (data.semantic_cache_enabled !== undefined) setSemanticCacheEnabled(data.semantic_cache_enabled);
       }
     } catch (e) {
       console.error("Erro ao carregar configurações de IA:", e);
@@ -120,7 +122,8 @@ export default function Configuracoes() {
           temperature: parseFloat(temperature.toString()),
           persona_name: personaName,
           voice_reply_enabled: voiceReplyEnabled,
-          voice_name: voiceName
+          voice_name: voiceName,
+          semantic_cache_enabled: semanticCacheEnabled
         })
       });
       if (res.ok) {
@@ -571,6 +574,29 @@ export default function Configuracoes() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Feature Flag: Otimização de Custos & Cache Semântico (Redis) */}
+            <div className="space-y-4 md:col-span-2 bg-gradient-to-r from-emerald-50/60 to-teal-50/60 p-6 rounded-2xl border border-emerald-200">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    ⚡ Economia de Custos & Cache Semântico (Redis)
+                  </h4>
+                  <p className="text-xs text-slate-600 mt-0.5 max-w-xl">
+                    Reduz até 60% na fatura da OpenAI respondendo instantaneamente (&lt;80ms) perguntas repetitivas de convênios, valores e preparos sem gastar tokens. Desligue para modo 100% tradicional a qualquer momento.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={semanticCacheEnabled}
+                    onChange={(e) => setSemanticCacheEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                </label>
+              </div>
             </div>
           </div>
         </div>
