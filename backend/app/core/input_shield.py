@@ -1,18 +1,22 @@
-﻿import re
+import re
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Padrões conhecidos de Prompt Injection, Jailbreak e Escape
+# Padrões conhecidos de Prompt Injection, Jailbreak, Escape e Off-Topic Exploitation
 JAILBREAK_PATTERNS = [
     r"(?i)\bignore\s+(all\s+)?(previous|prior|above)\s+instructions\b",
     r"(?i)\besque[cç]a\s+(todas\s+as\s+)?(regras|instru[cç][oõ]es|diretrizes)\b",
     r"(?i)\b(dan|jailbreak|developer\s+mode|unfiltered\s+mode)\b",
     r"(?i)\b(system\s+override|bypass\s+safety|modo\s+sem\s+regras)\b",
     r"(?i)\b(repita|mostre|quais\s+s[aã]o)\s+(seu\s+)?(system\s+prompt|prompt\s+inicial|instru[cç][oõ]es\s+secretas)\b",
-    r"(?i)\b(finja|aja|simule)\s+ser\s+(um\s+)?(m[eé]dico|doutor|hacker|ia\s+livre)\b",
+    r"(?i)\b(finja|aja|simule)\s+ser\s+(um\s+)?(m[eé]dico|doutor|hacker|ia\s+livre|programador|chef)\b",
     r"(?i)\b(voce\s+agora\s+e|agora\s+voce\s+responde\s+como)\b",
-    r"(?i)\[system\]|\<system\>|\#\#\#\s*system|\[inst\]|\<start_of_turn\>"
+    r"(?i)\[system\]|\<system\>|\#\#\#\s*system|\[inst\]|\<start_of_turn\>",
+    # Off-topic explícito (código, receitas, redação, cálculos)
+    r"(?i)\b(escreva|gere|crie)\s+(um\s+)?(c[oó]digo|script|fun[cç][aã]o|programa|algoritmo)\s+(em\s+)?(python|javascript|java|c\+\+|sql|php|html)\b",
+    r"(?i)\b(me\s+d[eê]|como\s+fazer|receita\s+de)\s+(um\s+)?(bolo|torta|p[aã]o|comida|culin[aá]ria)\b",
+    r"(?i)\b(resolva|calcule)\s+(a\s+equa[cç][aã]o|o\s+fatorial|a\s+derivada|a\s+integral)\b"
 ]
 
 def detect_adversarial_attempt(text: str) -> bool:
