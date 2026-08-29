@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 from datetime import datetime, timedelta
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -46,11 +46,9 @@ async def check_and_send_reminders():
                 if appt.contact and appt.contact.phone_number:
                     time_fmt = appt.appointment_time.strftime("%d/%m às %H:%M")
                     msg = (
-                        f"Olá, {appt.patient_name}! 🌼\n\n"
-                        f"Passando para lembrar da sua consulta agendada para amanhã, dia {time_fmt}.\n\n"
-                        "Por favor, responda com:\n"
-                        "👉 *1* para Confirmar sua presença\n"
-                        "👉 *2* para Reagendar ou Cancelar"
+                        f"Oi, {appt.patient_name}! Tudo bem por aí? 🌿\n\n"
+                        f"Passando para lembrar com carinho da sua consulta amanhã, dia *{time_fmt}*, na Clínica Respirar.\n\n"
+                        "Podemos confirmar a sua presença? Basta me responder com um 'Sim, confirmo' ou me avisar caso precise de outro dia!"
                     )
                     await send_text_message(appt.contact.phone_number, msg)
                     await save_message(appt.contact.phone_number, msg, sender='ia')
@@ -75,9 +73,10 @@ async def check_and_send_reminders():
                 if appt.contact and appt.contact.phone_number:
                     time_fmt = appt.appointment_time.strftime("%H:%M")
                     msg = (
-                        f"Olá, {appt.patient_name}! 🩺\n\n"
-                        f"Sua consulta é hoje às *{time_fmt}* (daqui a pouco!).\n"
-                        "Já estamos preparando tudo para recebê-lo(a) na Clínica Respirar. Se tiver qualquer imprevisto, nos avise por aqui!"
+                        f"Oi, {appt.patient_name}! 🩵\n\n"
+                        f"Sua consulta com o especialista é hoje às *{time_fmt}* (daqui a pouquinho!).\n\n"
+                        "📍 *Endereço:* Av. Paulista, 1000 - Conjunto 1204 (Temos manobrista no local).\n"
+                        "Nossa equipe já está te esperando com um café quentinho. Tenha uma excelente vinda!"
                     )
                     await send_text_message(appt.contact.phone_number, msg)
                     await save_message(appt.contact.phone_number, msg, sender='ia')

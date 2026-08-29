@@ -207,7 +207,11 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
             except RuntimeError:
                 asyncio.run(update_stage_and_save_appointment())
 
-        return f"Agendamento confirmado no Google Calendar! Link: {created_event.get('htmlLink')}"
+        return (
+            f"Agendamento confirmado com sucesso na agenda médica para o dia {date_str} às {time_str}! "
+            f"Oriente o paciente com carinho informando que a consulta está marcada, que nosso endereço é na "
+            f"Av. Paulista, 1000 - Conjunto 1204 (com manobrista no local), e que nossa equipe estará esperando com café especial e água aromatizada. 🌿"
+        )
 
     except Exception as e:
         logger.error(f"Erro ao criar evento: {e}")
