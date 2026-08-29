@@ -37,8 +37,10 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
+from pydantic import BaseModel, Field
+
 class SendMessageRequest(BaseModel):
-    text: str
+    text: str = Field(..., max_length=4096)
 
 from fastapi import Header
 
@@ -54,22 +56,25 @@ async def get_chats(db: AsyncSession = Depends(get_db), x_tenant_id: str = Heade
     return contacts
 
 @router.get("/{phone_number}/messages")
-async def get_messages(phone_number: str, db: AsyncSession = Depends(get_db)):
+async def get_messages(phone_number: str, db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
     """Retorna as mensagens de um contato"""
-    result = await db.execute(
-        select(Message)
-        .join(Contact)
-        .where(Contact.phone_number == phone_number)
-        .order_by(Message.created_at.asc())
-    )
+    query = select(Message).join(Contact).where(Contact.phone_number == phone_number)
+    if x_tenant_id:
+        query = query.where(Contact.tenant_id == x_tenant_id)
+        
+    result = await db.execute(query.order_by(Message.created_at.asc()))
     messages = result.scalars().all()
     return messages
 
 @router.delete("/{phone_number}/reset")
-async def reset_conversation(phone_number: str, db: AsyncSession = Depends(get_db)):
+async def reset_conversation(phone_number: str, db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
     """Reseta todo o histórico e memória de um contato"""
-    result = await db.execute(select(Contact).where(Contact.phone_number == phone_number))
-    contact = result.scalar_one_or_none()
+    query = select(Contact).where(Contact.phone_number == phone_number)
+    if x_tenant_id:
+        query = query.where(Contact.tenant_id == x_tenant_id)
+        
+    result = await db.execute(query)
+    contact = result.scalars().first() # Use first instead of scalar_one_or_none for retro-compatibility
     if contact:
         from sqlalchemy import delete
         # Apaga todas as mensagens desse contato no banco relacional
@@ -87,10 +92,14 @@ async def reset_conversation(phone_number: str, db: AsyncSession = Depends(get_d
     return {"status": "error", "message": "Contato não encontrado"}
 
 @router.post("/{phone_number}/toggle_bot")
-async def toggle_bot(phone_number: str, db: AsyncSession = Depends(get_db)):
+async def toggle_bot(phone_number: str, db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
     """Alterna o status do bot para este contato"""
-    result = await db.execute(select(Contact).where(Contact.phone_number == phone_number))
-    contact = result.scalar_one_or_none()
+    query = select(Contact).where(Contact.phone_number == phone_number)
+    if x_tenant_id:
+        query = query.where(Contact.tenant_id == x_tenant_id)
+        
+    result = await db.execute(query)
+    contact = result.scalars().first()
     if contact:
         contact.bot_active = not contact.bot_active
         await db.commit()
@@ -98,13 +107,17 @@ async def toggle_bot(phone_number: str, db: AsyncSession = Depends(get_db)):
     return {"status": "error", "message": "Contato não encontrado"}
 
 @router.post("/{phone_number}/send")
-async def send_human_message(phone_number: str, request: SendMessageRequest, db: AsyncSession = Depends(get_db)):
+async def send_human_message(phone_number: str, request: SendMessageRequest, db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
     """Envia uma mensagem humana (atendente) e salva no banco"""
     await send_text_message(phone_number, request.text)
     
     # Save to db
-    result = await db.execute(select(Contact).where(Contact.phone_number == phone_number))
-    contact = result.scalar_one_or_none()
+    query = select(Contact).where(Contact.phone_number == phone_number)
+    if x_tenant_id:
+        query = query.where(Contact.tenant_id == x_tenant_id)
+        
+    result = await db.execute(query)
+    contact = result.scalars().first()
     if contact:
         msg = Message(
             contact_id=contact.id,

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -6,10 +6,13 @@ from app.database import Base
 
 class Contact(Base):
     __tablename__ = "contacts"
+    __table_args__ = (
+        UniqueConstraint('tenant_id', 'phone_number', name='uq_tenant_phone'),
+    )
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     tenant_id = Column(String, ForeignKey("tenants.id"), index=True, nullable=True) # nullable temporariamente para não quebrar dados antigos
-    phone_number = Column(String, unique=True, index=True, nullable=False) # The JID
+    phone_number = Column(String, index=True, nullable=False) # The JID
     name = Column(String, nullable=True)
     bot_active = Column(Boolean, default=True) # Se a IA deve responder automaticamente
     stage = Column(String, default="novo_contato") # 'novo_contato', 'em_andamento', 'agendado'
