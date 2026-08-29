@@ -24,9 +24,15 @@ class AgentState(TypedDict):
     context: str
     intent: str
 
+from app.api.endpoints.settings import load_config
+
+def get_llm():
+    cfg = load_config()
+    model_name = cfg.get("model", "gpt-4o-mini")
+    temp = float(cfg.get("temperature", 0.2))
+    return ChatOpenAI(model=model_name, temperature=temp)
+
 tools = [check_availability, create_event]
-llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
-llm_with_tools = llm.bind_tools(tools)
 
 def extract_intent_node(state: AgentState):
     """Nó 1: Classifica a intenção do usuário."""
@@ -41,6 +47,7 @@ Mensagem: "{last_msg}"
 Classificação:"""
     
     logger.info("Extraindo intenção...")
+    llm = get_llm()
     response = llm.invoke([HumanMessage(content=prompt)]).content.strip().upper()
     
     intent = "AGENDAMENTO" if "AGENDAR" in response or "AGENDAMENTO" in response else "DUVIDA"
@@ -113,6 +120,7 @@ def generate_response_node(state: AgentState):
     # Adicionando a instrução do sistema no topo
     conversation = [SystemMessage(content=system_prompt)] + final_messages
     logger.info("Gerando resposta da LLM (Amanda) com tools...")
+    llm_with_tools = get_llm().bind_tools(tools)
     response = llm_with_tools.invoke(conversation)
     return {"messages": [response]}
 
