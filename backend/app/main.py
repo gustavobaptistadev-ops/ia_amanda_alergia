@@ -6,11 +6,7 @@ import logging
 from app.services.evolution_api import auto_create_instance
 from contextlib import asynccontextmanager
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-
-limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+from app.core.limiter import limiter, RateLimitExceeded, _rate_limit_exceeded_handler
 
 logger = logging.getLogger(__name__)
 

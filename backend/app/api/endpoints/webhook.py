@@ -35,7 +35,7 @@ async def get_redis_pool():
         _redis_pool = await create_pool(redis_settings)
     return _redis_pool
 
-from app.main import limiter
+from app.core.limiter import limiter
 
 @router.post("/evolution")
 @limiter.limit("60/minute")
