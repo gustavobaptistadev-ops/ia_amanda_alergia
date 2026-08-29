@@ -32,8 +32,20 @@ database = int(parsed.path.replace('/', '')) if parsed.path and parsed.path != '
 
 redis_settings = RedisSettings(host=host, port=port, password=password, database=database)
 
+from arq import cron
+
+# Função que roda periodicamente para checar lembretes de consultas
+async def run_reminders_job(ctx):
+    logger.info("Executando Cron Job de Lembretes de Consultas...")
+    from app.services.reminder_service import check_and_send_reminders
+    await check_and_send_reminders()
+
 class WorkerSettings:
-    functions = [process_message_job]
+    functions = [process_message_job, run_reminders_job]
+    # Executa a cada 15 minutos (:00, :15, :30, :45)
+    cron_jobs = [
+        cron(run_reminders_job, minute={0, 15, 30, 45})
+    ]
     redis_settings = redis_settings
     # Quantidade de jobs simultâneos
     max_jobs = 10

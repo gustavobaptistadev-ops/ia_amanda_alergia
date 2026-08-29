@@ -22,6 +22,7 @@ class Contact(Base):
     tenant = relationship("Tenant")
 
     messages = relationship("Message", back_populates="contact", cascade="all, delete-orphan")
+    appointments = relationship("Appointment", back_populates="contact", cascade="all, delete-orphan")
 
 class Message(Base):
     __tablename__ = "messages"
@@ -33,3 +34,17 @@ class Message(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     contact = relationship("Contact", back_populates="messages")
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    contact_id = Column(String, ForeignKey("contacts.id"), index=True, nullable=False)
+    patient_name = Column(String, nullable=False)
+    appointment_time = Column(DateTime, nullable=False, index=True)
+    status = Column(String, default="agendado") # 'agendado', 'confirmado', 'cancelado', 'concluido'
+    reminder_24h_sent = Column(Boolean, default=False)
+    reminder_2h_sent = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    contact = relationship("Contact", back_populates="appointments")

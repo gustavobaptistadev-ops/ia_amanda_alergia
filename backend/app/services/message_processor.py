@@ -72,6 +72,20 @@ async def process_message(data: dict):
                 text = message_obj["extendedTextMessage"].get("text", "")
             elif "imageMessage" in message_obj:
                 text = message_obj["imageMessage"].get("caption", "")
+            elif "audioMessage" in message_obj:
+                logger.info("Detectada mensagem de áudio (messages.upsert). Iniciando transcrição...")
+                from app.services.audio_service import transcribe_audio_from_base64_or_url, download_audio_from_url
+                import base64
+                
+                audio_data = message_obj["audioMessage"]
+                # Caso venha base64 direto ou url
+                if "base64" in audio_data:
+                    raw_audio = base64.b64decode(audio_data["base64"])
+                    text = await transcribe_audio_from_base64_or_url(raw_audio)
+                elif "url" in audio_data:
+                    raw_audio = await download_audio_from_url(audio_data["url"])
+                    if raw_audio:
+                        text = await transcribe_audio_from_base64_or_url(raw_audio)
 
         elif event_type == "Message":
             info = data.get("data", {}).get("Info", {})
@@ -89,6 +103,19 @@ async def process_message(data: dict):
                 text = msg_obj["extendedTextMessage"].get("text", "")
             elif "imageMessage" in msg_obj:
                 text = msg_obj["imageMessage"].get("caption", "")
+            elif "audioMessage" in msg_obj:
+                logger.info("Detectada mensagem de áudio (Message). Iniciando transcrição...")
+                from app.services.audio_service import transcribe_audio_from_base64_or_url, download_audio_from_url
+                import base64
+                
+                audio_data = msg_obj["audioMessage"]
+                if "base64" in audio_data:
+                    raw_audio = base64.b64decode(audio_data["base64"])
+                    text = await transcribe_audio_from_base64_or_url(raw_audio)
+                elif "url" in audio_data:
+                    raw_audio = await download_audio_from_url(audio_data["url"])
+                    if raw_audio:
+                        text = await transcribe_audio_from_base64_or_url(raw_audio)
 
         if from_me:
              return

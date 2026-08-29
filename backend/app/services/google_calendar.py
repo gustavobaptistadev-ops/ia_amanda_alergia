@@ -154,14 +154,14 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
 
         created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
         
-        # Atualizar a fase do Kanban para agendado!
+        # Atualizar a fase do Kanban para agendado e salvar Appointment
         if phone:
             from app.database import AsyncSessionLocal
-            from app.models.chat import Contact
+            from app.models.chat import Contact, Appointment
             from sqlalchemy.future import select
             import asyncio
             
-            async def update_stage():
+            async def update_stage_and_save_appointment():
                 async with AsyncSessionLocal() as session:
                     # O JID geralmente vem como DDI+DDD+numero@s.whatsapp.net. 
                     # Como o 'phone' pode ser só o número ou o JID, procuramos com 'like' ou exato.
@@ -170,14 +170,23 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
                     contact = result.scalars().first()
                     if contact:
                         contact.stage = "agendado"
+                        
+                        # Salva o agendamento no banco de dados para os lembretes automáticos
+                        new_appt = Appointment(
+                            contact_id=contact.id,
+                            patient_name=patient_name,
+                            appointment_time=start_dt,
+                            status="agendado"
+                        )
+                        session.add(new_appt)
                         await session.commit()
                         
             # Roda a função de forma fire-and-forget
             try:
                 loop = asyncio.get_running_loop()
-                loop.create_task(update_stage())
+                loop.create_task(update_stage_and_save_appointment())
             except RuntimeError:
-                asyncio.run(update_stage())
+                asyncio.run(update_stage_and_save_appointment())
 
         return f"Agendamento confirmado no Google Calendar! Link: {created_event.get('htmlLink')}"
 
