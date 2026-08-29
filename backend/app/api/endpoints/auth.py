@@ -81,3 +81,72 @@ async def get_me(user: User = Depends(get_current_user)):
         "name": user.name,
         "role": user.role
     }
+
+@router.get("/users")
+async def list_users(db: AsyncSession = Depends(get_db)):
+    """Lista todos os usuários cadastrados na clínica."""
+    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    users = result.scalars().all()
+    return [
+        {
+            "id": u.id,
+            "name": u.name,
+            "email": u.email,
+            "role": u.role,
+            "is_active": u.is_active,
+            "created_at": u.created_at.strftime("%d/%m/%Y %H:%M") if u.created_at else None
+        }
+        for u in users
+    ]
+
+@router.post("/users")
+async def create_user(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    """Cria um novo login de acesso para a equipe da clínica."""
+    if len(req.password) < 6:
+        raise HTTPException(status_code=400, detail="A senha deve ter no mínimo 6 caracteres.")
+        
+    result = await db.execute(select(User).where(User.email == req.email))
+    if result.scalars().first():
+        raise HTTPException(status_code=400, detail="Este e-mail já está cadastrado.")
+        
+    new_user = User(
+        email=req.email,
+        name=req.name,
+        hashed_password=get_password_hash(req.password),
+        role=req.role
+    )
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    
+    return {
+        "status": "ok",
+        "message": f"Usuário {new_user.name} criado com sucesso!",
+        "user": {
+            "id": new_user.id,
+            "name": new_user.name,
+            "email": new_user.email,
+            "role": new_user.role
+        }
+    }
+
+class ChangePasswordRequest(BaseModel):
+    email: str
+    current_password: str
+    new_password: str
+
+@router.post("/change-password")
+async def change_password(req: ChangePasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Altera a senha de um usuário autenticado."""
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="A nova senha deve ter no mínimo 6 caracteres.")
+        
+    result = await db.execute(select(User).where(User.email == req.email))
+    user = result.scalars().first()
+    
+    if not user or not verify_password(req.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Senha atual incorreta.")
+        
+    user.hashed_password = get_password_hash(req.new_password)
+    await db.commit()
+    return {"status": "ok", "message": "Senha alterada com sucesso!"}
