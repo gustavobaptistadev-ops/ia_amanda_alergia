@@ -92,8 +92,6 @@ export default function Configuracoes() {
     }
   };
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
   const fetchAiSettings = async () => {
     try {
       const res = await fetchWithAuth(`${apiUrl}/api/v1/settings/`);
