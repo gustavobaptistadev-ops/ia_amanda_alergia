@@ -38,19 +38,55 @@ export default function Conversas() {
   useEffect(() => {
     fetchContacts();
 
-    // WebSocket connection
-    const ws = new WebSocket(`${wsUrl}/api/v1/chats/ws`);
-    ws.onmessage = (event) => {
-      if (event.data === "update") {
-        fetchContacts();
-        if (selectedContact) {
-          fetchMessages(selectedContact.phone_number);
+    // WebSocket connection com Auto-reconnect e Polling Fallback
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: any = null;
+    let isMounted = true;
+
+    const connectWs = () => {
+      try {
+        ws = new WebSocket(`${wsUrl}/api/v1/chats/ws`);
+
+        ws.onmessage = (event) => {
+          if (event.data === "update") {
+            fetchContacts();
+            if (selectedContact) {
+              fetchMessages(selectedContact.phone_number);
+            }
+          }
+        };
+
+        ws.onclose = () => {
+          if (isMounted) {
+            reconnectTimeout = setTimeout(connectWs, 3000);
+          }
+        };
+
+        ws.onerror = () => {
+          ws?.close();
+        };
+      } catch (e) {
+        if (isMounted) {
+          reconnectTimeout = setTimeout(connectWs, 5000);
         }
       }
     };
 
+    connectWs();
+
+    // Polling de fallback caso o WebSocket falhe
+    const interval = setInterval(() => {
+      fetchContacts();
+      if (selectedContact) {
+        fetchMessages(selectedContact.phone_number);
+      }
+    }, 8000);
+
     return () => {
-      ws.close();
+      isMounted = false;
+      clearTimeout(reconnectTimeout);
+      clearInterval(interval);
+      ws?.close();
     };
   }, [selectedContact]);
 

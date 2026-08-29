@@ -224,6 +224,20 @@ async def process_user_message(thread_id: str, message: str) -> str:
         
     config = {"configurable": {"thread_id": thread_id}}
     
+    # [OBSERVABILIDADE] Adiciona Langfuse Callback Handler se configurado via ENV
+    if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
+        try:
+            from langfuse.callback import CallbackHandler
+            langfuse_handler = CallbackHandler(
+                public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+                secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+                host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+                session_id=thread_id
+            )
+            config["callbacks"] = [langfuse_handler]
+        except Exception as e:
+            logger.warning(f"Não foi possível inicializar Langfuse: {e}")
+
     # Com o checkpointer oficial, não precisamos carregar o histórico manualmente do banco de dados (tabela messages)
     # O próprio LangGraph vai gerenciar o histórico nas tabelas `checkpoints`!
     input_state = {"messages": [HumanMessage(content=message)]}

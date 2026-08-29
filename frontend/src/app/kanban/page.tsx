@@ -14,11 +14,19 @@ export default function Kanban() {
   const [columns, setColumns] = useState<Column[]>([]);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    fetchWithAuth(`${apiUrl}/api/v1/dashboard/kanban`)
-      .then((res) => res.json())
-      .then((data) => setColumns(data))
-      .catch((err) => console.error("Erro ao carregar kanban:", err));
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    
+    const fetchKanban = () => {
+      fetchWithAuth(`${apiUrl}/api/v1/dashboard/kanban`)
+        .then((res) => res.json())
+        .then((data) => setColumns(data))
+        .catch((err) => console.error("Erro ao carregar kanban:", err));
+    };
+
+    fetchKanban();
+    const interval = setInterval(fetchKanban, 10000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
