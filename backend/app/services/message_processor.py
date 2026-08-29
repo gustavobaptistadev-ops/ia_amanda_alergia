@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-async def process_and_respond(remote_jid: str, text: str, push_name: str):
+async def process_and_respond(remote_jid: str, text: str, push_name: str, is_audio: bool = False):
     """Executa a logica pesada de IA e envia a resposta."""
     try:
         await save_message(remote_jid, text, sender='paciente', name=push_name)
@@ -45,7 +45,23 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str):
                     c.stage = "atendimento_humano"
                     await session.commit()
 
-        await send_text_message(remote_jid, ai_response)
+        # [MULTIMODAL] Se o paciente mandou áudio e a opção de voz estiver ligada, responder com áudio TTS
+        from app.api.endpoints.settings import load_config
+        cfg = load_config()
+        voice_enabled = cfg.get("voice_reply_enabled", False)
+
+        if is_audio and voice_enabled:
+            from app.services.tts_service import generate_speech_audio
+            from app.services.evolution_api import send_voice_audio_message
+            voice_name = cfg.get("voice_name", "nova")
+            audio_bytes = await generate_speech_audio(ai_response, voice=voice_name)
+            if audio_bytes:
+                await send_voice_audio_message(remote_jid, audio_bytes)
+            else:
+                await send_text_message(remote_jid, ai_response)
+        else:
+            await send_text_message(remote_jid, ai_response)
+
         await save_message(remote_jid, ai_response, sender='ia')
         
         from app.api.endpoints.chats import manager
@@ -66,6 +82,7 @@ async def process_message(data: dict):
         remote_jid = ""
         push_name = "Cliente"
         text = ""
+        is_audio = False
 
         if event_type == "messages.upsert":
             message_data = data.get("data", {})
@@ -83,6 +100,7 @@ async def process_message(data: dict):
             elif "imageMessage" in message_obj:
                 text = message_obj["imageMessage"].get("caption", "")
             elif "audioMessage" in message_obj:
+                is_audio = True
                 logger.info("Detectada mensagem de áudio (messages.upsert). Iniciando transcrição...")
                 from app.services.audio_service import transcribe_audio_from_base64_or_url, download_audio_from_url
                 import base64
@@ -114,6 +132,7 @@ async def process_message(data: dict):
             elif "imageMessage" in msg_obj:
                 text = msg_obj["imageMessage"].get("caption", "")
             elif "audioMessage" in msg_obj:
+                is_audio = True
                 logger.info("Detectada mensagem de áudio (Message). Iniciando transcrição...")
                 from app.services.audio_service import transcribe_audio_from_base64_or_url, download_audio_from_url
                 import base64
@@ -135,7 +154,7 @@ async def process_message(data: dict):
              return
 
         logger.info(f"Processando Mensagem do paciente terminada em ...{remote_jid[-4:]} | Tamanho do texto: {len(text)} caracteres")
-        await process_and_respond(remote_jid, text, push_name)
+        await process_and_respond(remote_jid, text, push_name, is_audio=is_audio)
         
     except Exception as e:
         print(f"Error processing webhook msg: {e}", flush=True)

@@ -85,3 +85,29 @@ async def send_text_message(number: str, text: str):
             error_body = e.response.text if hasattr(e, 'response') and e.response else "No response body"
             logger.error(f"Erro ao enviar mensagem para {number}: {e} | Body: {error_body}")
             return None
+
+async def send_voice_audio_message(number: str, audio_bytes: bytes):
+    """Envia uma mensagem de áudio (formato de nota de voz WhatsApp) via EvolutionAPI / Ghosthub."""
+    import base64
+    url = f"{EVOLUTION_API_URL}/send/media"
+    
+    b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+    payload = {
+        "number": number,
+        "media": f"data:audio/ogg;base64,{b64_audio}",
+        "mediatype": "audio",
+        "delay": 1500
+    }
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(url, json=payload, headers=get_headers())
+            if response.status_code == 200:
+                logger.info(f"Áudio de voz enviado para {number} com sucesso.")
+                return response.json()
+            else:
+                logger.warning(f"Aviso ao enviar áudio: {response.status_code} - {response.text}")
+                return None
+        except Exception as e:
+            logger.error(f"Erro ao enviar áudio para {number}: {e}")
+            return None

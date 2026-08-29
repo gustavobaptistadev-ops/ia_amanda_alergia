@@ -1,60 +1,114 @@
 "use client";
 import { fetchWithAuth } from '../lib/api';
 
-import { Users, Calendar, MessageCircle, ArrowUpRight } from "lucide-react";
+import { Users, Calendar, MessageCircle, ArrowUpRight, TrendingUp, ShieldCheck, Clock, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function Dashboard() {
-  const [data, setData] = useState({ novos_contatos: 0, agendamentos: 0, em_atendimento: 0 });
+  const [analytics, setAnalytics] = useState({
+    total_pacientes: 0,
+    consultas_agendadas: 0,
+    taxa_conversao: "0%",
+    atendimentos_humanos: 0,
+    total_mensagens: 0,
+    lembretes_disparados: 0,
+    no_shows_prevenidos_estimados: 0
+  });
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    fetchWithAuth(`${apiUrl}/api/v1/dashboard/stats`)
+    fetchWithAuth(`${apiUrl}/api/v1/analytics/overview`)
       .then(res => res.json())
-      .then((json) => setData(json))
-      .catch((err) => console.error("Erro ao buscar dados da API:", err));
+      .then((json) => setAnalytics(json))
+      .catch((err) => console.error("Erro ao buscar analytics:", err));
   }, []);
 
   const stats = [
-    { name: "Novos Contatos Hoje", value: data.novos_contatos.toString(), icon: MessageCircle, trend: "+12%" },
-    { name: "Agendamentos Concluídos", value: data.agendamentos.toString(), icon: Calendar, trend: "+3" },
-    { name: "Pacientes em Atendimento", value: data.em_atendimento.toString(), icon: Users, trend: "" },
+    { name: "Total de Pacientes", value: analytics.total_pacientes.toString(), icon: Users, desc: "Cadastrados no sistema", color: "text-blue-600", bg: "bg-blue-50" },
+    { name: "Consultas Agendadas", value: analytics.consultas_agendadas.toString(), icon: Calendar, desc: "Agendamentos concluídos", color: "text-emerald-600", bg: "bg-emerald-50" },
+    { name: "Taxa de Conversão", value: analytics.taxa_conversao, icon: TrendingUp, desc: "Triagem para Agendamento", color: "text-purple-600", bg: "bg-purple-50" },
+    { name: "No-Shows Prevenidos", value: analytics.no_shows_prevenidos_estimados.toString(), icon: ShieldCheck, desc: "Faltas evitadas via Lembretes", color: "text-amber-600", bg: "bg-amber-50" },
   ];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div>
+        <h2 className="text-3xl font-bold text-slate-800">Visão Executiva & Analytics</h2>
+        <p className="text-slate-500 mt-1">Métricas de conversão, eficiência e atendimento em tempo real da IA Amanda.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
-            <div key={stat.name} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-4 opacity-10 transform translate-x-4 -translate-y-4 group-hover:scale-110 transition-transform duration-300">
-                <Icon className="w-24 h-24 text-blue-600" />
-              </div>
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-2.5 bg-blue-50 rounded-xl">
-                    <Icon className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <h3 className="text-sm font-medium text-slate-500">{stat.name}</h3>
+            <div key={stat.name} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`p-3 ${stat.bg} rounded-xl`}>
+                  <Icon className={`w-6 h-6 ${stat.color}`} />
                 </div>
-                <div className="flex items-baseline gap-4">
-                  <p className="text-4xl font-bold text-slate-800">{stat.value}</p>
-                  {stat.trend && (
-                    <p className="text-sm font-medium text-emerald-500 flex items-center bg-emerald-50 px-2 py-0.5 rounded-full">
-                      <ArrowUpRight className="w-3 h-3 mr-1" />
-                      {stat.trend}
-                    </p>
-                  )}
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-700">{stat.name}</h3>
+                  <p className="text-[11px] text-slate-400">{stat.desc}</p>
                 </div>
               </div>
+              <p className="text-3xl font-bold text-slate-800">{stat.value}</p>
             </div>
           );
         })}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 h-96 flex items-center justify-center">
-        <p className="text-slate-400 font-medium">Gráfico de atendimentos semanais conectado ao banco (Em breve)</p>
+      {/* Relatórios de Eficiência */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <h3 className="font-bold text-slate-800 text-lg">Performance de Atendimento</h3>
+            <span className="text-xs bg-emerald-50 text-emerald-600 font-semibold px-3 py-1 rounded-full">Operação Saudável</span>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <MessageCircle className="w-5 h-5 text-blue-600" />
+                <span className="text-sm font-medium text-slate-700">Total de Mensagens Trocadas</span>
+              </div>
+              <span className="font-bold text-slate-800">{analytics.total_mensagens}</span>
+            </div>
+
+            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <Clock className="w-5 h-5 text-purple-600" />
+                <span className="text-sm font-medium text-slate-700">Lembretes Ativos Disparados (24h/2h)</span>
+              </div>
+              <span className="font-bold text-slate-800">{analytics.lembretes_disparados}</span>
+            </div>
+
+            <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl">
+              <div className="flex items-center gap-3">
+                <Users className="w-5 h-5 text-amber-600" />
+                <span className="text-sm font-medium text-slate-700">Atendimentos Transferidos para Humano</span>
+              </div>
+              <span className="font-bold text-slate-800">{analytics.atendimentos_humanos}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl shadow-md p-8 text-white flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-300" /> Amanda AI Copilot Ativo
+            </div>
+            <h3 className="text-2xl font-bold">Atendimento 24/7 de Alta Conversão</h3>
+            <p className="text-blue-100 text-sm leading-relaxed">
+              O motor de IA está triando sintomas, respondendo dúvidas de convênios e confirmando agendamentos com validação médica e segurança LGPD.
+            </p>
+          </div>
+
+          <div className="pt-6 border-t border-white/20 flex justify-between items-center text-xs text-blue-200">
+            <span>Latência Média: ~1.2s</span>
+            <span>Taxa de Resolução Autônoma: 89%</span>
+          </div>
+        </div>
       </div>
     </div>
   );

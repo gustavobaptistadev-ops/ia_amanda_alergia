@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import logging
 from fastapi import APIRouter, HTTPException
@@ -14,13 +14,17 @@ class AIConfig(BaseModel):
     temperature: float = 0.2
     max_tokens: int = 1000
     persona_name: str = "Amanda"
+    voice_reply_enabled: bool = False
+    voice_name: str = "nova"
 
 def load_config() -> dict:
     default_cfg = {
         "model": "gpt-4o-mini",
         "temperature": 0.2,
         "max_tokens": 1000,
-        "persona_name": "Amanda"
+        "persona_name": "Amanda",
+        "voice_reply_enabled": False,
+        "voice_name": "nova"
     }
     if os.path.exists(CONFIG_FILE):
         try:

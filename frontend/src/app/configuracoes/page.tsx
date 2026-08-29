@@ -16,6 +16,8 @@ export default function Configuracoes() {
   const [aiModel, setAiModel] = useState("gpt-4o-mini");
   const [temperature, setTemperature] = useState(0.2);
   const [personaName, setPersonaName] = useState("Amanda");
+  const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
+  const [voiceName, setVoiceName] = useState("nova");
   const [savingAi, setSavingAi] = useState(false);
   const [aiSuccessMsg, setAiSuccessMsg] = useState(false);
 
@@ -29,6 +31,8 @@ export default function Configuracoes() {
         if (data.model) setAiModel(data.model);
         if (data.temperature !== undefined) setTemperature(data.temperature);
         if (data.persona_name) setPersonaName(data.persona_name);
+        if (data.voice_reply_enabled !== undefined) setVoiceReplyEnabled(data.voice_reply_enabled);
+        if (data.voice_name) setVoiceName(data.voice_name);
       }
     } catch (e) {
       console.error("Erro ao carregar configurações de IA:", e);
@@ -45,7 +49,9 @@ export default function Configuracoes() {
         body: JSON.stringify({
           model: aiModel,
           temperature: parseFloat(temperature.toString()),
-          persona_name: personaName
+          persona_name: personaName,
+          voice_reply_enabled: voiceReplyEnabled,
+          voice_name: voiceName
         })
       });
       if (res.ok) {
@@ -228,6 +234,52 @@ export default function Configuracoes() {
                 <span>0.0 (Mais Focada, Precisa e Padronizada)</span>
                 <span>1.0 (Mais Criativa e Conversacional)</span>
               </div>
+            </div>
+
+            {/* Configuração de Resposta em Áudio Humanizado (TTS) */}
+            <div className="space-y-4 md:col-span-2 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 p-6 rounded-2xl border border-blue-100">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    🎙️ Respostas em Áudio Humanizado (TTS)
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Quando ativado, caso o paciente envie um áudio, a Amanda responderá com uma mensagem de voz acolhedora.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={voiceReplyEnabled}
+                    onChange={(e) => setVoiceReplyEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+
+              {voiceReplyEnabled && (
+                <div className="pt-3 border-t border-blue-100/70 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Voz da Assistente</label>
+                    <select
+                      value={voiceName}
+                      onChange={(e) => setVoiceName(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-medium focus:outline-none"
+                    >
+                      <option value="nova">Nova (Voz Feminina Acolhedora - Recomendada)</option>
+                      <option value="shimmer">Shimmer (Voz Feminina Expressiva)</option>
+                      <option value="alloy">Alloy (Voz Neutra / Corporativa)</option>
+                      <option value="fable">Fable (Voz Dinâmica)</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <p className="text-[11px] text-slate-400">
+                      Utiliza o motor OpenAI TTS-1 em formato nativo de áudio do WhatsApp (Opus).
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

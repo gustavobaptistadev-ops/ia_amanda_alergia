@@ -24,12 +24,14 @@ class Contact(Base):
     messages = relationship("Message", back_populates="contact", cascade="all, delete-orphan")
     appointments = relationship("Appointment", back_populates="contact", cascade="all, delete-orphan")
 
+from app.models.types import EncryptedText
+
 class Message(Base):
     __tablename__ = "messages"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     contact_id = Column(String, ForeignKey("contacts.id"), index=True, nullable=False)
-    text = Column(Text, nullable=False)
+    text = Column(EncryptedText, nullable=False)
     sender = Column(String, nullable=False) # 'paciente', 'ia', 'humano'
     created_at = Column(DateTime, default=datetime.utcnow)
 
