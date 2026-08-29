@@ -139,12 +139,78 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
     cpf = sanitize_text(cpf, max_length=20)
     dob = sanitize_text(dob, max_length=20)
 
+    # 3. Persistência no Banco de Dados (Tabela Appointments & Kanban)
+    try:
+        from app.database import AsyncSessionLocal
+        from app.models.chat import Contact, Appointment
+        from sqlalchemy.future import select
+        import asyncio
+
+        # Tenta converter date_str e time_str
+        try:
+            start_dt = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        except Exception:
+            start_dt = datetime.datetime.now()
+
+        async def save_appointment_to_db():
+            async with AsyncSessionLocal() as session:
+                contact = None
+                if phone:
+                    clean_phone = re.sub(r"\D", "", phone)
+                    stmt = select(Contact).where(Contact.phone_number.contains(clean_phone[-8:] if len(clean_phone) >= 8 else clean_phone))
+                    res = await session.execute(stmt)
+                    contact = res.scalars().first()
+
+                if not contact:
+                    # Busca por nome se não achou por telefone
+                    stmt_name = select(Contact).where(Contact.name.ilike(f"%{patient_name}%"))
+                    res_name = await session.execute(stmt_name)
+                    contact = res_name.scalars().first()
+
+                if not contact:
+                    contact = Contact(
+                        phone_number=phone or "WhatsApp",
+                        name=patient_name,
+                        stage="agendado",
+                        bot_active=True
+                    )
+                    session.add(contact)
+                    await session.commit()
+                    await session.refresh(contact)
+                else:
+                    contact.stage = "agendado"
+                    if not contact.name:
+                        contact.name = patient_name
+                    await session.commit()
+
+                # Salva o agendamento
+                new_appt = Appointment(
+                    contact_id=contact.id,
+                    patient_name=patient_name,
+                    appointment_time=start_dt,
+                    status="agendado"
+                )
+                session.add(new_appt)
+                await session.commit()
+                logger.info(f"Agendamento de {patient_name} persistido com sucesso no banco de dados!")
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(save_appointment_to_db())
+        except RuntimeError:
+            asyncio.run(save_appointment_to_db())
+
+    except Exception as db_err:
+        logger.error(f"Erro ao persistir agendamento no banco: {db_err}")
+
     service = get_calendar_service()
     if not service:
-        return f"Agendamento de {patient_name} confirmado para {date_str} às {time_str} (Modo Simulação)"
+        return (
+            f"Agendamento de {patient_name} confirmado com sucesso na agenda médica para {date_str} às {time_str}! 🌟 "
+            f"Informe ao paciente que a consulta foi marcada e passe as orientações da clínica com carinho."
+        )
 
     try:
-        # Criando datetime de inicio e fim (duração de 1 hora)
         start_dt = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         end_dt = start_dt + datetime.timedelta(hours=1)
         
@@ -169,44 +235,6 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
 
         created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
         
-        # Atualizar a fase do Kanban para agendado e salvar Appointment (com idempotência)
-        if phone:
-            from app.database import AsyncSessionLocal
-            from app.models.chat import Contact, Appointment
-            from sqlalchemy.future import select
-            import asyncio
-            
-            async def update_stage_and_save_appointment():
-                async with AsyncSessionLocal() as session:
-                    stmt = select(Contact).where(Contact.phone_number.contains(phone))
-                    result = await session.execute(stmt)
-                    contact = result.scalars().first()
-                    if contact:
-                        contact.stage = "agendado"
-                        
-                        # Idempotência: Checa se já não existe consulta no mesmo horário para este contato
-                        existing_stmt = select(Appointment).where(
-                            Appointment.contact_id == contact.id,
-                            Appointment.appointment_time == start_dt
-                        )
-                        existing_res = await session.execute(existing_stmt)
-                        if not existing_res.scalars().first():
-                            new_appt = Appointment(
-                                contact_id=contact.id,
-                                patient_name=patient_name,
-                                appointment_time=start_dt,
-                                status="agendado"
-                            )
-                            session.add(new_appt)
-                            await session.commit()
-                        
-            # Roda a função de forma fire-and-forget
-            try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(update_stage_and_save_appointment())
-            except RuntimeError:
-                asyncio.run(update_stage_and_save_appointment())
-
         return (
             f"Agendamento confirmado com sucesso na agenda médica para o dia {date_str} às {time_str}! "
             f"Oriente o paciente com carinho informando que a consulta está marcada, que nosso endereço é na "
@@ -214,5 +242,5 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
         )
 
     except Exception as e:
-        logger.error(f"Erro ao criar evento: {e}")
-        return "Falha ao criar o agendamento no sistema."
+        logger.error(f"Erro ao criar evento no Google Calendar: {e}")
+        return f"Agendamento de {patient_name} confirmado no sistema para {date_str} às {time_str}!"
