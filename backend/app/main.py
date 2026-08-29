@@ -46,6 +46,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from starlette.requests import Request
+from starlette.responses import Response
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Injeta headers de segurança bancária em todas as respostas HTTP."""
+    response: Response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
 @app.get("/")
 async def root():
     return {"message": "Bem-vindo à API da IA Amanda - Sistema de Recepção Inteligente"}

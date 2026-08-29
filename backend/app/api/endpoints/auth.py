@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -27,18 +27,24 @@ class UserResponse(BaseModel):
     name: str
     role: str
 
+import os
+from app.core.limiter import limiter
+from fastapi import Request
+
 @router.post("/login")
-async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Autentica usuário e retorna JWT token com permissões (RBAC)."""
+@limiter.limit("5/minute")
+async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(get_db)):
+    """Autentica usuário e retorna JWT token com permissões (RBAC) e proteção contra força bruta."""
     result = await db.execute(select(User).where(User.email == req.email))
     user = result.scalars().first()
     
     # Se for o primeiro acesso da clínica e não houver usuários, auto-cria o admin padrão
-    if not user and req.email == "admin@respirar.com" and req.password == "admin123":
+    initial_admin_pwd = os.getenv("INITIAL_ADMIN_PASSWORD", "admin123")
+    if not user and req.email == "admin@respirar.com" and req.password == initial_admin_pwd:
         user = User(
             email="admin@respirar.com",
             name="Dr. Gustavo (Admin)",
-            hashed_password=get_password_hash("admin123"),
+            hashed_password=get_password_hash(initial_admin_pwd),
             role="admin"
         )
         db.add(user)

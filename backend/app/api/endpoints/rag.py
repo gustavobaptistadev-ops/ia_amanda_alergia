@@ -38,30 +38,48 @@ async def list_rag_files():
         logger.error(f"Erro ao ler base de conhecimento: {e}")
         raise HTTPException(status_code=500, detail="Erro ao ler os documentos")
 
+import re
+
+SAFE_FILENAME_REGEX = re.compile(r'^[a-zA-Z0-9_\-\.]+$')
+
+def validate_safe_filename(filename: str) -> str:
+    """Garante que o arquivo seja um .md seguro e impede Path Traversal."""
+    clean_name = os.path.basename(filename).strip()
+    if not clean_name.endswith('.md'):
+        clean_name += '.md'
+    if not SAFE_FILENAME_REGEX.match(clean_name) or '..' in clean_name:
+        raise HTTPException(status_code=400, detail="Nome de arquivo inválido ou inseguro.")
+    return clean_name
+
 @router.post("/")
 async def save_rag_file(data: RagData):
-    """Salva um arquivo .md específico."""
+    """Salva um arquivo .md específico com proteção estrita contra Path Traversal."""
     try:
-        if not data.filename.endswith('.md'):
-            data.filename += '.md'
-            
-        filepath = os.path.join(KNOWLEDGE_DIR, data.filename)
+        clean_filename = validate_safe_filename(data.filename)
+        filepath = os.path.join(KNOWLEDGE_DIR, clean_filename)
+        
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(data.content)
             
         return {"status": "ok", "message": "Arquivo salvo com sucesso!"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Erro ao salvar arquivo RAG: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/{filename}")
 async def delete_rag_file(filename: str):
-    """Deleta um arquivo .md específico."""
+    """Deleta um arquivo .md específico com proteção contra Path Traversal."""
     try:
-        filepath = os.path.join(KNOWLEDGE_DIR, filename)
+        clean_filename = validate_safe_filename(filename)
+        filepath = os.path.join(KNOWLEDGE_DIR, clean_filename)
+        
         if os.path.exists(filepath):
             os.remove(filepath)
         return {"status": "ok", "message": "Arquivo deletado."}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Erro ao deletar arquivo RAG: {e}")
         raise HTTPException(status_code=500, detail=str(e))
