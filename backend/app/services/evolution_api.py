@@ -89,9 +89,13 @@ async def send_text_message(number: str, text: str):
 async def send_voice_audio_message(number: str, audio_bytes: bytes):
     """Envia uma mensagem de áudio (formato de nota de voz WhatsApp) via EvolutionAPI / Ghosthub."""
     import base64
-    url = f"{EVOLUTION_API_URL}/send/media"
-    
+    if not audio_bytes:
+        return None
+
     b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+    
+    # 1. Tenta endpoint padrão /send/media
+    url = f"{EVOLUTION_API_URL}/send/media"
     payload = {
         "number": number,
         "media": f"data:audio/ogg;base64,{b64_audio}",
@@ -103,10 +107,22 @@ async def send_voice_audio_message(number: str, audio_bytes: bytes):
         try:
             response = await client.post(url, json=payload, headers=get_headers())
             if response.status_code == 200:
-                logger.info(f"Áudio de voz enviado para {number} com sucesso.")
+                logger.info(f"Áudio de voz enviado para {number} com sucesso via /send/media.")
                 return response.json()
             else:
-                logger.warning(f"Aviso ao enviar áudio: {response.status_code} - {response.text}")
+                logger.warning(f"Aviso /send/media ({response.status_code}): {response.text}. Tentando endpoint alternativo /send/audio...")
+                
+                # 2. Fallback para /send/audio (se suportado pelo provedor Ghosthub)
+                alt_url = f"{EVOLUTION_API_URL}/send/audio"
+                alt_payload = {
+                    "number": number,
+                    "audio": f"data:audio/ogg;base64,{b64_audio}",
+                    "delay": 1500
+                }
+                alt_res = await client.post(alt_url, json=alt_payload, headers=get_headers())
+                if alt_res.status_code == 200:
+                    logger.info(f"Áudio de voz enviado para {number} com sucesso via /send/audio.")
+                    return alt_res.json()
                 return None
         except Exception as e:
             logger.error(f"Erro ao enviar áudio para {number}: {e}")

@@ -108,21 +108,30 @@ async def process_message(data: dict):
                 text = message_obj["extendedTextMessage"].get("text", "")
             elif "imageMessage" in message_obj:
                 text = message_obj["imageMessage"].get("caption", "")
-            elif "audioMessage" in message_obj:
+            elif "audioMessage" in message_obj or "pttMessage" in message_obj or message_type in ["audioMessage", "pttMessage"]:
                 is_audio = True
-                logger.info("Detectada mensagem de áudio (messages.upsert). Iniciando transcrição...")
+                logger.info("Detectada mensagem de áudio (messages.upsert). Iniciando transcrição com Whisper...")
                 from app.services.audio_service import transcribe_audio_from_base64_or_url, download_audio_from_url
                 import base64
                 
-                audio_data = message_obj["audioMessage"]
-                # Caso venha base64 direto ou url
-                if "base64" in audio_data:
-                    raw_audio = base64.b64decode(audio_data["base64"])
+                audio_data = message_obj.get("audioMessage") or message_obj.get("pttMessage") or message_obj
+                raw_audio = None
+                
+                if isinstance(audio_data, dict):
+                    if "base64" in audio_data and audio_data["base64"]:
+                        raw_audio = base64.b64decode(audio_data["base64"])
+                    elif "url" in audio_data and audio_data["url"]:
+                        from app.services.evolution_api import get_headers
+                        raw_audio = await download_audio_from_url(audio_data["url"], headers=get_headers())
+                    elif "directPath" in audio_data and "mediaKey" in audio_data:
+                        logger.info("Tentando baixar áudio via URL de mídia do WhatsApp...")
+                elif isinstance(audio_data, str) and (audio_data.startswith("http") or audio_data.startswith("data:audio")):
+                    raw_audio = await download_audio_from_url(audio_data)
+
+                if raw_audio:
                     text = await transcribe_audio_from_base64_or_url(raw_audio)
-                elif "url" in audio_data:
-                    raw_audio = await download_audio_from_url(audio_data["url"])
-                    if raw_audio:
-                        text = await transcribe_audio_from_base64_or_url(raw_audio)
+                else:
+                    logger.warning(f"Não foi possível obter os bytes do áudio no payload: {audio_data}")
 
         elif event_type == "Message":
             info = data.get("data", {}).get("Info", {})
@@ -140,20 +149,36 @@ async def process_message(data: dict):
                 text = msg_obj["extendedTextMessage"].get("text", "")
             elif "imageMessage" in msg_obj:
                 text = msg_obj["imageMessage"].get("caption", "")
-            elif "audioMessage" in msg_obj:
+            elif "audioMessage" in msg_obj or "pttMessage" in msg_obj:
                 is_audio = True
-                logger.info("Detectada mensagem de áudio (Message). Iniciando transcrição...")
+                logger.info("Detectada mensagem de áudio (Message). Iniciando transcrição com Whisper...")
                 from app.services.audio_service import transcribe_audio_from_base64_or_url, download_audio_from_url
                 import base64
                 
-                audio_data = msg_obj["audioMessage"]
-                if "base64" in audio_data:
-                    raw_audio = base64.b64decode(audio_data["base64"])
+                audio_data = msg_obj.get("audioMessage") or msg_obj.get("pttMessage") or msg_obj
+                raw_audio = None
+                
+                if isinstance(audio_data, dict):
+                    if "base64" in audio_data and audio_data["base64"]:
+                        raw_audio = base64.b64decode(audio_data["base64"])
+                    elif "url" in audio_data and audio_data["url"]:
+                        from app.services.evolution_api import get_headers
+                        raw_audio = await download_audio_from_url(audio_data["url"], headers=get_headers())
+                    elif "file" in audio_data and audio_data["file"]:
+                        if audio_data["file"].startswith("http"):
+                            raw_audio = await download_audio_from_url(audio_data["file"])
+                        else:
+                            try:
+                                raw_audio = base64.b64decode(audio_data["file"])
+                            except Exception:
+                                pass
+                elif isinstance(audio_data, str) and (audio_data.startswith("http") or audio_data.startswith("data:audio")):
+                    raw_audio = await download_audio_from_url(audio_data)
+
+                if raw_audio:
                     text = await transcribe_audio_from_base64_or_url(raw_audio)
-                elif "url" in audio_data:
-                    raw_audio = await download_audio_from_url(audio_data["url"])
-                    if raw_audio:
-                        text = await transcribe_audio_from_base64_or_url(raw_audio)
+                else:
+                    logger.warning(f"Não foi possível obter os bytes do áudio no payload (Message): {audio_data}")
 
         if from_me:
              return
