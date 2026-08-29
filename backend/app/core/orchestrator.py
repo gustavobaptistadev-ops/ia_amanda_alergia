@@ -76,12 +76,42 @@ def generate_response_node(state: AgentState):
         chat_history="O LangGraph gerencia este histórico.",
         user_message="[Leia o histórico acima para entender o fluxo atual e continuar a conversa.]"
     )
-    
-    # Filtra mensagens problemáticas que possam ter ficado no histórico
-    valid_messages = [m for m in messages if not isinstance(m, RemoveMessage)]
+    # Filtra mensagens problemáticas (órfãs, dicts, RemoveMessage) para evitar erro 400 da OpenAI
+    sanitized = []
+    for m in messages:
+        if not hasattr(m, "content"): # Ignora dicts corrompidos ou tipos desconhecidos
+            continue
+        from langchain_core.messages import RemoveMessage, ToolMessage, AIMessage, BaseMessage
+        if isinstance(m, RemoveMessage):
+            continue
+        
+        if isinstance(m, ToolMessage):
+            if not sanitized:
+                continue
+            prev = sanitized[-1]
+            if isinstance(prev, AIMessage) and getattr(prev, 'tool_calls', None):
+                sanitized.append(m)
+            elif isinstance(prev, ToolMessage):
+                sanitized.append(m)
+            else:
+                continue # Descarta ToolMessage órfã
+        else:
+            sanitized.append(m)
+
+    # Segundo passe: remove tool_calls de AIMessages se não forem seguidos por um ToolMessage
+    final_messages = []
+    for i, m in enumerate(sanitized):
+        if isinstance(m, AIMessage) and getattr(m, 'tool_calls', None):
+            has_tool_result = (i + 1 < len(sanitized) and isinstance(sanitized[i+1], ToolMessage))
+            if not has_tool_result:
+                final_messages.append(AIMessage(content=m.content or ""))
+            else:
+                final_messages.append(m)
+        else:
+            final_messages.append(m)
     
     # Adicionando a instrução do sistema no topo
-    conversation = [SystemMessage(content=system_prompt)] + valid_messages
+    conversation = [SystemMessage(content=system_prompt)] + final_messages
     logger.info("Gerando resposta da LLM (Amanda) com tools...")
     response = llm_with_tools.invoke(conversation)
     return {"messages": [response]}
