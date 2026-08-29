@@ -66,11 +66,23 @@ def check_availability(date_str: str) -> str:
         
         events = events_result.get('items', [])
         
-        # Grade de horários de trabalho: Consultas de 1 em 1 hora
-        horarios_trabalho = [
-            "09:00", "10:00", "11:00", 
-            "14:00", "15:00", "16:00", "17:00"
-        ]
+        # Grade de horários de trabalho da clínica:
+        base_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+        weekday = base_date.weekday() # 0 = Segunda, 5 = Sábado, 6 = Domingo
+
+        # Domingo (6) a clínica não abre
+        if weekday == 6:
+            return f"A clínica não realiza atendimentos aos domingos. Por favor, consulte horários para dias úteis (segunda a sexta) ou sábados pela manhã."
+
+        # Sábado (5): Atendimento reduzido das 08h às 12h
+        if weekday == 5:
+            horarios_trabalho = ["08:30", "09:30", "10:30", "11:30"]
+        else:
+            # Segunda a Sexta: Atendimento normal
+            horarios_trabalho = [
+                "09:00", "10:00", "11:00", 
+                "14:00", "15:00", "16:00", "17:00"
+            ]
         
         ocupados_ranges = []
         for event in events:
@@ -79,7 +91,6 @@ def check_availability(date_str: str) -> str:
             
             if start and end:
                 try:
-                    # Converte para datetime
                     s_dt = datetime.datetime.fromisoformat(start.replace("Z", "+00:00"))
                     e_dt = datetime.datetime.fromisoformat(end.replace("Z", "+00:00"))
                     ocupados_ranges.append((s_dt, e_dt))
@@ -87,22 +98,18 @@ def check_availability(date_str: str) -> str:
                     pass
 
         livres = []
-        base_date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
         
         for h in horarios_trabalho:
             slot_time = datetime.datetime.strptime(h, "%H:%M").time()
             slot_start = datetime.datetime.combine(base_date, slot_time).replace(tzinfo=datetime.timezone(datetime.timedelta(hours=-3)))
             slot_end = slot_start + datetime.timedelta(hours=1)
             
-            # Verifica se o slot intercede com algum evento ocupado
             conflito = False
             for (s_dt, e_dt) in ocupados_ranges:
-                # Se o inicio do slot for antes do fim do evento E o fim do slot for depois do inicio do evento
                 if slot_start < e_dt and slot_end > s_dt:
                     conflito = True
                     break
             
-            # Se a data for hoje, não oferece horários que já passaram
             agora = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
             if slot_start < agora:
                 conflito = True
@@ -111,7 +118,9 @@ def check_availability(date_str: str) -> str:
                 livres.append(h)
         
         if livres:
-            return f"Horários livres para {date_str}: " + ", ".join(livres)
+            # Retorna apenas 3 opções mais próximas para um visual arejado e limpo no WhatsApp
+            sugestoes = livres[:3]
+            return f"Horários livres para {date_str}: " + ", ".join(sugestoes)
         else:
             return f"Não há horários disponíveis para {date_str}."
 
