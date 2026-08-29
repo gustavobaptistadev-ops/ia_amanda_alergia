@@ -123,7 +123,7 @@ from fastapi import Request
 @router.post("/{phone_number}/send")
 @limiter.limit("30/minute")
 async def send_human_message(request: Request, phone_number: str, payload: SendMessageRequest, db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
-    """Envia uma mensagem humana (atendente) com sanitização anti-XSS e rate limiting."""
+    """Envia uma mensagem humana (atendente) com sanitização anti-XSS, rate limiting e Human Takeover automático."""
     clean_text = sanitize_html(payload.text)
     await send_text_message(phone_number, clean_text)
     
@@ -141,6 +141,9 @@ async def send_human_message(request: Request, phone_number: str, payload: SendM
             sender='humano'
         )
         db.add(msg)
+        # Transição transparente: Atendente assumiu a conversa, pausa o bot temporariamente
+        contact.bot_active = False
         await db.commit()
+        await manager.broadcast("update")
         
-    return {"status": "ok"}
+    return {"status": "ok", "bot_active": False}

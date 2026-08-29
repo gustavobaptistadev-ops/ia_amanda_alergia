@@ -18,7 +18,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   Loader2,
-  CalendarCheck
+  CalendarCheck,
+  FileText
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -174,6 +175,34 @@ export default function Agenda() {
     return matchesSearch && matchesStatus;
   });
 
+  const handleExportCSV = () => {
+    if (appointments.length === 0) {
+      alert("Nenhuma consulta para exportar.");
+      return;
+    }
+    const headers = ["Data", "Horario", "Paciente", "Telefone", "Status"];
+    const rows = appointments.map((appt) => {
+      const dt = new Date(appt.appointment_time);
+      const dateStr = dt.toLocaleDateString("pt-BR");
+      const timeStr = dt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+      return [
+        `"${dateStr}"`,
+        `"${timeStr}"`,
+        `"${appt.patient_name.replace(/"/g, '""')}"`,
+        `"${appt.phone_number}"`,
+        `"${appt.status}"`
+      ].join(",");
+    });
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `agenda_consultas_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 min-h-screen">
       {/* Header Superior da Agenda */}
@@ -188,6 +217,14 @@ export default function Agenda() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
+            title="Exportar consultas em formato CSV"
+          >
+            <FileText className="w-4 h-4 text-emerald-600" /> Exportar Planilha (CSV)
+          </button>
+
           <button
             onClick={fetchAppointments}
             disabled={loading}
