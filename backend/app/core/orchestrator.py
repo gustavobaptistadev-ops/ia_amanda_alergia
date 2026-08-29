@@ -221,6 +221,13 @@ async def process_user_message(thread_id: str, message: str) -> str:
     # Garante que o checkpointer e o grafo estão inicializados
     if app_graph is None:
         await init_checkpointer()
+
+    # [CAMADA 1: INPUT SHIELD] Interceptação de ataques adversariais / jailbreak
+    from app.core.input_shield import detect_adversarial_attempt, sanitize_and_wrap_user_input
+    
+    if detect_adversarial_attempt(message):
+        logger.warning(f"[SECURITY SHIELD] Prompt injection interceptado para thread {thread_id}")
+        return "Olá! Sou a Amanda, assistente da clínica. 🌻 Como posso te ajudar hoje com suas dúvidas ou agendamento de consultas?"
         
     config = {"configurable": {"thread_id": thread_id}}
     
@@ -238,9 +245,9 @@ async def process_user_message(thread_id: str, message: str) -> str:
         except Exception as e:
             logger.warning(f"Não foi possível inicializar Langfuse: {e}")
 
-    # Com o checkpointer oficial, não precisamos carregar o histórico manualmente do banco de dados (tabela messages)
-    # O próprio LangGraph vai gerenciar o histórico nas tabelas `checkpoints`!
-    input_state = {"messages": [HumanMessage(content=message)]}
+    # Envelopa o input com delimitadores seguros para proteger o modelo contra quebras de contexto
+    wrapped_message = sanitize_and_wrap_user_input(message)
+    input_state = {"messages": [HumanMessage(content=wrapped_message)]}
     
     logger.info(f"LangGraph processando thread {thread_id} com AsyncPostgresSaver.")
     
