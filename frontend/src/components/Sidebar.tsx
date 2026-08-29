@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, MessageSquare, Settings, Activity, Database, Calendar } from "lucide-react";
+import { LayoutDashboard, Users, MessageSquare, Settings, Activity, Database, Calendar, Terminal } from "lucide-react";
 import clsx from "clsx";
 
 export default function Sidebar() {
@@ -14,6 +14,7 @@ export default function Sidebar() {
     { name: "Pacientes", href: "/kanban", icon: Users },
     { name: "Conversas", href: "/conversas", icon: MessageSquare },
     { name: "Conhecimento", href: "/conhecimento", icon: Database },
+    { name: "Auditoria & Lotes", href: "/logs", icon: Terminal },
     { name: "Configurações", href: "/configuracoes", icon: Settings },
   ];
 

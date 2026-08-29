@@ -50,3 +50,13 @@ class Appointment(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     contact = relationship("Contact", back_populates="appointments")
+
+class SystemLog(Base):
+    __tablename__ = "system_logs"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    category = Column(String, nullable=False, index=True) # 'cron_lembretes', 'webhook', 'ia_amanda', 'sistema', 'seguranca'
+    level = Column(String, default="INFO") # 'INFO', 'WARNING', 'ERROR', 'SUCCESS'
+    title = Column(String, nullable=False)
+    detail = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

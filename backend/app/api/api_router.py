@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.api.endpoints import webhook, dashboard, evolution, chats, rag, settings, auth, analytics, appointments
+from app.api.endpoints import webhook, dashboard, evolution, chats, rag, settings, auth, analytics, appointments, logs
 from app.core.security import get_api_key
 
 api_router = APIRouter()
@@ -16,3 +16,4 @@ api_router.include_router(evolution.router, prefix="/evolution", tags=["Evolutio
 api_router.include_router(chats.router, prefix="/chats", tags=["Chats Omnichannel"], dependencies=[Depends(get_api_key)])
 api_router.include_router(rag.router, prefix="/rag", tags=["RAG (Base de Conhecimento)"], dependencies=[Depends(get_api_key)])
 api_router.include_router(settings.router, prefix="/settings", tags=["Configurações de IA"], dependencies=[Depends(get_api_key)])
+api_router.include_router(logs.router, prefix="/logs", tags=["Auditoria & Monitor de Lotes"], dependencies=[Depends(get_api_key)])

@@ -3,9 +3,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.database import AsyncSessionLocal
-from app.models.chat import Appointment, Contact
-from app.services.evolution_api import send_text_message
-from app.services.db_service import save_message
+from app.models.chat import Appointment, Contact, SystemLog
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +26,7 @@ async def check_and_send_reminders():
 
     async with AsyncSessionLocal() as session:
         try:
+            total_sent = 0
             # 1. Checar lembretes de 24h
             stmt_24h = (
                 select(Appointment)
@@ -53,6 +52,13 @@ async def check_and_send_reminders():
                     await send_text_message(appt.contact.phone_number, msg)
                     await save_message(appt.contact.phone_number, msg, sender='ia')
                     appt.reminder_24h_sent = True
+                    total_sent += 1
+                    session.add(SystemLog(
+                        category="cron_lembretes",
+                        level="INFO",
+                        title=f"Lembrete 24h enviado: {appt.patient_name}",
+                        detail=f"Disparo via WhatsApp para {appt.contact.phone_number[:6]}****"
+                    ))
                     logger.info(f"Lembrete 24h enviado para {appt.contact.phone_number}")
 
             # 2. Checar lembretes de 2h
@@ -81,9 +87,32 @@ async def check_and_send_reminders():
                     await send_text_message(appt.contact.phone_number, msg)
                     await save_message(appt.contact.phone_number, msg, sender='ia')
                     appt.reminder_2h_sent = True
+                    total_sent += 1
+                    session.add(SystemLog(
+                        category="cron_lembretes",
+                        level="INFO",
+                        title=f"Lembrete 2h enviado: {appt.patient_name}",
+                        detail=f"Disparo com rota da clínica para {appt.contact.phone_number[:6]}****"
+                    ))
                     logger.info(f"Lembrete 2h enviado para {appt.contact.phone_number}")
 
+            session.add(SystemLog(
+                category="cron_lembretes",
+                level="SUCCESS",
+                title="Varredura de Lembretes Concluída",
+                detail=f"Lote verificado com sucesso. Total de lembretes disparados: {total_sent}."
+            ))
             await session.commit()
             logger.info("Rotina de lembretes finalizada com sucesso.")
         except Exception as e:
             logger.error(f"Erro ao processar lembretes: {e}")
+            try:
+                session.add(SystemLog(
+                    category="cron_lembretes",
+                    level="ERROR",
+                    title="Erro na Execução do Lote",
+                    detail=str(e)
+                ))
+                await session.commit()
+            except:
+                pass
