@@ -12,9 +12,11 @@ router = APIRouter()
 
 api_key_query = APIKeyQuery(name="token", auto_error=False)
 
+import secrets
+
 def verify_webhook_token(token: str = Security(api_key_query)):
-    if token != WEBHOOK_SECRET:
-        logger.warning(f"Tentativa de webhook negada. Token invalido: {token}")
+    if not secrets.compare_digest(token, WEBHOOK_SECRET):
+        logger.warning("Tentativa de webhook negada. Token inválido/incompatível.")
         raise HTTPException(status_code=403, detail="Invalid Webhook Secret")
     return token
 
@@ -38,7 +40,9 @@ async def evolution_webhook(request: Request, token: str = Security(verify_webho
     """Webhook para receber eventos da EvolutionAPI / Ghosthub."""
     try:
         data = await request.json()
-        print(f">>> [DEBUG] Webhook Payload: {data}", flush=True)
+        
+        # [SECURITY] Não logar o payload completo (evita vazar PII, CPFs e Base64 nos logs da nuvem)
+        logger.info(f"Webhook recebido: evento={data.get('event', 'unknown')}")
         
         pool = await get_redis_pool()
         await pool.enqueue_job("process_message_job", data)

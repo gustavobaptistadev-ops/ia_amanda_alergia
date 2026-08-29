@@ -40,11 +40,16 @@ async def websocket_endpoint(websocket: WebSocket):
 class SendMessageRequest(BaseModel):
     text: str
 
+from fastapi import Header
+
 @router.get("/")
-async def get_chats(db: AsyncSession = Depends(get_db)):
+async def get_chats(db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
     """Retorna a lista de contatos ordenados pela última mensagem"""
-    # Simple query for now
-    result = await db.execute(select(Contact).order_by(Contact.updated_at.desc()))
+    query = select(Contact)
+    if x_tenant_id:
+        query = query.where(Contact.tenant_id == x_tenant_id)
+    
+    result = await db.execute(query.order_by(Contact.updated_at.desc()))
     contacts = result.scalars().all()
     return contacts
 

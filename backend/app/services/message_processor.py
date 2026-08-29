@@ -93,7 +93,7 @@ async def process_message(data: dict):
         if "status@broadcast" in remote_jid:
              return
 
-        print(f">>> [DEBUG] Processando Mensagem de {remote_jid}: {text}", flush=True)
+        logger.info(f"Processando Mensagem do paciente terminada em ...{remote_jid[-4:]} | Tamanho do texto: {len(text)} caracteres")
         await process_and_respond(remote_jid, text, push_name)
         
     except Exception as e:
