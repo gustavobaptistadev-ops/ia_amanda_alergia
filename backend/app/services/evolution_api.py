@@ -82,5 +82,6 @@ async def send_text_message(number: str, text: str):
             logger.info(f"Mensagem enviada para {number} com sucesso.")
             return response.json()
         except httpx.HTTPError as e:
-            logger.error(f"Erro ao enviar mensagem para {number}: {e}")
+            error_body = e.response.text if hasattr(e, 'response') and e.response else "No response body"
+            logger.error(f"Erro ao enviar mensagem para {number}: {e} | Body: {error_body}")
             return None

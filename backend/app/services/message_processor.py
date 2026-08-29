@@ -29,7 +29,11 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str):
         is_safe = validar_resposta(ai_response)
         
         if not is_safe:
-            ai_response = "Desculpe, por segurana e para estarmos de acordo com a LGPD e o Conselho de Medicina, nuo posso abordar esse assunto por aqui. Por favor, aguarde que irei transferir vocG para nossa equipe m?dica ou ligue para a clnica."
+            ai_response = "Desculpe, por segurança e para estarmos de acordo com a LGPD e o Conselho de Medicina, não posso abordar esse assunto por aqui. Por favor, aguarde que irei transferir você para nossa equipe médica ou ligue para a clínica."
+
+        if not ai_response or not ai_response.strip():
+            logger.warning("AI response was empty. Using fallback message.")
+            ai_response = "Tive um pequeno problema ao processar sua solicitação. Poderia repetir, por favor?"
 
         await send_text_message(remote_jid, ai_response)
         await save_message(remote_jid, ai_response, sender='ia')

@@ -150,18 +150,18 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
         
         # Atualizar a fase do Kanban para agendado!
         if phone:
-            from app.database import async_session_maker
+            from app.database import AsyncSessionLocal
             from app.models.chat import Contact
             from sqlalchemy.future import select
             import asyncio
             
             async def update_stage():
-                async with async_session_maker() as session:
+                async with AsyncSessionLocal() as session:
                     # O JID geralmente vem como DDI+DDD+numero@s.whatsapp.net. 
                     # Como o 'phone' pode ser só o número ou o JID, procuramos com 'like' ou exato.
                     stmt = select(Contact).where(Contact.phone_number.contains(phone))
                     result = await session.execute(stmt)
-                    contact = result.scalar_one_or_none()
+                    contact = result.scalars().first()
                     if contact:
                         contact.stage = "agendado"
                         await session.commit()
