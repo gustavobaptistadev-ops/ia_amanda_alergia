@@ -11,7 +11,7 @@ CONFIG_FILE = os.path.join(os.path.dirname(__file__), "../../../settings_ai.json
 
 class AIConfig(BaseModel):
     model: str = "gpt-4o-mini"
-    temperature: float = 0.2
+    temperature: float = 0.35
     max_tokens: int = 1000
     persona_name: str = "Amanda"
     voice_reply_enabled: bool = False
@@ -20,7 +20,7 @@ class AIConfig(BaseModel):
 def load_config() -> dict:
     default_cfg = {
         "model": "gpt-4o-mini",
-        "temperature": 0.2,
+        "temperature": 0.35,
         "max_tokens": 1000,
         "persona_name": "Amanda",
         "voice_reply_enabled": False,
