@@ -40,6 +40,7 @@ def extract_intent_node(state: AgentState):
     last_msg = messages[-1].content
     
     prompt = f"""Analise a mensagem do paciente e classifique a intenção principal em apenas UMA das palavras abaixo:
+- URGENCIA (se o paciente relatar falta de ar súbita, edema de glote, reação anafilática grave, dor intensa no peito, ou irritação extrema querendo falar com humano)
 - AGENDAMENTO (se o paciente quiser marcar consulta, perguntar sobre horários)
 - DUVIDA (se o paciente quiser tirar dúvidas, saber preços, localização, ou apenas dar um Oi)
 
@@ -50,14 +51,31 @@ Classificação:"""
     llm = get_llm()
     response = llm.invoke([HumanMessage(content=prompt)]).content.strip().upper()
     
-    intent = "AGENDAMENTO" if "AGENDAR" in response or "AGENDAMENTO" in response else "DUVIDA"
+    if "URGENCIA" in response or "EMERGENCIA" in response:
+        intent = "URGENCIA"
+    elif "AGENDAR" in response or "AGENDAMENTO" in response:
+        intent = "AGENDAMENTO"
+    else:
+        intent = "DUVIDA"
     return {"intent": intent}
 
-def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow"]:
+def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow"]:
     """Função de roteamento condicional baseada na intenção."""
-    if state.get("intent") == "AGENDAMENTO":
+    intent = state.get("intent")
+    if intent == "URGENCIA":
+        return "urgency_flow"
+    if intent == "AGENDAMENTO":
         return "schedule_flow"
     return "fetch_context"
+
+def urgency_flow_node(state: AgentState):
+    """Nó de Alerta/Urgência: Gera mensagem de acolhimento emergencial e orienta buscar pronto-socorro."""
+    msg = (
+        "⚠️ Identifiquei que você pode estar passando por uma situação de urgência ou necessitando de atenção imediata.\n\n"
+        "Se estiver com sintomas agudos (como falta de ar súbita ou reação alérgica severa), por favor, *procure o Pronto Socorro mais próximo imediatamente*.\n\n"
+        "Já notifiquei nossa equipe clínica prioritariamente para assumir seu atendimento por aqui."
+    )
+    return {"messages": [AIMessage(content=msg)]}
 
 def fetch_context_node(state: AgentState):
     """Nó 2a: Busca o contexto no RAG (para Dúvidas)."""
@@ -147,6 +165,7 @@ tool_node = ToolNode(tools)
 workflow.add_node("extract_intent", extract_intent_node)
 workflow.add_node("fetch_context", fetch_context_node)
 workflow.add_node("schedule_flow", schedule_flow_node)
+workflow.add_node("urgency_flow", urgency_flow_node)
 workflow.add_node("generate_response", generate_response_node)
 workflow.add_node("tools", tool_node)
 workflow.add_node("prune_history", prune_history_node)
@@ -155,6 +174,7 @@ workflow.add_edge(START, "extract_intent")
 workflow.add_conditional_edges("extract_intent", route_intent)
 workflow.add_edge("fetch_context", "generate_response")
 workflow.add_edge("schedule_flow", "generate_response")
+workflow.add_edge("urgency_flow", "prune_history")
 
 workflow.add_conditional_edges(
     "generate_response",

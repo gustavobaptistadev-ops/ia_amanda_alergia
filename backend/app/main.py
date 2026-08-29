@@ -6,6 +6,12 @@ import logging
 from app.services.evolution_api import auto_create_instance
 from contextlib import asynccontextmanager
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
@@ -25,6 +31,8 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 import os
 frontend_url = os.getenv("NEXT_PUBLIC_FRONTEND_URL", "https://ia-amanda-frontend.up.railway.app")

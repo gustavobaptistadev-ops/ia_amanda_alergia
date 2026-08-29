@@ -35,7 +35,10 @@ async def get_redis_pool():
         _redis_pool = await create_pool(redis_settings)
     return _redis_pool
 
+from app.main import limiter
+
 @router.post("/evolution")
+@limiter.limit("60/minute")
 async def evolution_webhook(request: Request, token: str = Security(verify_webhook_token)):
     """Webhook para receber eventos da EvolutionAPI / Ghosthub."""
     try:

@@ -31,9 +31,19 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str):
         if not is_safe:
             ai_response = "Desculpe, por segurança e para estarmos de acordo com a LGPD e o Conselho de Medicina, não posso abordar esse assunto por aqui. Por favor, aguarde que irei transferir você para nossa equipe médica ou ligue para a clínica."
 
-        if not ai_response or not ai_response.strip():
-            logger.warning("AI response was empty. Using fallback message.")
-            ai_response = "Tive um pequeno problema ao processar sua solicitação. Poderia repetir, por favor?"
+        if "⚠️ Identifiquei que você pode estar passando por uma situação de urgência" in ai_response:
+            logger.warning(f"Urgência detectada para {remote_jid}. Pausando IA e escalando para atendimento humano...")
+            from app.database import AsyncSessionLocal
+            from app.models.chat import Contact
+            from sqlalchemy.future import select
+            
+            async with AsyncSessionLocal() as session:
+                res = await session.execute(select(Contact).where(Contact.phone_number == remote_jid))
+                c = res.scalars().first()
+                if c:
+                    c.bot_active = False
+                    c.stage = "atendimento_humano"
+                    await session.commit()
 
         await send_text_message(remote_jid, ai_response)
         await save_message(remote_jid, ai_response, sender='ia')
