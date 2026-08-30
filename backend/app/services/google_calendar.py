@@ -44,14 +44,19 @@ def get_calendar_service():
         return None
 
 @tool
-def check_availability(date_str: str) -> str:
+def check_availability(date_str: str, period: str = "todos") -> str:
     """
     Checa a disponibilidade na agenda para uma data específica (YYYY-MM-DD).
+    Opcionalmente filtra por período preferido ('manha', 'tarde' ou 'todos').
     """
     service = get_calendar_service()
     if not service:
-        # Se não tiver configurado ainda, retorna uma resposta mock para desenvolvimento
-        return f"Os seguintes horários estão livres para o dia {date_str}: 09:00, 10:30, 14:00 e 15:30. (Modo Simulação)"
+        # Modo Simulação com suporte a filtro de período
+        if period.lower() == "manha":
+            return f"Os seguintes horários da MANHÃ estão livres para o dia {date_str}: 09:00 e 10:30."
+        elif period.lower() == "tarde":
+            return f"Os seguintes horários da TARDE estão livres para o dia {date_str}: 14:00 e 15:30."
+        return f"Os seguintes horários estão livres para o dia {date_str}: 09:00, 10:30, 14:00 e 15:30."
 
     try:
         start_time = f"{date_str}T00:00:00-03:00"
@@ -85,6 +90,12 @@ def check_availability(date_str: str) -> str:
                 "14:00", "15:00", "16:00", "17:00"
             ]
         
+        # Filtra pelo turno solicitado pelo paciente
+        if period and period.lower() in ["manha", "manhã"]:
+            horarios_trabalho = [h for h in horarios_trabalho if int(h.split(":")[0]) < 12]
+        elif period and period.lower() == "tarde":
+            horarios_trabalho = [h for h in horarios_trabalho if int(h.split(":")[0]) >= 12]
+
         ocupados_ranges = []
         for event in events:
             start = event['start'].get('dateTime')
@@ -119,11 +130,12 @@ def check_availability(date_str: str) -> str:
                 livres.append(h)
         
         if livres:
-            # Retorna apenas 3 opções mais próximas para um visual arejado e limpo no WhatsApp
+            # Retorna até 3 opções para visual leve no WhatsApp
             sugestoes = livres[:3]
-            return f"Horários livres para {date_str}: " + ", ".join(sugestoes)
+            period_label = f" ({period.lower()})" if period != "todos" else ""
+            return f"Horários livres para {date_str}{period_label}: " + ", ".join(sugestoes)
         else:
-            return f"Não há horários disponíveis para {date_str}."
+            return f"Não há horários disponíveis para {date_str} no período solicitado ({period})."
 
     except Exception as e:
         logger.error(f"Erro ao consultar disponibilidade: {e}")

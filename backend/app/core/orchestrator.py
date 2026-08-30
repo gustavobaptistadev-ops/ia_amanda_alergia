@@ -90,15 +90,47 @@ def schedule_flow_node(state: AgentState):
     return {"context": context}
 
 async def generate_response_node(state: AgentState):
-    """Nó 3: Gera a resposta da Amanda com base no contexto, intenção e histórico seguro."""
+    """Nó 3: Gera a resposta da Amanda com base no contexto, intenção, perfil do paciente e histórico seguro."""
     intent = state.get('intent', 'duvidas_clinica')
     context = state.get('context', '')
     messages = state['messages']
     
     hoje = datetime.date.today().strftime("%d/%m/%Y")
     
+    # [MEMÓRIA DE LONGO PRAZO] Recupera perfil cadastral prévio do paciente no banco de dados
+    patient_profile_str = ""
+    try:
+        from app.database import AsyncSessionLocal
+        from app.models.chat import Contact
+        from sqlalchemy.future import select
+        
+        # O thread_id ou identificador pode ser associado
+        # Se houver dados cadastrados em contatos, extraímos para a persona
+        async with AsyncSessionLocal() as session:
+            # Pega o último número consultado ou ativo
+            stmt = select(Contact).order_by(Contact.updated_at.desc()).limit(1)
+            res = await session.execute(stmt)
+            active_contact = res.scalars().first()
+            if active_contact:
+                profile_parts = []
+                if active_contact.name:
+                    profile_parts.append(f"Nome do Paciente: {active_contact.name}")
+                if active_contact.insurance_operator:
+                    profile_parts.append(f"Convênio: {active_contact.insurance_operator} (Plano: {active_contact.insurance_plan_name or 'Padrão'})")
+                if active_contact.insurance_card_number:
+                    profile_parts.append(f"Matrícula do Plano: {active_contact.insurance_card_number}")
+                if active_contact.stage == "agendado":
+                    profile_parts.append("Status: Já possui agendamento prévio ou histórico na clínica.")
+                
+                if profile_parts:
+                    patient_profile_str = "📋 FICHA PRÉVIA DO PACIENTE (MEMÓRIA DE LONGO PRAZO):\n" + "\n".join(profile_parts) + "\n\n"
+    except Exception as err:
+        logger.debug(f"Aviso memória de longo prazo: {err}")
+
+    enriched_context = f"DATA DE HOJE: {hoje}\n\n" + (patient_profile_str if patient_profile_str else "") + context
+
     system_prompt = AMANDA_PERSONA_PROMPT.format(
-        rag_context=f"DATA DE HOJE: {hoje}\n" + context,
+        rag_context=enriched_context,
         chat_history="O LangGraph gerencia este histórico.",
         user_message="[Leia o histórico acima para entender o fluxo atual e continuar a conversa.]"
     )
