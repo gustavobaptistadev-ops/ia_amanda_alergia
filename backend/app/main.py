@@ -36,14 +36,16 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_card_number VARCHAR;",
             "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_plan_name VARCHAR;",
             "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_coverage VARCHAR;",
-            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_accommodation VARCHAR;"
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_accommodation VARCHAR;",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS prep_reminder_sent BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS follow_up_sent BOOLEAN DEFAULT FALSE;"
         ]
         for stmt in ddl_statements:
             try:
                 await conn.execute(text(stmt))
             except Exception as e:
                 logger.warning(f"Aviso ao executar DDL '{stmt}': {e}")
-        logger.info("Colunas de convênio sincronizadas no PostgreSQL com sucesso.")
+        logger.info("Tabelas e colunas sincronizadas no PostgreSQL com sucesso.")
     
     # Auto-create the instance in Evolution GO using the Global Key
     await auto_create_instance()

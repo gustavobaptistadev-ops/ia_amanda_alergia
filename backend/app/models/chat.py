@@ -52,6 +52,8 @@ class Appointment(Base):
     status = Column(String, default="agendado") # 'agendado', 'confirmado', 'cancelado', 'concluido'
     reminder_24h_sent = Column(Boolean, default=False)
     reminder_2h_sent = Column(Boolean, default=False)
+    prep_reminder_sent = Column(Boolean, default=False) # Reforço de suspensão de antialérgicos 5 dias antes
+    follow_up_sent = Column(Boolean, default=False) # Acolhimento 48h pós-consulta
     created_at = Column(DateTime, default=datetime.utcnow)
 
     contact = relationship("Contact", back_populates="appointments")

@@ -20,7 +20,8 @@ import {
   X,
   ChevronLeft,
   Filter,
-  Send
+  Send,
+  Mic
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -190,7 +191,7 @@ export default function Conversas() {
     return true;
   });
 
-  // Renderização amigável de mensagem (com formatação de imagem/carteirinha)
+  // Renderização amigável de mensagem (com formatação de imagem/carteirinha e áudio transcrito)
   const renderMessageContent = (text: string) => {
     if (text.includes("DADOS EXTRAÍDOS PELA VISÃO COMPUTACIONAL")) {
       const match = text.match(/Operadora: (.*?), Matrícula: (.*?), Plano: (.*?), Acomodação: (.*?), Abrangência: (.*?), Titular: (.*?)]/);
@@ -212,6 +213,21 @@ export default function Conversas() {
         );
       }
     }
+
+    if (text.startsWith("[Áudio Transcrito por IA]:") || text.includes("Áudio transcrito:")) {
+      return (
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-700 text-[11px] font-semibold">
+            <Mic className="w-3 h-3 text-purple-600 animate-pulse" />
+            <span>Áudio Transcrito por IA (Whisper)</span>
+          </div>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap italic">
+            "{text.replace("[Áudio Transcrito por IA]:", "").replace("Áudio transcrito:", "").trim()}"
+          </p>
+        </div>
+      );
+    }
+
     return <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>;
   };
 
