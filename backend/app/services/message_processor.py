@@ -397,11 +397,21 @@ async def process_message(data: dict):
 
                 if raw_audio:
                     text = await transcribe_audio_from_base64_or_url(raw_audio)
+                    if not text:
+                        logger.warning(f"Transcrição do áudio retornou vazia para {remote_jid}.")
                 else:
                     logger.warning(f"Não foi possível obter os bytes descriptografados do áudio: {audio_data}")
 
         if from_me:
              return
+        
+        # Se for áudio e a transcrição falhou (ex: quota Whisper esgotada ou ruído inaudível), acolhe o paciente
+        if is_audio and not text:
+             fallback_audio_msg = "🌻 Olá! Recebi seu áudio, mas no momento não consegui ouvir com total clareza. Você poderia me enviar sua dúvida ou solicitação por mensagem de texto, por favor? Assim já consigo te ajudar rapidinho!"
+             await send_text_message(remote_jid, fallback_audio_msg)
+             await save_message(remote_jid, fallback_audio_msg, sender='ia')
+             return
+
         if not text or not remote_jid:
              return
         if "status@broadcast" in remote_jid:
