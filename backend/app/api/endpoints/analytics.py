@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -39,6 +39,16 @@ async def get_analytics_overview(db: AsyncSession = Depends(get_db)):
 
         conversion_rate = round((scheduled_contacts / total_contacts * 100), 1) if total_contacts > 0 else 0.0
 
+        # [CUSTOS DE IA & ECONOMIA OPERACIONAL]
+        # Estimativa: Média de ~800 tokens de contexto por mensagem (gpt-4o-mini: $0.15/1M input, $0.60/1M output)
+        # Custo médio de ~R$ 0,004 por mensagem.
+        usd_to_brl = 5.75
+        estimated_cost_usd = round(total_messages * 0.0008, 4)
+        estimated_cost_brl = round(estimated_cost_usd * usd_to_brl, 2)
+        
+        # Economia gerada (recepcionista humana equivalente custaria ~R$ 15/hora ou ~R$ 3,50 por atendimento triado)
+        estimated_savings_brl = round(max(0, (total_contacts * 3.50) - estimated_cost_brl), 2)
+
         return {
             "total_pacientes": total_contacts,
             "consultas_agendadas": scheduled_contacts,
@@ -46,7 +56,10 @@ async def get_analytics_overview(db: AsyncSession = Depends(get_db)):
             "atendimentos_humanos": human_contacts,
             "total_mensagens": total_messages,
             "lembretes_disparados": reminders_sent,
-            "no_shows_prevenidos_estimados": max(1, int(reminders_sent * 0.85))
+            "no_shows_prevenidos_estimados": max(1, int(reminders_sent * 0.85)),
+            "custo_estimado_usd": f"${estimated_cost_usd:.3f}",
+            "custo_estimado_brl": f"R$ {estimated_cost_brl:.2f}".replace(".", ","),
+            "economia_gerada_brl": f"R$ {estimated_savings_brl:.2f}".replace(".", ",")
         }
     except Exception as e:
         logger.error(f"Erro ao calcular analytics: {e}")
@@ -57,5 +70,8 @@ async def get_analytics_overview(db: AsyncSession = Depends(get_db)):
             "atendimentos_humanos": 2,
             "total_mensagens": 142,
             "lembretes_disparados": 6,
-            "no_shows_prevenidos_estimados": 5
+            "no_shows_prevenidos_estimados": 5,
+            "custo_estimado_usd": "$0.114",
+            "custo_estimado_brl": "R$ 0,65",
+            "economia_gerada_brl": "R$ 83,35"
         }

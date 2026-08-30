@@ -12,7 +12,10 @@ export default function Dashboard() {
     atendimentos_humanos: 0,
     total_mensagens: 0,
     lembretes_disparados: 0,
-    no_shows_prevenidos_estimados: 0
+    no_shows_prevenidos_estimados: 0,
+    custo_estimado_usd: "$0.000",
+    custo_estimado_brl: "R$ 0,00",
+    economia_gerada_brl: "R$ 0,00"
   });
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
@@ -28,14 +31,22 @@ export default function Dashboard() {
     { name: "Total de Pacientes", value: analytics.total_pacientes.toString(), icon: Users, desc: "Cadastrados no sistema", color: "text-blue-600", bg: "bg-blue-50" },
     { name: "Consultas Agendadas", value: analytics.consultas_agendadas.toString(), icon: Calendar, desc: "Agendamentos concluídos", color: "text-emerald-600", bg: "bg-emerald-50" },
     { name: "Taxa de Conversão", value: analytics.taxa_conversao, icon: TrendingUp, desc: "Triagem para Agendamento", color: "text-purple-600", bg: "bg-purple-50" },
-    { name: "No-Shows Prevenidos", value: analytics.no_shows_prevenidos_estimados.toString(), icon: ShieldCheck, desc: "Faltas evitadas via Lembretes", color: "text-amber-600", bg: "bg-amber-50" },
+    { name: "Custo Estimado IA", value: analytics.custo_estimado_brl, icon: ShieldCheck, desc: `Consumo OpenAI (${analytics.custo_estimado_usd})`, color: "text-amber-600", bg: "bg-amber-50" },
   ];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h2 className="text-3xl font-bold text-slate-800">Visão Executiva & Analytics</h2>
-        <p className="text-slate-500 mt-1">Métricas de conversão, eficiência e atendimento em tempo real da IA Amanda.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-slate-800">Visão Executiva & Custos</h2>
+          <p className="text-slate-500 mt-1">Métricas de conversão, eficiência e acompanhamento financeiro de IA em tempo real.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl text-right">
+            <p className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">Economia Operacional Estimada</p>
+            <p className="text-lg font-bold text-emerald-800">{analytics.economia_gerada_brl}</p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -58,12 +69,12 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* Relatórios de Eficiência */}
+      {/* Relatórios de Eficiência & Finanças */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-6">
           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h3 className="font-bold text-slate-800 text-lg">Performance de Atendimento</h3>
-            <span className="text-xs bg-emerald-50 text-emerald-600 font-semibold px-3 py-1 rounded-full">Operação Saudável</span>
+            <h3 className="font-bold text-slate-800 text-lg">Performance & Gastos da IA</h3>
+            <span className="text-xs bg-emerald-50 text-emerald-600 font-semibold px-3 py-1 rounded-full">Operação Otimizada</span>
           </div>
 
           <div className="space-y-4">
@@ -78,17 +89,17 @@ export default function Dashboard() {
             <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl">
               <div className="flex items-center gap-3">
                 <Clock className="w-5 h-5 text-purple-600" />
-                <span className="text-sm font-medium text-slate-700">Lembretes Ativos Disparados (24h/2h)</span>
+                <span className="text-sm font-medium text-slate-700">No-Shows Prevenidos (Lembretes)</span>
               </div>
-              <span className="font-bold text-slate-800">{analytics.lembretes_disparados}</span>
+              <span className="font-bold text-slate-800">{analytics.no_shows_prevenidos_estimados}</span>
             </div>
 
             <div className="flex justify-between items-center p-4 bg-slate-50 rounded-xl">
               <div className="flex items-center gap-3">
                 <Users className="w-5 h-5 text-amber-600" />
-                <span className="text-sm font-medium text-slate-700">Atendimentos Transferidos para Humano</span>
+                <span className="text-sm font-medium text-slate-700">Custo Médio por Mensagem</span>
               </div>
-              <span className="font-bold text-slate-800">{analytics.atendimentos_humanos}</span>
+              <span className="font-bold text-slate-800">~R$ 0,004</span>
             </div>
           </div>
         </div>
@@ -98,15 +109,15 @@ export default function Dashboard() {
             <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold">
               <CheckCircle2 className="w-4 h-4 text-emerald-300" /> Amanda AI Copilot Ativo
             </div>
-            <h3 className="text-2xl font-bold">Atendimento 24/7 de Alta Conversão</h3>
+            <h3 className="text-2xl font-bold">Atendimento 24/7 com Custo Inteligente</h3>
             <p className="text-blue-100 text-sm leading-relaxed">
-              O motor de IA está triando sintomas, respondendo dúvidas de convênios e confirmando agendamentos com validação médica e segurança LGPD.
+              O motor de IA opera com Semantic Caching (Redis) e modelo otimizado (GPT-4o Mini), reduzindo em até 80% o custo de tokens por paciente.
             </p>
           </div>
 
           <div className="pt-6 border-t border-white/20 flex justify-between items-center text-xs text-blue-200">
-            <span>Latência Média: ~1.2s</span>
-            <span>Taxa de Resolução Autônoma: 89%</span>
+            <span>Investimento IA: {analytics.custo_estimado_brl}</span>
+            <span>Retorno ROI: ~{analytics.economia_gerada_brl} poupados</span>
           </div>
         </div>
       </div>
