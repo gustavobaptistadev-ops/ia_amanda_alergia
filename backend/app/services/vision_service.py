@@ -29,6 +29,71 @@ Retorne is_health_card: false e preencha summary_for_chat informando o que parec
 IMPORTANTE: Responda estritamente em formato JSON válido conforme as chaves acima.
 """
 
+import io
+import pypdf
+
+PDF_TEXT_PROMPT = """Você é um especialista sênior em faturamento médico e credenciamento hospitalar da Clínica Respirar.
+Sua missão é analisar o texto extraído de um documento PDF enviado por um paciente no WhatsApp e identificar se é uma Carteirinha de Plano de Saúde / Convênio Médico ou documento de saúde.
+
+Texto extraído do documento PDF:
+\"\"\"{extracted_text}\"\"\"
+
+Se FOR uma Carteirinha de Convênio ou Comprovante de Beneficiário (ex: Assefaz, Fundação Assefaz, Unimed, Bradesco, Amil, SulAmérica, Cassi, etc.), extraia minuciosamente:
+1. is_health_card: true
+2. operator: Nome da operadora (ex: Fundação Assefaz, Unimed, Bradesco Saúde, Amil, SulAmérica, etc.)
+3. patient_name: Nome do beneficiário (ex: MATEUS SANT ANA DOS SANTOS, PEDRO SANT ANA DOS SANTOS, SILAS NEVES PEREIRA)
+4. card_number: Número da matrícula / carteira (ex: 0001 0300 012963 007, 0001 0113 001426 861)
+5. plan_name: Categoria / Plano (ex: ASSEFAZ SAFIRA, ASSEFAZ RUBI, AMB + HOSP + OBST)
+6. coverage_area: Abrangência geográfica (ex: NACIONAL)
+7. accommodation: Acomodação (ex: APARTAMENTO, ENFERMARIA)
+8. expiration_date: Data de validade (ex: 31/07/2027)
+9. ans_code: Registro na ANS (ex: 34.692-6)
+10. summary_for_chat: Um resumo elegante para a Amanda confirmar com o paciente.
+
+Se NÃO for carteirinha:
+Retorne is_health_card: false e preencha summary_for_chat.
+
+Responda estritamente em formato JSON válido com as chaves acima.
+"""
+
+async def process_health_card_document(file_bytes: bytes, filename: str = "") -> Dict[str, Any]:
+    """
+    Processa documentos PDF ou imagens de carteirinhas de convênio (Assefaz, Unimed, Bradesco, etc.).
+    """
+    # 1. Se for PDF, tenta extrair o texto embutido com pypdf primeiro
+    if file_bytes.startswith(b"%PDF") or filename.lower().endswith(".pdf"):
+        logger.info("[DOC OCR] Detectado arquivo PDF. Extraindo texto do PDF...")
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            pdf_text = ""
+            for page in reader.pages:
+                t = page.extract_text()
+                if t:
+                    pdf_text += t + "\n"
+            
+            if len(pdf_text.strip()) > 30:
+                logger.info(f"[DOC OCR] Texto extraído com sucesso do PDF ({len(pdf_text)} caracteres). Analisando com LLM...")
+                llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+                messages = [
+                    SystemMessage(content="Você extrai dados de saúde e responde apenas em JSON."),
+                    HumanMessage(content=PDF_TEXT_PROMPT.format(extracted_text=pdf_text))
+                ]
+                resp = await llm.ainvoke(messages)
+                content = resp.content.strip()
+                if "```json" in content:
+                    content = content.split("```json")[1].split("```")[0].strip()
+                elif "```" in content:
+                    content = content.split("```")[1].split("```")[0].strip()
+                data = json.loads(content)
+                if data.get("is_health_card"):
+                    logger.info(f"[PDF SUCCESS] Carteirinha lida: Operadora={data.get('operator')}, Titular={data.get('patient_name')}, Matrícula={data.get('card_number')}")
+                    return data
+        except Exception as pdf_err:
+            logger.warning(f"[DOC OCR] Falha ao extrair texto do PDF via pypdf: {pdf_err}")
+
+    # 2. Se for imagem ou se o PDF precisar de visão computacional
+    return await process_health_card_image(file_bytes)
+
 async def process_health_card_image(image_bytes: bytes) -> Dict[str, Any]:
     """
     Processa os bytes de uma imagem usando GPT-4o Vision e retorna os dados estruturados da carteirinha.
@@ -46,7 +111,7 @@ async def process_health_card_image(image_bytes: bytes) -> Dict[str, Any]:
             SystemMessage(content=VISION_PROMPT),
             HumanMessage(
                 content=[
-                    {"type": "text", "text": "Analise esta imagem enviada pelo paciente e extraia os dados da carteirinha médica se aplicável."},
+                    {"type": "text", "text": "Analise esta imagem/carteirinha enviada pelo paciente e extraia os dados médicos com precisão."},
                     {
                         "type": "image_url",
                         "image_url": {
@@ -69,7 +134,7 @@ async def process_health_card_image(image_bytes: bytes) -> Dict[str, Any]:
             content = content.split("```")[1].split("```")[0].strip()
             
         data = json.loads(content)
-        logger.info(f"[VISION OCR SUCCESS] Carteirinha processada: Operadora={data.get('operator')}, Matrícula={data.get('card_number')}")
+        logger.info(f"[VISION OCR SUCCESS] Carteirinha processada: Operadora={data.get('operator')}, Matrícula={data.get('card_number')}, Titular={data.get('patient_name')}")
         return data
         
     except Exception as e:
@@ -77,5 +142,5 @@ async def process_health_card_image(image_bytes: bytes) -> Dict[str, Any]:
         return {
             "is_health_card": False,
             "error": str(e),
-            "summary_for_chat": "Recebi sua imagem, mas não consegui ler os dados da carteirinha com nitidez. Poderia me enviar outra foto mais nítida ou confirmar o número do seu plano por texto?"
+            "summary_for_chat": "Recebi seu documento/carteirinha, mas não consegui ler os dados com nitidez. Poderia me confirmar o nome do seu plano e o número da carteirinha por texto?"
         }

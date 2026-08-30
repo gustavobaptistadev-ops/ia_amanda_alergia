@@ -106,10 +106,59 @@ async def process_message(data: dict):
                 text = message_obj["conversation"]
             elif "extendedTextMessage" in message_obj:
                 text = message_obj["extendedTextMessage"].get("text", "")
+            elif "documentMessage" in message_obj or "documentWithCaptionMessage" in message_obj or message_type in ["documentMessage", "documentWithCaptionMessage"]:
+                doc_obj = message_obj.get("documentMessage") or message_obj.get("documentWithCaptionMessage", {}).get("message", {}).get("documentMessage") or message_obj
+                caption = doc_obj.get("caption", "")
+                filename = doc_obj.get("fileName") or doc_obj.get("filename") or "documento.pdf"
+                logger.info(f"Detectado documento enviado pelo paciente (upsert): {filename}. Processando OCR de PDF/Carteirinha...")
+                from app.services.vision_service import process_health_card_document
+                from app.services.audio_service import download_audio_from_url, decrypt_whatsapp_media
+                import base64
+
+                raw_doc = None
+                b64_val = doc_obj.get("base64") or doc_obj.get("Base64") or doc_obj.get("media") or ""
+                media_key = doc_obj.get("mediaKey")
+                media_url = doc_obj.get("url") or doc_obj.get("URL") or ""
+
+                if b64_val:
+                    if "," in b64_val:
+                        b64_val = b64_val.split(",")[1]
+                    raw_doc = base64.b64decode(b64_val)
+                elif media_url and media_key:
+                    enc_bytes = await download_audio_from_url(media_url)
+                    if enc_bytes:
+                        raw_doc = decrypt_whatsapp_media(enc_bytes, media_key, media_type="document")
+                elif media_url and not ".enc" in media_url:
+                    raw_doc = await download_audio_from_url(media_url)
+
+                if raw_doc:
+                    card_data = await process_health_card_document(raw_doc, filename=filename)
+                    if card_data.get("is_health_card"):
+                        from app.database import AsyncSessionLocal
+                        from app.models.chat import Contact
+                        from sqlalchemy.future import select
+                        async with AsyncSessionLocal() as session:
+                            res = await session.execute(select(Contact).where(Contact.phone_number == remote_jid))
+                            c = res.scalars().first()
+                            if c:
+                                c.insurance_operator = card_data.get("operator")
+                                c.insurance_card_number = card_data.get("card_number")
+                                c.insurance_plan_name = card_data.get("plan_name")
+                                c.insurance_coverage = card_data.get("coverage_area")
+                                c.insurance_accommodation = card_data.get("accommodation")
+                                if card_data.get("patient_name") and not c.name:
+                                    c.name = card_data.get("patient_name")
+                                await session.commit()
+
+                        text = f"[O paciente enviou o PDF/comprovante da sua carteirinha de convênio ({card_data.get('operator')}). DADOS EXTRAÍDOS PELA VISÃO COMPUTACIONAL: Operadora: {card_data.get('operator')}, Matrícula: {card_data.get('card_number')}, Plano: {card_data.get('plan_name')}, Acomodação: {card_data.get('accommodation')}, Abrangência: {card_data.get('coverage_area')}, Titular: {card_data.get('patient_name')}]. {caption}"
+                    else:
+                        text = f"[O paciente enviou um documento PDF ({filename}). Resumo do conteúdo: {card_data.get('summary_for_chat')}]. {caption}"
+                else:
+                    text = caption or f"[Documento PDF {filename} enviado pelo paciente]"
             elif "imageMessage" in message_obj:
                 caption = message_obj["imageMessage"].get("caption", "")
                 logger.info("Detectada imagem enviada pelo paciente. Acionando módulo Vision OCR de Carteirinhas...")
-                from app.services.vision_service import process_health_card_image
+                from app.services.vision_service import process_health_card_document
                 from app.services.audio_service import download_audio_from_url, decrypt_whatsapp_media
                 import base64
                 
@@ -131,7 +180,7 @@ async def process_message(data: dict):
                     raw_img = await download_audio_from_url(media_url)
 
                 if raw_img:
-                    card_data = await process_health_card_image(raw_img)
+                    card_data = await process_health_card_document(raw_img)
                     if card_data.get("is_health_card"):
                         # Atualiza dados do contato no banco relacional
                         from app.database import AsyncSessionLocal
@@ -201,14 +250,63 @@ async def process_message(data: dict):
                 text = msg_obj["conversation"]
             elif "extendedTextMessage" in msg_obj:
                 text = msg_obj["extendedTextMessage"].get("text", "")
-            elif "imageMessage" in msg_obj:
-                caption = msg_obj["imageMessage"].get("caption", "")
+            elif "documentMessage" in message_obj or "documentWithCaptionMessage" in message_obj or message_type in ["documentMessage", "documentWithCaptionMessage"]:
+                doc_obj = message_obj.get("documentMessage") or message_obj.get("documentWithCaptionMessage", {}).get("message", {}).get("documentMessage") or message_obj
+                caption = doc_obj.get("caption", "")
+                filename = doc_obj.get("fileName") or doc_obj.get("filename") or "documento.pdf"
+                logger.info(f"Detectado documento enviado pelo paciente: {filename}. Processando OCR de PDF/Carteirinha...")
+                from app.services.vision_service import process_health_card_document
+                from app.services.audio_service import download_audio_from_url, decrypt_whatsapp_media
+                import base64
+
+                raw_doc = None
+                b64_val = doc_obj.get("base64") or doc_obj.get("Base64") or doc_obj.get("media") or ""
+                media_key = doc_obj.get("mediaKey")
+                media_url = doc_obj.get("url") or doc_obj.get("URL") or ""
+
+                if b64_val:
+                    if "," in b64_val:
+                        b64_val = b64_val.split(",")[1]
+                    raw_doc = base64.b64decode(b64_val)
+                elif media_url and media_key:
+                    enc_bytes = await download_audio_from_url(media_url)
+                    if enc_bytes:
+                        raw_doc = decrypt_whatsapp_media(enc_bytes, media_key, media_type="document")
+                elif media_url and not ".enc" in media_url:
+                    raw_doc = await download_audio_from_url(media_url)
+
+                if raw_doc:
+                    card_data = await process_health_card_document(raw_doc, filename=filename)
+                    if card_data.get("is_health_card"):
+                        from app.database import AsyncSessionLocal
+                        from app.models.chat import Contact
+                        from sqlalchemy.future import select
+                        async with AsyncSessionLocal() as session:
+                            res = await session.execute(select(Contact).where(Contact.phone_number == remote_jid))
+                            c = res.scalars().first()
+                            if c:
+                                c.insurance_operator = card_data.get("operator")
+                                c.insurance_card_number = card_data.get("card_number")
+                                c.insurance_plan_name = card_data.get("plan_name")
+                                c.insurance_coverage = card_data.get("coverage_area")
+                                c.insurance_accommodation = card_data.get("accommodation")
+                                if card_data.get("patient_name") and not c.name:
+                                    c.name = card_data.get("patient_name")
+                                await session.commit()
+
+                        text = f"[O paciente enviou o PDF/comprovante da sua carteirinha de convênio ({card_data.get('operator')}). DADOS EXTRAÍDOS PELA VISÃO COMPUTACIONAL: Operadora: {card_data.get('operator')}, Matrícula: {card_data.get('card_number')}, Plano: {card_data.get('plan_name')}, Acomodação: {card_data.get('accommodation')}, Abrangência: {card_data.get('coverage_area')}, Titular: {card_data.get('patient_name')}]. {caption}"
+                    else:
+                        text = f"[O paciente enviou um documento PDF ({filename}). Resumo do conteúdo: {card_data.get('summary_for_chat')}]. {caption}"
+                else:
+                    text = caption or f"[Documento PDF {filename} enviado pelo paciente]"
+            elif "imageMessage" in message_obj:
+                caption = message_obj["imageMessage"].get("caption", "")
                 logger.info("Detectada imagem enviada pelo paciente (Message). Acionando módulo Vision OCR de Carteirinhas...")
-                from app.services.vision_service import process_health_card_image
+                from app.services.vision_service import process_health_card_document
                 from app.services.audio_service import download_audio_from_url, decrypt_whatsapp_media
                 import base64
                 
-                img_data = msg_obj.get("imageMessage", {})
+                img_data = message_obj.get("imageMessage", {})
                 raw_img = None
                 b64_val = img_data.get("base64") or img_data.get("Base64") or img_data.get("media") or ""
                 media_key = img_data.get("mediaKey")
@@ -232,7 +330,7 @@ async def process_message(data: dict):
                         raw_img = await get_base64_from_media(msg_id, remote_jid)
 
                 if raw_img:
-                    card_data = await process_health_card_image(raw_img)
+                    card_data = await process_health_card_document(raw_img)
                     if card_data.get("is_health_card"):
                         from app.database import AsyncSessionLocal
                         from app.models.chat import Contact
