@@ -166,7 +166,7 @@ export default function Conversas() {
 
   const resetConversation = async () => {
     if (!selectedContact) return;
-    if (window.confirm("Atenção! Isso apagará TODO o histórico de mensagens, resetará o Kanban para Novo Contato e limpará a memória da IA para este número. Continuar?")) {
+    if (window.confirm("Atenção! Isso apagará o histórico de mensagens, resetará o Kanban e limpará a memória da IA para este paciente. Continuar?")) {
       try {
         await fetchWithAuth(`${apiUrl}/api/v1/chats/${selectedContact.phone_number}/reset`, {
           method: "DELETE"
@@ -174,6 +174,24 @@ export default function Conversas() {
         setMessages([]);
         fetchContacts();
         setSelectedContact({ ...selectedContact, bot_active: true });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
+  const resetAllConversations = async () => {
+    if (window.confirm("⚠️ ATENÇÃO MÁXIMA: Deseja apagar TODAS as conversas, contatos e memórias da IA de todo o sistema? Essa ação não pode ser desfeita.")) {
+      try {
+        const res = await fetchWithAuth(`${apiUrl}/api/v1/chats/reset-all`, {
+          method: "DELETE"
+        });
+        if (res.ok) {
+          setMessages([]);
+          setSelectedContact(null);
+          fetchContacts();
+          alert("Todas as conversas foram resetadas com sucesso!");
+        }
       } catch (e) {
         console.error(e);
       }
@@ -243,8 +261,17 @@ export default function Conversas() {
           <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Monitoramento Clínico Omnichannel</h2>
           <p className="text-slate-500 text-xs md:text-sm mt-0.5">Acompanhe as triagens da Amanda IA em tempo real e assuma quando necessário.</p>
         </div>
-        <div className="hidden sm:flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={resetAllConversations}
+            title="Apagar todas as mensagens e memórias antigas"
+            className="flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-full border border-rose-200 transition-all"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Limpar Histórico Geral</span>
+          </button>
+
+          <span className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             WhatsApp Ativo
           </span>

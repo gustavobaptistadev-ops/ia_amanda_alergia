@@ -66,6 +66,28 @@ async def get_messages(phone_number: str, db: AsyncSession = Depends(get_db), x_
     messages = result.scalars().all()
     return messages
 
+@router.delete("/reset-all")
+async def reset_all_conversations(db: AsyncSession = Depends(get_db)):
+    """Reseta e limpa absolutamente todas as conversas, contatos e checkpoints de memoria do LangGraph."""
+    from sqlalchemy import delete, text
+    try:
+        await db.execute(delete(Message))
+        await db.execute(delete(Contact))
+        
+        try:
+            await db.execute(text("DELETE FROM checkpoints"))
+            await db.execute(text("DELETE FROM checkpoint_blobs"))
+            await db.execute(text("DELETE FROM checkpoint_writes"))
+        except Exception:
+            pass
+            
+        await db.commit()
+        await manager.broadcast("update")
+        return {"status": "ok", "message": "Todas as conversas e memórias da IA foram completamente resetadas!"}
+    except Exception as e:
+        logger.error(f"Erro ao resetar todas as conversas: {e}")
+        return {"status": "error", "detail": str(e)}
+
 @router.delete("/{phone_number}/reset")
 async def reset_conversation(phone_number: str, db: AsyncSession = Depends(get_db), x_tenant_id: str = Header(None)):
     """Reseta todo o histórico e memória de um contato (PostgreSQL + Checkpoints LangGraph)"""
