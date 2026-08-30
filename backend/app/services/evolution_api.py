@@ -11,10 +11,17 @@ EVOLUTION_GLOBAL_KEY = os.getenv("EVOLUTION_GLOBAL_KEY", "1dcd4e3bc54541449f52c5
 EVOLUTION_API_KEY = os.getenv("EVOLUTION_API_KEY", "chave-secreta-ia-amanda")
 EVOLUTION_INSTANCE_NAME = os.getenv("EVOLUTION_INSTANCE_NAME", "ia_amanda")
 
+_cached_tenant_token = None
+
 def get_headers():
+    token = os.getenv("EVOLUTION_API_KEY", "sk_amanda_9f8d7e6c5b4a3f2e1d0c9b8a7f6e5d4c")
+    # Se a chave do ENV for a antiga ou estiver faltando, usa a chave ativa do tenant
+    if not token or token == "chave-secreta-ia-amanda":
+        token = "sk_amanda_9f8d7e6c5b4a3f2e1d0c9b8a7f6e5d4c"
+        
     return {
-        "apikey": EVOLUTION_API_KEY,
-        "Authorization": f"Bearer {EVOLUTION_API_KEY}",
+        "apikey": token,
+        "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
         "instance": EVOLUTION_INSTANCE_NAME
     }
