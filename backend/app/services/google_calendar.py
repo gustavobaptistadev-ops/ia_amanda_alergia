@@ -2,10 +2,15 @@ import os
 import datetime
 import json
 import re
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 import logging
 from langchain_core.tools import tool
+
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+except ImportError:
+    service_account = None
+    build = None
 
 logger = logging.getLogger(__name__)
 
