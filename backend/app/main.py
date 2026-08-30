@@ -29,19 +29,21 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
-        # 2. Executa DDL idempotente para garantir que colunas novas existam em tabelas legadas
+        # 2. Executa DDL idempotente comando a comando (exigência do driver asyncpg)
         from sqlalchemy import text
-        try:
-            await conn.execute(text("""
-                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_operator VARCHAR;
-                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_card_number VARCHAR;
-                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_plan_name VARCHAR;
-                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_coverage VARCHAR;
-                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_accommodation VARCHAR;
-            """))
-            logger.info("Colunas de convênio sincronizadas no PostgreSQL com sucesso.")
-        except Exception as e:
-            logger.warning(f"Aviso ao verificar colunas da tabela contacts: {e}")
+        ddl_statements = [
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_operator VARCHAR;",
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_card_number VARCHAR;",
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_plan_name VARCHAR;",
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_coverage VARCHAR;",
+            "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_accommodation VARCHAR;"
+        ]
+        for stmt in ddl_statements:
+            try:
+                await conn.execute(text(stmt))
+            except Exception as e:
+                logger.warning(f"Aviso ao executar DDL '{stmt}': {e}")
+        logger.info("Colunas de convênio sincronizadas no PostgreSQL com sucesso.")
     
     # Auto-create the instance in Evolution GO using the Global Key
     await auto_create_instance()
