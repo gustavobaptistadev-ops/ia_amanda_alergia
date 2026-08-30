@@ -60,12 +60,37 @@ def sanitize_rag_chunk(text: str) -> str:
     clean = re.sub(r"(?i)\besque[cç]a\s+(todas\s+as\s+)?regras\b", "", clean)
     return clean.strip()
 
+KNOWLEDGE_DIR = os.path.join(os.path.dirname(__file__), '../../docs/knowledge_base')
+
+def load_all_local_knowledge() -> str:
+    """Lê todos os arquivos .md da base de conhecimento local como fallback garantido."""
+    try:
+        combined = []
+        if os.path.exists(KNOWLEDGE_DIR):
+            for filename in sorted(os.listdir(KNOWLEDGE_DIR)):
+                if filename.endswith(".md"):
+                    filepath = os.path.join(KNOWLEDGE_DIR, filename)
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        txt = f.read()
+                        if txt.strip():
+                            combined.append(f"--- {filename} ---\n{txt.strip()}")
+        return "\n\n".join(combined)
+    except Exception as e:
+        logger.error(f"Erro ao carregar base local de markdown: {e}")
+        return ""
+
 def retrieve_context(query: str) -> str:
-    """Busca o contexto mais relevante para a pergunta aplicando filtro defensivo Zero-Trust."""
-    store = get_vectorstore()
-    retriever = store.as_retriever(search_kwargs={"k": 3})
-    docs = retriever.invoke(query)
-    
-    clean_chunks = [sanitize_rag_chunk(doc.page_content) for doc in docs if doc.page_content]
-    context = "\n\n".join(clean_chunks)
-    return context
+    """Busca o contexto mais relevante aplicando busca vetorial e garantindo leitura da base de conhecimento."""
+    try:
+        store = get_vectorstore()
+        retriever = store.as_retriever(search_kwargs={"k": 3})
+        docs = retriever.invoke(query)
+        
+        clean_chunks = [sanitize_rag_chunk(doc.page_content) for doc in docs if doc.page_content]
+        if clean_chunks:
+            return "\n\n".join(clean_chunks)
+    except Exception as e:
+        logger.warning(f"Aviso na busca vetorial do PGVector ({e}). Acionando leitura direta dos arquivos RAG...")
+
+    # Fallback Garantido 100% à Prova de Falhas: lê os arquivos markdown atualizados da pasta knowledge_base
+    return load_all_local_knowledge()

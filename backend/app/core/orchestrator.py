@@ -80,14 +80,15 @@ def urgency_flow_node(state: AgentState):
     return {"messages": [AIMessage(content=msg)]}
 
 def fetch_context_node(state: AgentState):
-    """Nó 2a: Busca o contexto no RAG (para Dúvidas)."""
+    """Nó 2a: Busca o contexto no RAG (para Dúvidas e Corpo Clínico)."""
     last_message = state['messages'][-1].content
     context = retrieve_context(last_message)
     return {"context": context}
 
 def schedule_flow_node(state: AgentState):
-    """Nó 2b: Fluxo dedicado para agendamento."""
-    context = retrieve_context("convênios e preços")
+    """Nó 2b: Fluxo dedicado para agendamento com corpo clínico e regras."""
+    last_message = state['messages'][-1].content
+    context = retrieve_context(f"{last_message} médicos convênios preços")
     return {"context": context}
 
 async def generate_response_node(state: AgentState):
