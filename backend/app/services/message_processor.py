@@ -38,7 +38,8 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
             is_safe = validar_resposta(ai_response)
             
             if not is_safe:
-                ai_response = "Desculpe, por segurança e para estarmos de acordo com a LGPD e o Conselho de Medicina, não posso abordar esse assunto por aqui. Por favor, aguarde que irei transferir você para nossa equipe médica ou ligue para a clínica."
+                # Se for bloqueio real de segurança (prescrição ou jailbreak), responde com prudência médica
+                ai_response = "Por diretrizes do Conselho de Medicina e segurança clínica, prescrições de remédios e orientações de posologia são realizadas exclusivamente pelo médico durante a sua consulta. Posso te ajudar a agendar um horário com nossos especialistas?"
 
             if "⚠️ Identifiquei que você pode estar passando por uma situação de urgência" in ai_response:
                 logger.warning(f"Urgência detectada para {remote_jid}. Pausando IA e escalando para atendimento humano...")
