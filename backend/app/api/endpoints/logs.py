@@ -35,27 +35,31 @@ async def list_system_logs(
     limit: int = Query(50, le=200),
     db: AsyncSession = Depends(get_db)
 ):
-    """Lista os logs e eventos de auditoria do sistema em tempo real."""
-    query = select(SystemLog)
-    if category:
-        query = query.where(SystemLog.category == category)
-    if level:
-        query = query.where(SystemLog.level == level)
+    """Lista os logs e eventos de auditoria do sistema em tempo real com fallback gracioso."""
+    try:
+        query = select(SystemLog)
+        if category:
+            query = query.where(SystemLog.category == category)
+        if level:
+            query = query.where(SystemLog.level == level)
+            
+        result = await db.execute(query.order_by(SystemLog.created_at.desc()).limit(limit))
+        logs = result.scalars().all()
         
-    result = await db.execute(query.order_by(SystemLog.created_at.desc()).limit(limit))
-    logs = result.scalars().all()
-    
-    return [
-        {
-            "id": l.id,
-            "category": l.category,
-            "level": l.level,
-            "title": l.title,
-            "detail": l.detail,
-            "created_at": l.created_at.strftime("%d/%m/%Y %H:%M:%S") if l.created_at else None
-        }
-        for l in logs
-    ]
+        return [
+            {
+                "id": l.id,
+                "category": l.category,
+                "level": l.level,
+                "title": l.title,
+                "detail": l.detail,
+                "created_at": l.created_at.strftime("%d/%m/%Y %H:%M:%S") if l.created_at else None
+            }
+            for l in logs
+        ]
+    except Exception as e:
+        print(f"Aviso: Erro ao listar system_logs (sincronizando tabela): {e}", flush=True)
+        return []
 
 @router.get("/worker-stats")
 async def get_worker_stats():

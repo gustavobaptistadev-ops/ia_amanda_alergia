@@ -17,8 +17,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # As tabelas agora são gerenciadas via Alembic
-    logger.info("Iniciando aplicação (Migrações via Alembic)...")
+    logger.info("Iniciando aplicação e sincronizando tabelas...")
+    
+    # Garante que novas tabelas (como system_logs) sejam criadas automaticamente
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     
     # Auto-create the instance in Evolution GO using the Global Key
     await auto_create_instance()
