@@ -99,8 +99,9 @@ async def generate_response_node(state: AgentState):
     
     hoje = datetime.date.today().strftime("%d/%m/%Y")
     
-    # [MEMÓRIA DE LONGO PRAZO ESPECÍFICA] Recupera perfil cadastral prévio do paciente pelo thread_id (WhatsApp)
+    # [ESTADO DO PACIENTE: PRIMEIRO CONTATO VS RECORRENTE]
     patient_profile_str = ""
+    contact_status_str = ""
     thread_id = state.get("thread_id", "")
     try:
         from app.database import AsyncSessionLocal
@@ -121,10 +122,14 @@ async def generate_response_node(state: AgentState):
                 res_recent = await session.execute(stmt_recent)
                 active_contact = res_recent.scalars().first()
 
+            # Checa quantidade de mensagens trocadas na conversa atual
+            msg_count = len(messages) if messages else 0
+            
             if active_contact:
                 profile_parts = []
-                if active_contact.name:
-                    profile_parts.append(f"Nome do Paciente: {active_contact.name}")
+                patient_name = active_contact.name
+                if patient_name:
+                    profile_parts.append(f"Nome do Paciente: {patient_name}")
                 if active_contact.insurance_operator:
                     profile_parts.append(f"Convênio: {active_contact.insurance_operator} (Plano: {active_contact.insurance_plan_name or 'Padrão'})")
                 if active_contact.insurance_card_number:
@@ -134,6 +139,23 @@ async def generate_response_node(state: AgentState):
                 
                 if profile_parts:
                     patient_profile_str = "📋 FICHA PRÉVIA DO PACIENTE (MEMÓRIA DE LONGO PRAZO):\n" + "\n".join(profile_parts) + "\n\n"
+
+                # Se o contato já tem nome ou agendamento prévio e está abrindo conversa nova:
+                if patient_name and (msg_count <= 2 or active_contact.stage == "agendado"):
+                    contact_status_str = (
+                        f"👤 TIPO DE ATENDIMENTO: PACIENTE RECORRENTE [Nome: {patient_name}]\n"
+                        f"• ACOLHIMENTO DE RETORNO: Como o paciente {patient_name} já tem histórico, inicie com saudação calorosa reconhecendo-o com alegria (ex: 'Olá, {patient_name.split()[0]}! Que alegria falar com você novamente 🌿. Como posso te ajudar hoje?').\n\n"
+                    )
+                elif msg_count <= 2:
+                    contact_status_str = (
+                        "👤 TIPO DE ATENDIMENTO: NOVO CONTATO / BOAS-VINDAS\n"
+                        "• APRESENTAÇÃO OBRIGATÓRIA: Como é a primeira mensagem da conversa, apresente-se com calor humano dizendo seu nome Amanda, citando a Clínica Respirar e oferecendo ajuda (ex: 'Olá, boa tarde! Sou a Amanda, assistente da Clínica Respirar 🌻. É um prazer te atender! Como posso te ajudar hoje?').\n\n"
+                    )
+            else:
+                contact_status_str = (
+                    "👤 TIPO DE ATENDIMENTO: NOVO CONTATO / BOAS-VINDAS\n"
+                    "• APRESENTAÇÃO OBRIGATÓRIA: Apresente-se dizendo seu nome Amanda, cite a Clínica Respirar e dê as boas-vindas com carinho.\n\n"
+                )
     except Exception as err:
         logger.debug(f"Aviso memória de longo prazo: {err}")
 
@@ -166,7 +188,7 @@ async def generate_response_node(state: AgentState):
         f"⚠️ REGRA DE AGENDAMENTO: Ao citar qualquer dia da semana (ex: próxima segunda-feira, amanhã, etc.), consulte OBRIGATORIAMENTE a tabela acima para informar a data correta. NUNCA invente ou calcule de cabeça.\n\n"
     )
 
-    enriched_context = temporal_anchor + (patient_profile_str if patient_profile_str else "") + context
+    enriched_context = temporal_anchor + (contact_status_str if contact_status_str else "") + (patient_profile_str if patient_profile_str else "") + context
 
     system_prompt = AMANDA_PERSONA_PROMPT.format(
         rag_context=enriched_context,
