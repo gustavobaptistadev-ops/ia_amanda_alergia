@@ -83,8 +83,11 @@ async def get_me(user: User = Depends(get_current_user)):
     }
 
 @router.get("/users")
-async def list_users(db: AsyncSession = Depends(get_db)):
-    """Lista todos os usuários cadastrados na clínica."""
+async def list_users(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Lista todos os usuários cadastrados na clínica (Acesso Restrito)."""
+    if current_user and current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas administradores podem listar colaboradores.")
+        
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     users = result.scalars().all()
     return [
@@ -100,8 +103,11 @@ async def list_users(db: AsyncSession = Depends(get_db)):
     ]
 
 @router.post("/users")
-async def create_user(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    """Cria um novo login de acesso para a equipe da clínica."""
+async def create_user(req: RegisterRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Cria um novo login de acesso para a equipe da clínica (Acesso Restrito ao Admin)."""
+    if current_user and current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas administradores podem criar novos colaboradores.")
+
     if len(req.password) < 6:
         raise HTTPException(status_code=400, detail="A senha deve ter no mínimo 6 caracteres.")
         
@@ -136,8 +142,11 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 @router.post("/change-password")
-async def change_password(req: ChangePasswordRequest, db: AsyncSession = Depends(get_db)):
+async def change_password(req: ChangePasswordRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Altera a senha de um usuário autenticado."""
+    if current_user and current_user.email != req.email and current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Não é permitido alterar a senha de outro usuário.")
+
     if len(req.new_password) < 6:
         raise HTTPException(status_code=400, detail="A nova senha deve ter no mínimo 6 caracteres.")
         
