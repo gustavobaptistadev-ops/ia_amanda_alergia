@@ -8,9 +8,15 @@ from contextlib import asynccontextmanager
 
 from app.core.limiter import limiter, RateLimitExceeded, _rate_limit_exceeded_handler
 from app.core.logger_filter import PIIMaskingFilter
+from app.core.live_logger import InMemoryLogHandler, append_custom_log
 
 logging.basicConfig(level=logging.INFO)
-for handler in logging.getLogger().handlers:
+root_logger = logging.getLogger()
+memory_handler = InMemoryLogHandler()
+memory_handler.addFilter(PIIMaskingFilter())
+root_logger.addHandler(memory_handler)
+
+for handler in root_logger.handlers:
     handler.addFilter(PIIMaskingFilter())
 
 logger = logging.getLogger(__name__)

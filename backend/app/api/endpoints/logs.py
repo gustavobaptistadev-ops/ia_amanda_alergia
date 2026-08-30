@@ -61,6 +61,26 @@ async def list_system_logs(
         print(f"Aviso: Erro ao listar system_logs (sincronizando tabela): {e}", flush=True)
         return []
 
+@router.get("/live")
+async def get_live_terminal_logs():
+    """Retorna os logs brutos e vivos do console em tempo real."""
+    from app.core.live_logger import get_live_logs
+    return get_live_logs()
+
+from pydantic import BaseModel
+
+class ClientLogPayload(BaseModel):
+    level: str = "INFO"
+    name: str = "Frontend"
+    msg: str
+
+@router.post("/client")
+async def receive_client_log(payload: ClientLogPayload):
+    """Permite que o frontend envie seus logs para a mesma janelinha do terminal."""
+    from app.core.live_logger import append_custom_log
+    append_custom_log(payload.level, f"Frontend:{payload.name}", payload.msg)
+    return {"status": "ok"}
+
 @router.get("/worker-stats")
 async def get_worker_stats():
     """Retorna a saúde do Redis e dos lotes em background."""
