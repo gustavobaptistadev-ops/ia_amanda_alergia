@@ -35,6 +35,7 @@ export default function Conversas() {
   const [showPatientDrawer, setShowPatientDrawer] = useState(false); // Fechado por padrão em telas menores
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
   const messagesEndRef = useRef<any>(null);
+  const selectedContactRef = useRef<any>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
   const wsUrl = apiUrl.replace("http", "ws");
@@ -65,6 +66,7 @@ export default function Conversas() {
     }
   };
 
+  // 1. Efeito de ciclo de vida unico para WebSocket e Polling Global
   useEffect(() => {
     fetchContacts();
 
@@ -80,8 +82,8 @@ export default function Conversas() {
         ws.onmessage = (event) => {
           if (event.data === "update") {
             fetchContacts();
-            if (selectedContact) {
-              fetchMessages(selectedContact.phone_number);
+            if (selectedContactRef.current) {
+              fetchMessages(selectedContactRef.current.phone_number);
             }
           }
         };
@@ -104,13 +106,13 @@ export default function Conversas() {
 
     connectWs();
 
-    // Polling de fallback caso o WebSocket falhe
+    // Polling de fallback seguro a cada 10s
     const interval = setInterval(() => {
       fetchContacts();
-      if (selectedContact) {
-        fetchMessages(selectedContact.phone_number);
+      if (selectedContactRef.current) {
+        fetchMessages(selectedContactRef.current.phone_number);
       }
-    }, 8000);
+    }, 10000);
 
     return () => {
       isMounted = false;
@@ -118,13 +120,15 @@ export default function Conversas() {
       clearInterval(interval);
       ws?.close();
     };
-  }, [selectedContact]);
+  }, []); // Monta apenas uma vez
 
+  // 2. Busca mensagens apenas quando o usuario clicar em um contato diferente
   useEffect(() => {
+    selectedContactRef.current = selectedContact;
     if (selectedContact) {
       fetchMessages(selectedContact.phone_number);
     }
-  }, [selectedContact]);
+  }, [selectedContact?.phone_number]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
