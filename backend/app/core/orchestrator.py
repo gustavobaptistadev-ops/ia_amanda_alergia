@@ -24,6 +24,7 @@ class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], add_messages]
     context: str
     intent: str
+    thread_id: str
 
 from app.api.endpoints.settings import load_config
 
@@ -97,20 +98,28 @@ async def generate_response_node(state: AgentState):
     
     hoje = datetime.date.today().strftime("%d/%m/%Y")
     
-    # [MEMÓRIA DE LONGO PRAZO] Recupera perfil cadastral prévio do paciente no banco de dados
+    # [MEMÓRIA DE LONGO PRAZO ESPECÍFICA] Recupera perfil cadastral prévio do paciente pelo thread_id (WhatsApp)
     patient_profile_str = ""
+    thread_id = state.get("thread_id", "")
     try:
         from app.database import AsyncSessionLocal
         from app.models.chat import Contact
         from sqlalchemy.future import select
+        import re
         
-        # O thread_id ou identificador pode ser associado
-        # Se houver dados cadastrados em contatos, extraímos para a persona
         async with AsyncSessionLocal() as session:
-            # Pega o último número consultado ou ativo
-            stmt = select(Contact).order_by(Contact.updated_at.desc()).limit(1)
-            res = await session.execute(stmt)
-            active_contact = res.scalars().first()
+            active_contact = None
+            if thread_id:
+                clean_phone = re.sub(r"\D", "", thread_id)
+                stmt = select(Contact).where(Contact.phone_number.contains(clean_phone[-8:] if len(clean_phone) >= 8 else clean_phone))
+                res = await session.execute(stmt)
+                active_contact = res.scalars().first()
+                
+            if not active_contact:
+                stmt_recent = select(Contact).order_by(Contact.updated_at.desc()).limit(1)
+                res_recent = await session.execute(stmt_recent)
+                active_contact = res_recent.scalars().first()
+
             if active_contact:
                 profile_parts = []
                 if active_contact.name:
@@ -281,7 +290,10 @@ async def process_user_message(thread_id: str, message: str) -> str:
 
     # Envelopa o input com delimitadores seguros para proteger o modelo contra quebras de contexto
     wrapped_message = sanitize_and_wrap_user_input(message)
-    input_state = {"messages": [HumanMessage(content=wrapped_message)]}
+    input_state = {
+        "messages": [HumanMessage(content=wrapped_message)],
+        "thread_id": thread_id
+    }
     
     logger.info(f"LangGraph processando thread {thread_id} com AsyncPostgresSaver.")
     
