@@ -135,7 +135,17 @@ def check_availability(date_str: str, period: str = "todos") -> str:
             period_label = f" ({period.lower()})" if period != "todos" else ""
             return f"Horários livres para {date_str}{period_label}: " + ", ".join(sugestoes)
         else:
-            return f"Não há horários disponíveis para {date_str} no período solicitado ({period})."
+            # [PROATIVIDADE 10/10] Se não houver horários, busca no próximo dia útil para não deixar o paciente sem opção
+            next_day = base_date + datetime.timedelta(days=1)
+            if next_day.weekday() == 6: # Se for domingo, pula pra segunda
+                next_day += datetime.timedelta(days=1)
+            elif next_day.weekday() == 5: # Se for sábado, busca na segunda
+                next_day += datetime.timedelta(days=2)
+            next_date_str = next_day.strftime("%Y-%m-%d")
+            return (
+                f"A agenda para {date_str} no período ({period}) já está completa. "
+                f"Por favor, sugira ao paciente uma alternativa com carinho (ex: no próximo dia útil {next_date_str} ou em outro turno)."
+            )
 
     except Exception as e:
         logger.error(f"Erro ao consultar disponibilidade: {e}")

@@ -136,7 +136,17 @@ async def generate_response_node(state: AgentState):
     except Exception as err:
         logger.debug(f"Aviso memória de longo prazo: {err}")
 
-    enriched_context = f"DATA DE HOJE: {hoje}\n\n" + (patient_profile_str if patient_profile_str else "") + context
+    # [CONSCIÊNCIA TEMPORAL DINÂMICA] Detecta o turno do dia no horário de Brasília (UTC-3)
+    now_sp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
+    hora = now_sp.hour
+    if 6 <= hora < 12:
+        saudacao_turno = "MANHÃ (Use 'Bom dia' se for iniciar contato)"
+    elif 12 <= hora < 18:
+        saudacao_turno = "TARDE (Use 'Boa tarde' se for iniciar contato)"
+    else:
+        saudacao_turno = "NOITE/MADRUGADA (Use 'Boa noite' se for iniciar contato. Acolha informando que mesmo fora do expediente da recepção, você está à disposição para adiantar o agendamento)"
+
+    enriched_context = f"DATA DE HOJE: {hoje} | TURNO ATUAL: {saudacao_turno}\n\n" + (patient_profile_str if patient_profile_str else "") + context
 
     system_prompt = AMANDA_PERSONA_PROMPT.format(
         rag_context=enriched_context,
