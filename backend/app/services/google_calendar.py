@@ -54,14 +54,24 @@ def check_availability(date_str: str, period: str = "todos") -> str:
     Checa a disponibilidade na agenda para uma data específica (YYYY-MM-DD).
     Opcionalmente filtra por período preferido ('manha', 'tarde' ou 'todos').
     """
+    weekdays_pt = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+    try:
+        dt_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+        dia_da_semana_nome = weekdays_pt[dt_obj.weekday()]
+        data_formatada = dt_obj.strftime("%d/%m/%Y")
+    except Exception:
+        dia_da_semana_nome = ""
+        data_formatada = date_str
+
     service = get_calendar_service()
     if not service:
-        # Modo Simulação com suporte a filtro de período
+        # Modo Simulação com suporte a filtro de período e ancoragem de dia da semana
+        header = f"Horários livres para {dia_da_semana_nome}, dia {data_formatada} ({date_str})"
         if period.lower() == "manha":
-            return f"Os seguintes horários da MANHÃ estão livres para o dia {date_str}: 09:00 e 10:30."
+            return f"Os seguintes horários da MANHÃ estão livres para {dia_da_semana_nome} ({data_formatada}): 09:00 e 10:30."
         elif period.lower() == "tarde":
-            return f"Os seguintes horários da TARDE estão livres para o dia {date_str}: 14:00 e 15:30."
-        return f"Os seguintes horários estão livres para o dia {date_str}: 09:00, 10:30, 14:00 e 15:30."
+            return f"Os seguintes horários da TARDE estão livres para {dia_da_semana_nome} ({data_formatada}): 14:00 e 15:30."
+        return f"Os seguintes horários estão livres para {dia_da_semana_nome} ({data_formatada}): 09:00, 10:30, 14:00 e 15:30."
 
     try:
         start_time = f"{date_str}T00:00:00-03:00"

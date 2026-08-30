@@ -137,9 +137,12 @@ async def generate_response_node(state: AgentState):
     except Exception as err:
         logger.debug(f"Aviso memória de longo prazo: {err}")
 
-    # [CONSCIÊNCIA TEMPORAL DINÂMICA] Detecta o turno do dia no horário de Brasília (UTC-3)
+    # [CONSCIÊNCIA TEMPORAL DINÂMICA & CALENDÁRIO CANÔNICO ANTI-ALUCINAÇÃO]
     now_sp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
     hora = now_sp.hour
+    weekdays_pt = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+    dia_semana_hoje = weekdays_pt[now_sp.weekday()]
+    
     if 6 <= hora < 12:
         saudacao_turno = "MANHÃ (Use 'Bom dia' se for iniciar contato)"
     elif 12 <= hora < 18:
@@ -147,7 +150,23 @@ async def generate_response_node(state: AgentState):
     else:
         saudacao_turno = "NOITE/MADRUGADA (Use 'Boa noite' se for iniciar contato. Acolha informando que mesmo fora do expediente da recepção, você está à disposição para adiantar o agendamento)"
 
-    enriched_context = f"DATA DE HOJE: {hoje} | TURNO ATUAL: {saudacao_turno}\n\n" + (patient_profile_str if patient_profile_str else "") + context
+    # Constrói o mapa cronológico exato dos próximos 7 dias para a IA nunca errar o dia da semana
+    calendario_linhas = [f"• HOJE: {dia_semana_hoje}, {now_sp.strftime('%d/%m/%Y')} (ISO: {now_sp.strftime('%Y-%m-%d')})"]
+    for i in range(1, 8):
+        d_futuro = now_sp + datetime.timedelta(days=i)
+        dia_sem = weekdays_pt[d_futuro.weekday()]
+        calendario_linhas.append(f"• Próximo dia (+{i}): {dia_sem}, {d_futuro.strftime('%d/%m/%Y')} (Use '{d_futuro.strftime('%Y-%m-%d')}' nas tools)")
+
+    calendario_tabela = "\n".join(calendario_linhas)
+
+    temporal_anchor = (
+        f"📅 CALENDÁRIO OFICIAL DA CLÍNICA (RIGOR CRONOLÓGICO ABSOLUTO):\n"
+        f"{calendario_tabela}\n"
+        f"TURNO ATUAL: {saudacao_turno}\n"
+        f"⚠️ REGRA DE AGENDAMENTO: Ao citar qualquer dia da semana (ex: próxima segunda-feira, amanhã, etc.), consulte OBRIGATORIAMENTE a tabela acima para informar a data correta. NUNCA invente ou calcule de cabeça.\n\n"
+    )
+
+    enriched_context = temporal_anchor + (patient_profile_str if patient_profile_str else "") + context
 
     system_prompt = AMANDA_PERSONA_PROMPT.format(
         rag_context=enriched_context,
