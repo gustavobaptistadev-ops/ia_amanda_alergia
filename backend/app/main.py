@@ -17,11 +17,25 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Iniciando aplicação e sincronizando tabelas...")
+    logger.info("Iniciando aplicação e sincronizando tabelas/colunas...")
     
-    # Garante que novas tabelas (como system_logs) sejam criadas automaticamente
+    # 1. Garante que tabelas novas (system_logs, users, etc) sejam criadas
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # 2. Executa DDL idempotente para garantir que colunas novas existam em tabelas legadas
+        from sqlalchemy import text
+        try:
+            await conn.execute(text("""
+                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_operator VARCHAR;
+                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_card_number VARCHAR;
+                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_plan_name VARCHAR;
+                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_coverage VARCHAR;
+                ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_accommodation VARCHAR;
+            """))
+            logger.info("Colunas de convênio sincronizadas no PostgreSQL com sucesso.")
+        except Exception as e:
+            logger.warning(f"Aviso ao verificar colunas da tabela contacts: {e}")
     
     # Auto-create the instance in Evolution GO using the Global Key
     await auto_create_instance()
