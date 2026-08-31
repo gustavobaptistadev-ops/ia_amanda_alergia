@@ -10,7 +10,17 @@ load_dotenv()
 
 # Configuração de Log
 logging.basicConfig(level=logging.INFO)
+root_logger = logging.getLogger()
 logger = logging.getLogger("worker")
+
+try:
+    from app.core.live_logger import InMemoryLogHandler
+    from app.core.logger_filter import PIIMaskingFilter
+    memory_handler = InMemoryLogHandler()
+    memory_handler.addFilter(PIIMaskingFilter())
+    root_logger.addHandler(memory_handler)
+except ImportError:
+    pass
 
 # Função que será processada em background
 async def process_message_job(ctx, data: dict):

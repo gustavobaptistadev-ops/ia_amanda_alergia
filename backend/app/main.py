@@ -16,8 +16,14 @@ memory_handler = InMemoryLogHandler()
 memory_handler.addFilter(PIIMaskingFilter())
 root_logger.addHandler(memory_handler)
 
+# Adiciona o filtro PII em todos os handlers do root
 for handler in root_logger.handlers:
     handler.addFilter(PIIMaskingFilter())
+
+# Injeta explicitamente nos loggers do Uvicorn para que os logs de acesso e erros HTTP apareçam no painel
+for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+    l = logging.getLogger(logger_name)
+    l.addHandler(memory_handler)
 
 logger = logging.getLogger(__name__)
 
