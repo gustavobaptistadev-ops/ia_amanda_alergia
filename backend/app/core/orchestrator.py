@@ -73,7 +73,7 @@ def extract_intent_node(state: AgentState):
 Mensagem: "{last_msg}"
 Classificação:"""
     
-    llm = get_llm(model_name="gpt-4o-mini")
+    llm = get_llm()
     response = llm.invoke([HumanMessage(content=prompt)]).content.strip().upper()
     
     if "URGENCIA" in response:
