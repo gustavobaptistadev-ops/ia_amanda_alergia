@@ -7,7 +7,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, To
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, RemoveMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
-from app.core.prompt_master import AMANDA_PERSONA_PROMPT
+from app.core.prompt_master import PersonaBuilder
 
 from langgraph.checkpoint.memory import MemorySaver
 import operator
@@ -38,28 +38,58 @@ def get_llm():
 tools = [check_availability, create_event, cancel_event, reschedule_event, confirm_event]
 
 def extract_intent_node(state: AgentState):
-    """Nó 1: Classifica a intenção do usuário."""
+    """Nó 1: Classifica a intenção do usuário (Zero-Cost Router NLP/LLM)."""
     messages = state['messages']
-    last_msg = messages[-1].content
+    last_msg = messages[-1].content.strip().lower()
     
-    prompt = f"""Analise a mensagem do paciente e classifique a intenção principal em apenas UMA das palavras abaixo:
-- URGENCIA (se o paciente relatar falta de ar súbita, edema de glote, reação anafilática grave, dor intensa no peito, ou irritação extrema querendo falar com humano)
-- AGENDAMENTO (se o paciente quiser marcar consulta, perguntar sobre horários)
-- DUVIDA (se o paciente quiser tirar dúvidas, saber preços, localização, ou apenas dar um Oi)
+    # 1. Heurística Local Rápida (Zero-Cost NLP)
+    import re
+    if any(k in last_msg for k in ["urgência", "urgencia", "emergência", "emergencia", "falta de ar", "sufocando", "glote", "anafilaxia", "grave", "pronto socorro"]):
+        logger.info("Intenção identificada via Heurística: URGENCIA")
+        return {"intent": "URGENCIA"}
+        
+    if any(k in last_msg for k in ["remarcar", "reagendar", "mudar o dia", "mudar a hora", "mudar horario", "mudar a data"]):
+        logger.info("Intenção identificada via Heurística: REAGENDAMENTO")
+        return {"intent": "REAGENDAMENTO"}
+
+    if any(k in last_msg for k in ["cancelar", "desmarcar"]):
+        logger.info("Intenção identificada via Heurística: CANCELAMENTO")
+        return {"intent": "CANCELAMENTO"}
+
+    if any(k in last_msg for k in ["agendar", "marcar", "consulta", "horário", "horario", "vaga", "quero ir"]):
+        logger.info("Intenção identificada via Heurística: AGENDAMENTO")
+        return {"intent": "AGENDAMENTO"}
+        
+    # 2. Fallback: Se for ambíguo, invocamos LLM (gpt-4o-mini)
+    logger.info("Intenção ambígua. Invocando LLM Fallback (Zero-Cost Router)...")
+    prompt = f"""Analise a mensagem do paciente e classifique a intenção principal em UMA das palavras abaixo:
+- URGENCIA (falta de ar, emergência)
+- AGENDAMENTO (marcar consulta, interesse em agendar)
+- REAGENDAMENTO (remarcar, trocar de dia)
+- CANCELAMENTO (desmarcar)
+- CONFIRMACAO (confirmar que vai na consulta, aceitar o horário)
+- DUVIDA (dúvidas em geral, perguntas sobre clínica, oi/bom dia)
 
 Mensagem: "{last_msg}"
 Classificação:"""
     
-    logger.info("Extraindo intenção...")
-    llm = get_llm()
+    llm = get_llm(model_name="gpt-4o-mini")
     response = llm.invoke([HumanMessage(content=prompt)]).content.strip().upper()
     
-    if "URGENCIA" in response or "EMERGENCIA" in response:
+    if "URGENCIA" in response:
         intent = "URGENCIA"
-    elif "AGENDAR" in response or "AGENDAMENTO" in response:
+    elif "REAGENDAMENTO" in response:
+        intent = "REAGENDAMENTO"
+    elif "CANCELAMENTO" in response:
+        intent = "CANCELAMENTO"
+    elif "CONFIRMACAO" in response:
+        intent = "CONFIRMACAO"
+    elif "AGENDAMENTO" in response or "AGENDAR" in response:
         intent = "AGENDAMENTO"
     else:
         intent = "DUVIDA"
+    
+    logger.info(f"Intenção identificada via LLM: {intent}")
     return {"intent": intent}
 
 def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow"]:
@@ -67,7 +97,7 @@ def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow",
     intent = state.get("intent")
     if intent == "URGENCIA":
         return "urgency_flow"
-    if intent == "AGENDAMENTO":
+    if intent in ["AGENDAMENTO", "REAGENDAMENTO", "CANCELAMENTO"]:
         return "schedule_flow"
     return "fetch_context"
 
@@ -194,10 +224,20 @@ async def generate_response_node(state: AgentState):
 
     enriched_context = temporal_anchor + (contact_status_str if contact_status_str else "") + (patient_profile_str if patient_profile_str else "") + context
 
-    system_prompt = AMANDA_PERSONA_PROMPT.format(
+    from app.core.prompt_master import PersonaBuilder
+    
+    # Busca a última mensagem do usuário para heurísticas do Builder
+    user_msg_text = ""
+    for m in reversed(messages):
+        if m.type == "human":
+            user_msg_text = m.content
+            break
+            
+    system_prompt = PersonaBuilder.build_dynamic_prompt(
+        intent=intent,
         rag_context=enriched_context,
-        chat_history="O LangGraph gerencia este histórico.",
-        user_message="[Leia o histórico acima para entender o fluxo atual e continuar a conversa.]"
+        chat_history="O LangGraph gerencia este histórico de forma persistente.",
+        user_message=f"[Mensagem atual do paciente:]\n{user_msg_text}"
     )
     # Filtra mensagens problemáticas (órfãs, dicts, RemoveMessage) para evitar erro 400 da OpenAI
     sanitized = []
@@ -317,7 +357,7 @@ async def process_user_message(thread_id: str, message: str) -> str:
     # [CAMADA 1: INPUT SHIELD] Interceptação de ataques adversariais / jailbreak
     from app.core.input_shield import detect_adversarial_attempt, sanitize_and_wrap_user_input
     
-    if detect_adversarial_attempt(message):
+    if await detect_adversarial_attempt(message):
         logger.warning(f"[SECURITY SHIELD] Prompt injection interceptado para thread {thread_id}")
         return "Olá! Sou a Amanda, assistente da clínica. 🌻 Como posso te ajudar hoje com suas dúvidas ou agendamento de consultas?"
         

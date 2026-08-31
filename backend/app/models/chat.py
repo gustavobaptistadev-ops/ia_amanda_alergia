@@ -55,6 +55,7 @@ class Appointment(Base):
     prep_reminder_sent = Column(Boolean, default=False) # Reforço de suspensão de antialérgicos 5 dias antes
     follow_up_sent = Column(Boolean, default=False) # Acolhimento 48h pós-consulta
     reschedule_count = Column(Integer, default=0) # Quantas vezes a consulta foi reagendada
+    google_event_id = Column(String, nullable=True) # ID do evento no Google Calendar
     created_at = Column(DateTime, default=datetime.utcnow)
 
     contact = relationship("Contact", back_populates="appointments")
