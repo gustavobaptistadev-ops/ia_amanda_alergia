@@ -240,7 +240,8 @@ async def process_message(data: dict):
 
         elif event_type == "Message":
             info = data.get("data", {}).get("Info", {})
-            msg_obj = data.get("data", {}).get("Message", {})
+            message_obj = data.get("data", {}).get("Message", {})
+            message_type = info.get("MediaType", "")
             from_me = info.get("IsFromMe", False)
             
             # Suporte a AddressingMode: lid / jid padrão da Evolution
@@ -251,12 +252,12 @@ async def process_message(data: dict):
             push_name = info.get("PushName", "") or info.get("pushName", "Cliente")
             if info.get("IsGroup", False):
                  return
-            if "conversation" in msg_obj:
-                text = msg_obj["conversation"]
-            elif "extendedTextMessage" in msg_obj:
-                text = msg_obj["extendedTextMessage"].get("text", "")
-            elif isinstance(msg_obj, str):
-                text = msg_obj
+            if "conversation" in message_obj:
+                text = message_obj["conversation"]
+            elif "extendedTextMessage" in message_obj:
+                text = message_obj["extendedTextMessage"].get("text", "")
+            elif isinstance(message_obj, str):
+                text = message_obj
             elif "documentMessage" in message_obj or "documentWithCaptionMessage" in message_obj or message_type in ["documentMessage", "documentWithCaptionMessage"]:
                 doc_obj = message_obj.get("documentMessage") or message_obj.get("documentWithCaptionMessage", {}).get("message", {}).get("documentMessage") or message_obj
                 caption = doc_obj.get("caption", "")
