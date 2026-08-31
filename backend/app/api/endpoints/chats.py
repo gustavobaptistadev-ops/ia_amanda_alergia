@@ -11,20 +11,61 @@ import json
 
 router = APIRouter()
 
+import asyncio
+import os
+import redis.asyncio as redis
+from typing import List
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+PUBSUB_CHANNEL = "chat_updates"
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
+        self.redis = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+        self.pubsub = self.redis.pubsub()
+        self.listener_task = None
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        # Inicia a task de listen do Redis PubSub apenas se houver conexões locais ativas
+        if not self.listener_task or self.listener_task.done():
+            self.listener_task = asyncio.create_task(self._listen_to_redis())
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        
+    async def _listen_to_redis(self):
+        """Task que escuta o PubSub do Redis e repassa aos WebSockets conectados neste worker Uvicorn"""
+        try:
+            await self.pubsub.subscribe(PUBSUB_CHANNEL)
+            async for message in self.pubsub.listen():
+                if message["type"] == "message":
+                    payload = message["data"]
+                    for connection in self.active_connections:
+                        try:
+                            await connection.send_text(payload)
+                        except Exception:
+                            # Ignora se a conexão já caiu, o loop de receive trata o disconnect
+                            pass
+        except Exception as e:
+            logger.error(f"Erro no Redis PubSub Listener: {e}")
 
     async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
+        """Faz PUBLISH no Redis. Assim, qualquer Worker ou API Server pode sinalizar atualização global."""
+        try:
+            # Em vez de mandar apenas para `self.active_connections`, publica no Redis!
+            pub_redis = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+            await pub_redis.publish(PUBSUB_CHANNEL, message)
+            await pub_redis.aclose()
+        except Exception as e:
+            logger.error(f"Erro ao publicar no Redis PubSub: {e}")
 
 manager = ConnectionManager()
 
@@ -36,6 +77,7 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
 
 from pydantic import BaseModel, Field
 

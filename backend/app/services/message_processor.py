@@ -8,15 +8,16 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
-# Lock sequencial por contato para prevenir race conditions de mensagens rápidas
-_patient_locks = {}
+import os
+import redis.asyncio as redis
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 async def process_and_respond(remote_jid: str, text: str, push_name: str, is_audio: bool = False):
-    """Executa a logica pesada de IA e envia a resposta de forma estritamente sequencial."""
-    if remote_jid not in _patient_locks:
-        _patient_locks[remote_jid] = asyncio.Lock()
-
-    async with _patient_locks[remote_jid]:
+    """Executa a logica pesada de IA e envia a resposta de forma estritamente sequencial (lock distribuído via Redis)."""
+    # Lock distribuído (timeout: liberta a trava se o worker morrer; blocking_timeout: aguarda até 2 mins por outra msg terminar)
+    async with redis_client.lock(f"lock:patient:{remote_jid}", timeout=180, blocking_timeout=120):
         try:
             await save_message(remote_jid, text, sender='paciente', name=push_name)
             
