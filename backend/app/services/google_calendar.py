@@ -450,4 +450,36 @@ async def reschedule_event(phone: str, new_date_str: str, new_time_str: str) -> 
             except Exception as e:
                 logger.error(f"Erro ao atualizar google calendar: {e}")
 
-        return f"Sucesso! Consulta remarcada para {new_date_str} às {new_time_str}. Restam {2 - apt.reschedule_count} reagendamentos. INSTRUÇÃO PARA AMANDA: Comunique a confirmação da remarcação ao paciente com empatia."
+@tool
+async def confirm_event(phone: str) -> str:
+    """Confirma o agendamento mais recente do paciente (altera o status para 'confirmado' no banco de dados)."""
+    import re
+    from app.database import AsyncSessionLocal
+    from app.models.chat import Appointment, Contact
+    from sqlalchemy.future import select
+
+    clean_phone = re.sub(r"\D", "", phone) if phone else ""
+    if not clean_phone:
+        return "Erro: Telefone não fornecido para confirmação."
+
+    async with AsyncSessionLocal() as session:
+        stmt = select(Contact).where(Contact.phone_number.contains(clean_phone[-8:] if len(clean_phone) >= 8 else clean_phone))
+        res = await session.execute(stmt)
+        contact = res.scalars().first()
+
+        if not contact:
+            return "Não encontrei cadastro com esse telefone."
+
+        stmt_apt = select(Appointment).where(
+            Appointment.contact_id == contact.id,
+            Appointment.status == "agendado"
+        ).order_by(Appointment.created_at.desc()).limit(1)
+        res_apt = await session.execute(stmt_apt)
+        apt = res_apt.scalars().first()
+
+        if not apt:
+            return "Não encontrei nenhum agendamento pendente de confirmação."
+
+        apt.status = "confirmado"
+        await session.commit()
+        return "Sucesso! O agendamento foi confirmado no sistema. INSTRUÇÃO PARA AMANDA: Agradeça ao paciente pela confirmação e reforce que a clínica o aguarda no horário marcado."
