@@ -52,12 +52,15 @@ async def set_cached_response(user_message: str, ai_response: str):
         if not cfg.get("semantic_cache_enabled", True):
             return
 
-        # Não cachear agendamentos com dados privados, nomes específicos ou confirmações com datas dinâmicas
-        if any(term in ai_response.lower() for term in ["consulta marcada", "agendamento confirmado", "doutor(a)"]):
+        # Não cachear agendamentos com dados privados, nomes específicos ou confirmações com datas dinâmicas, nem mensagens de segurança/bloqueio
+        if any(term in ai_response.lower() for term in ["consulta marcada", "agendamento confirmado", "doutor(a)", "conselho de medicina", "prescrições de remédios"]):
             return
 
-        # Cacheia apenas respostas ricas e explicativas (convênios, preparos, endereço, valores)
+        # Cacheia APENAS respostas estáticas comprovadas (ex: localização, convênios aceitos, preparo geral de exames)
         if len(user_message.strip()) > 5 and len(ai_response.strip()) > 20:
+            # Nunca cachear mensagens curtas de fluxo de agendamento (ex: "plano bradesco", "sim", "na parte da tarde")
+            if any(term in user_message.lower() for term in ["plano", "convenio", "bradesco", "unimed", "sulamerica", "tarde", "manha", "hoje", "amanha"]):
+                return
             key = generate_cache_key(user_message)
             payload = json.dumps({"query": user_message, "response": ai_response}, ensure_ascii=False)
             async with redis.Redis.from_url(REDIS_URL) as r:

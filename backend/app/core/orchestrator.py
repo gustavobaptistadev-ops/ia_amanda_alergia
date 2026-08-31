@@ -123,6 +123,7 @@ async def generate_response_node(state: AgentState):
                 active_contact = res_recent.scalars().first()
 
             # Checa se é o início absoluto da conversa
+            msg_count = len(messages) if messages else 0
             # Note: na primeira mensagem o array messages contém apenas 1 item
             is_initial_turn = (msg_count <= 1)
             
