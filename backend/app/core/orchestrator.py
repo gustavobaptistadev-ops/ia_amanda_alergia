@@ -4,13 +4,14 @@ import datetime
 from typing import TypedDict, Annotated, Sequence, Literal
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, RemoveMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, RemoveMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import AMANDA_PERSONA_PROMPT
 
 from langgraph.checkpoint.memory import MemorySaver
 import operator
-from app.services.google_calendar import check_availability, create_event
+from app.services.google_calendar import check_availability, create_event, cancel_event, reschedule_event
 from langgraph.prebuilt import ToolNode
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ def get_llm():
     temp = float(cfg.get("temperature", 0.2))
     return ChatOpenAI(model=model_name, temperature=temp)
 
-tools = [check_availability, create_event]
+tools = [check_availability, create_event, cancel_event, reschedule_event]
 
 def extract_intent_node(state: AgentState):
     """Nó 1: Classifica a intenção do usuário."""

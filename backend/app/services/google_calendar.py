@@ -292,6 +292,20 @@ async def create_event(date_str: str, time_str: str, patient_name: str, phone: s
         created_event = await asyncio.to_thread(
             service.events().insert(calendarId=CALENDAR_ID, body=event).execute
         )
+        event_id = created_event.get("id")
+
+        # Update event ID in DB
+        if contact_id:
+            async with AsyncSessionLocal() as session:
+                # Get the most recent appointment for this contact
+                stmt = select(Appointment).where(
+                    Appointment.contact_id == contact_id
+                ).order_by(Appointment.created_at.desc()).limit(1)
+                res = await session.execute(stmt)
+                last_apt = res.scalars().first()
+                if last_apt:
+                    last_apt.google_event_id = event_id
+                    await session.commit()
         
         return (
             f"Agendamento de {patient_name} confirmado com sucesso na agenda médica para o dia {date_str} às {time_str}!{link_info}\n\n"
@@ -304,3 +318,136 @@ async def create_event(date_str: str, time_str: str, patient_name: str, phone: s
     except Exception as e:
         logger.error(f"Erro ao criar evento no Google Calendar: {e}")
         return f"Agendamento de {patient_name} confirmado no sistema médico para o dia {date_str} às {time_str}!{link_info}"
+
+@tool
+async def cancel_event(phone: str) -> str:
+    """Cancela o agendamento mais recente do paciente, liberando a vaga."""
+    import re
+    from app.database import AsyncSessionLocal
+    from app.models.chat import Appointment, Contact
+    from sqlalchemy.future import select
+
+    clean_phone = re.sub(r"\D", "", phone) if phone else ""
+    if not clean_phone:
+        return "Erro: Telefone não fornecido para cancelamento."
+
+    async with AsyncSessionLocal() as session:
+        # Pega o contato
+        stmt = select(Contact).where(Contact.phone_number.contains(clean_phone[-8:] if len(clean_phone) >= 8 else clean_phone))
+        res = await session.execute(stmt)
+        contact = res.scalars().first()
+
+        if not contact:
+            return "Não encontrei nenhum paciente cadastrado com esse telefone para cancelar."
+
+        # Pega o agendamento ativo mais recente
+        stmt_apt = select(Appointment).where(
+            Appointment.contact_id == contact.id,
+            Appointment.status.in_(["agendado", "confirmado"])
+        ).order_by(Appointment.created_at.desc()).limit(1)
+        res_apt = await session.execute(stmt_apt)
+        apt = res_apt.scalars().first()
+
+        if not apt:
+            return "Não encontrei nenhum agendamento ativo para cancelar."
+
+        # Cancela no banco
+        apt.status = "cancelado"
+        contact.stage = "novo_contato"
+        await session.commit()
+
+        # Cancela no Google
+        if apt.google_event_id:
+            service = get_calendar_service()
+            if service:
+                import asyncio
+                try:
+                    await asyncio.to_thread(
+                        service.events().delete(calendarId=CALENDAR_ID, eventId=apt.google_event_id).execute
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao deletar evento no google: {e}")
+        
+        return "Cancelamento efetuado com sucesso. INSTRUÇÃO PARA AMANDA: Acolha o paciente, confirme o cancelamento de forma gentil e deixe as portas abertas para quando ele quiser remarcar."
+
+@tool
+async def reschedule_event(phone: str, new_date_str: str, new_time_str: str) -> str:
+    """Remarca o agendamento mais recente do paciente para a nova data (YYYY-MM-DD) e hora (HH:MM)."""
+    import re
+    from app.database import AsyncSessionLocal
+    from app.models.chat import Appointment, Contact
+    from sqlalchemy.future import select
+
+    clean_phone = re.sub(r"\D", "", phone) if phone else ""
+    if not clean_phone:
+        return "Erro: Telefone não fornecido para reagendamento."
+
+    async with AsyncSessionLocal() as session:
+        stmt = select(Contact).where(Contact.phone_number.contains(clean_phone[-8:] if len(clean_phone) >= 8 else clean_phone))
+        res = await session.execute(stmt)
+        contact = res.scalars().first()
+
+        if not contact:
+            return "Não encontrei cadastro com esse telefone."
+
+        stmt_apt = select(Appointment).where(
+            Appointment.contact_id == contact.id,
+            Appointment.status.in_(["agendado", "confirmado"])
+        ).order_by(Appointment.created_at.desc()).limit(1)
+        res_apt = await session.execute(stmt_apt)
+        apt = res_apt.scalars().first()
+
+        if not apt:
+            return "Não encontrei nenhum agendamento ativo para remarcar."
+
+        if apt.reschedule_count >= 2:
+            return "ERRO: O limite de 2 reagendamentos foi atingido para essa consulta. INSTRUÇÃO PARA AMANDA: Informe ao paciente gentilmente que o sistema não permite mais reagendamentos automáticos e oriente a falar com a ouvidoria/gerência."
+
+        # Verifica conflito no Google Calendar para o novo horário
+        service = get_calendar_service()
+        if service:
+            start_time = f"{new_date_str}T00:00:00-03:00"
+            end_time = f"{new_date_str}T23:59:59-03:00"
+            import asyncio
+            try:
+                events_result = await asyncio.to_thread(
+                    service.events().list(calendarId=CALENDAR_ID, timeMin=start_time, timeMax=end_time, singleEvents=True).execute
+                )
+                events = events_result.get('items', [])
+                dt_new_start = datetime.datetime.strptime(f"{new_date_str} {new_time_str}", "%Y-%m-%d %H:%M").replace(tzinfo=datetime.timezone(datetime.timedelta(hours=-3)))
+                dt_new_end = dt_new_start + datetime.timedelta(hours=1)
+                
+                conflito = False
+                for event in events:
+                    if event.get("id") == apt.google_event_id: continue # ignora o evento atual
+                    s = event['start'].get('dateTime')
+                    e = event['end'].get('dateTime')
+                    if s and e:
+                        try:
+                            s_dt = datetime.datetime.fromisoformat(s.replace("Z", "+00:00"))
+                            e_dt = datetime.datetime.fromisoformat(e.replace("Z", "+00:00"))
+                            if dt_new_start < e_dt and dt_new_end > s_dt:
+                                conflito = True
+                        except: pass
+                if conflito:
+                    return f"O horário {new_date_str} às {new_time_str} já está ocupado. Por favor, ofereça outro horário usando a ferramenta check_availability."
+            except Exception as e:
+                logger.error(f"Erro ao checar conflitos no reagendamento: {e}")
+
+        # Atualiza o banco
+        dt_start = datetime.datetime.strptime(f"{new_date_str} {new_time_str}", "%Y-%m-%d %H:%M")
+        apt.appointment_time = dt_start
+        apt.reschedule_count += 1
+        await session.commit()
+
+        # Atualiza no Google
+        if apt.google_event_id and service:
+            try:
+                event = await asyncio.to_thread(service.events().get(calendarId=CALENDAR_ID, eventId=apt.google_event_id).execute)
+                event['start'] = {'dateTime': dt_start.isoformat(), 'timeZone': 'America/Sao_Paulo'}
+                event['end'] = {'dateTime': (dt_start + datetime.timedelta(hours=1)).isoformat(), 'timeZone': 'America/Sao_Paulo'}
+                await asyncio.to_thread(service.events().update(calendarId=CALENDAR_ID, eventId=apt.google_event_id, body=event).execute)
+            except Exception as e:
+                logger.error(f"Erro ao atualizar google calendar: {e}")
+
+        return f"Sucesso! Consulta remarcada para {new_date_str} às {new_time_str}. Restam {2 - apt.reschedule_count} reagendamentos. INSTRUÇÃO PARA AMANDA: Comunique a confirmação da remarcação ao paciente com empatia."
