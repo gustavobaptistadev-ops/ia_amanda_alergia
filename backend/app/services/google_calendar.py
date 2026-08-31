@@ -167,7 +167,7 @@ def check_availability(date_str: str, period: str = "todos") -> str:
         return "Erro ao consultar agenda."
 
 @tool
-def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "", cpf: str = "", dob: str = "") -> str:
+async def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "", cpf: str = "", dob: str = "") -> str:
     """
     Cria um agendamento na agenda do Google com validação estrita de dados e idempotência.
     """
@@ -187,12 +187,41 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
     dob = sanitize_text(dob, max_length=20)
 
     # 3. Persistência no Banco de Dados (Tabela Appointments & Kanban)
-    # [DESATIVADO TEMPORARIAMENTE] O uso de sessões async (SQLAlchemy + asyncpg) 
-    # dentro de uma Tool síncrona (executada em ThreadPool pelo LangChain) causa 
-    # erro de 'Task attached to a different loop'. A persistência precisará ser 
-    # movida para uma função async nativa ou uma Tool assíncrona futuramente.
-    # A fonte da verdade atual permanece sendo o Google Calendar oficial.
-    pass
+    import re
+    import uuid
+    from app.database import AsyncSessionLocal
+    from app.models.chat import Appointment, Contact
+    from sqlalchemy.future import select
+
+    try:
+        dt_start = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+        clean_phone = re.sub(r"\D", "", phone) if phone else ""
+        async with AsyncSessionLocal() as session:
+            contact_id = None
+            if clean_phone:
+                stmt = select(Contact).where(Contact.phone_number.contains(clean_phone[-8:] if len(clean_phone) >= 8 else clean_phone))
+                res = await session.execute(stmt)
+                contact = res.scalars().first()
+                if contact:
+                    contact_id = contact.id
+                    contact.stage = "agendado"
+
+            if not contact_id:
+                new_contact = Contact(id=str(uuid.uuid4()), phone_number=clean_phone or "0000000000", name=patient_name, stage="agendado")
+                session.add(new_contact)
+                await session.flush()
+                contact_id = new_contact.id
+
+            new_apt = Appointment(
+                contact_id=contact_id,
+                patient_name=patient_name,
+                appointment_time=dt_start,
+                status="agendado"
+            )
+            session.add(new_apt)
+            await session.commit()
+    except Exception as db_err:
+        logger.error(f"Erro ao salvar no banco: {db_err}")
 
     # 4. Geração do Link Oficial de 1 Clique para a Agenda Pessoal do Google do Paciente (Compacto e Limpo)
     import urllib.parse
@@ -259,7 +288,10 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
             },
         }
 
-        created_event = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        import asyncio
+        created_event = await asyncio.to_thread(
+            service.events().insert(calendarId=CALENDAR_ID, body=event).execute
+        )
         
         return (
             f"Agendamento de {patient_name} confirmado com sucesso na agenda médica para o dia {date_str} às {time_str}!{link_info}\n\n"
