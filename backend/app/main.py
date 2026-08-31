@@ -44,7 +44,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_coverage VARCHAR;",
             "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS insurance_accommodation VARCHAR;",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS prep_reminder_sent BOOLEAN DEFAULT FALSE;",
-            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS follow_up_sent BOOLEAN DEFAULT FALSE;"
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS follow_up_sent BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reschedule_count INTEGER DEFAULT 0;"
         ]
         for stmt in ddl_statements:
             try:

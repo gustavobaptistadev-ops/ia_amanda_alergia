@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, DateTime, Text, ForeignKey, UniqueConstraint, Integer
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -54,6 +54,7 @@ class Appointment(Base):
     reminder_2h_sent = Column(Boolean, default=False)
     prep_reminder_sent = Column(Boolean, default=False) # Reforço de suspensão de antialérgicos 5 dias antes
     follow_up_sent = Column(Boolean, default=False) # Acolhimento 48h pós-consulta
+    reschedule_count = Column(Integer, default=0) # Quantas vezes a consulta foi reagendada
     created_at = Column(DateTime, default=datetime.utcnow)
 
     contact = relationship("Contact", back_populates="appointments")
