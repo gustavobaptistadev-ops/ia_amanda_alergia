@@ -69,9 +69,9 @@ class PersonaBuilder:
         
         prompt_blocks.append(PRIVACY_RULES)
         
-        final_prompt = "\\n\\n".join(prompt_blocks)
+        final_prompt = "\n\n".join(prompt_blocks)
         
-        return f\"\"\"{final_prompt}
+        return f"""{final_prompt}
 
 Contexto da Clínica e Conhecimentos Gerais (RAG):
 {rag_context}
@@ -83,4 +83,4 @@ Sua tarefa agora:
 Responda ao paciente com carinho, elegância, discrição e humanidade, seguindo as diretrizes acima.
 
 {user_message}
-Sua Resposta:\"\"\"
+Sua Resposta:"""
