@@ -1,0 +1,48 @@
+/* Customizações para o react-big-calendar no tema Tailwind */
+.rbc-calendar {
+  font-family: inherit;
+}
+
+.rbc-header {
+  padding: 8px 4px;
+  font-weight: 600;
+  color: #475569; /* slate-600 */
+  border-bottom: 1px solid #e2e8f0; /* slate-200 */
+  text-transform: capitalize;
+}
+
+.rbc-today {
+  background-color: #f1f5f9; /* slate-100 */
+}
+
+.rbc-event {
+  border: none !important;
+}
+
+.rbc-time-view, .rbc-month-view {
+  border: 1px solid #e2e8f0; /* slate-200 */
+  border-radius: 8px;
+}
+
+.rbc-time-header.rbc-overflowing {
+  border-right: 1px solid #e2e8f0;
+}
+
+.rbc-toolbar button {
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 500;
+}
+
+.rbc-toolbar button.rbc-active {
+  background-color: #eff6ff; /* blue-50 */
+  color: #2563eb; /* blue-600 */
+  border-color: #bfdbfe; /* blue-200 */
+  box-shadow: none;
+}
+
+.rbc-toolbar button:hover {
+  background-color: #f8fafc; /* slate-50 */
+}
