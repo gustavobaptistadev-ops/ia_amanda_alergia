@@ -241,16 +241,21 @@ async def process_message(data: dict):
             info = data.get("data", {}).get("Info", {})
             msg_obj = data.get("data", {}).get("Message", {})
             from_me = info.get("IsFromMe", False)
-            remote_jid = info.get("Sender", "")
-            if not remote_jid:
-                remote_jid = info.get("Chat", "")
-            push_name = info.get("PushName", "Cliente")
+            
+            # Suporte a AddressingMode: lid / jid padrão da Evolution
+            remote_jid = info.get("Chat", "") or info.get("Sender", "") or info.get("SenderAlt", "") or info.get("RemoteJid", "")
+            if not remote_jid and isinstance(data.get("data"), dict):
+                remote_jid = data.get("data", {}).get("key", {}).get("remoteJid", "")
+                
+            push_name = info.get("PushName", "") or info.get("pushName", "Cliente")
             if info.get("IsGroup", False):
                  return
             if "conversation" in msg_obj:
                 text = msg_obj["conversation"]
             elif "extendedTextMessage" in msg_obj:
                 text = msg_obj["extendedTextMessage"].get("text", "")
+            elif isinstance(msg_obj, str):
+                text = msg_obj
             elif "documentMessage" in message_obj or "documentWithCaptionMessage" in message_obj or message_type in ["documentMessage", "documentWithCaptionMessage"]:
                 doc_obj = message_obj.get("documentMessage") or message_obj.get("documentWithCaptionMessage", {}).get("message", {}).get("documentMessage") or message_obj
                 caption = doc_obj.get("caption", "")
