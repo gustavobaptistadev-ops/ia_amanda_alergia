@@ -250,34 +250,26 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
     except Exception as db_err:
         logger.error(f"Erro ao persistir agendamento no banco: {db_err}")
 
-    # 4. Geração do Link Oficial de 1 Clique para a Agenda Pessoal do Google do Paciente
+    # 4. Geração do Link Oficial de 1 Clique para a Agenda Pessoal do Google do Paciente (Compacto e Limpo)
     import urllib.parse
     google_cal_link = ""
     try:
         dt_local = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-        # Horário de Brasília (UTC-3) convertido para UTC para o formato do link (YYYYMMDDTHHMMSSZ)
+        # Horário de Brasília (UTC-3) convertido para UTC (YYYYMMDDTHHMMSSZ)
         dt_utc_start = dt_local + datetime.timedelta(hours=3)
         dt_utc_end = dt_utc_start + datetime.timedelta(hours=1)
         
         dates_param = f"{dt_utc_start.strftime('%Y%m%dT%H%M%SZ')}/{dt_utc_end.strftime('%Y%m%dT%H%M%SZ')}"
-        title_param = urllib.parse.quote("Consulta Médica - Clínica Respirar (Alergia e Imunologia)")
-        details_param = urllib.parse.quote(
-            f"Consulta de Alergia e Imunologia com especialista.\n"
-            f"Paciente: {patient_name}\n\n"
-            f"💡 Lembrete: Se for realizar testes de alergia de pele, recomenda-se suspender antialérgicos orais de 5 a 7 dias antes.\n"
-            f"Telefone da clínica: (11) 3000-0000"
-        )
-        location_param = urllib.parse.quote("Av. Paulista, 1000 - Cj. 1204 - Bela Vista, São Paulo - SP")
+        title_param = urllib.parse.quote(f"Consulta Alergia - {patient_name.split()[0] if patient_name else 'Clínica Respirar'}")
+        details_param = urllib.parse.quote("Consulta Médica na Clínica Respirar.\nAv. Paulista, 1000 - Cj 1204.")
+        location_param = urllib.parse.quote("Av. Paulista, 1000, Bela Vista, São Paulo")
         
-        google_cal_link = (
-            f"https://calendar.google.com/calendar/render?action=TEMPLATE"
-            f"&text={title_param}&dates={dates_param}&details={details_param}&location={location_param}"
-        )
+        google_cal_link = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_param}&dates={dates_param}&details={details_param}&location={location_param}"
     except Exception as err:
         logger.warning(f"Erro ao gerar link do Google Calendar: {err}")
 
     # Retorno limpo e humanizado para a Amanda entregar ao paciente
-    link_info = f"\n\nLink do Google Agenda para o paciente salvar no celular:\n{google_cal_link}" if google_cal_link else ""
+    link_info = f"\n\nLink do Google Agenda:\n{google_cal_link}" if google_cal_link else ""
 
     service = get_calendar_service()
     if not service:

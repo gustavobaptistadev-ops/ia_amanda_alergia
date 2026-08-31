@@ -122,8 +122,9 @@ async def generate_response_node(state: AgentState):
                 res_recent = await session.execute(stmt_recent)
                 active_contact = res_recent.scalars().first()
 
-            # Checa quantidade de mensagens trocadas na conversa atual
-            msg_count = len(messages) if messages else 0
+            # Checa se é o início absoluto da conversa
+            # Note: na primeira mensagem o array messages contém apenas 1 item
+            is_initial_turn = (msg_count <= 1)
             
             if active_contact:
                 profile_parts = []
@@ -140,22 +141,23 @@ async def generate_response_node(state: AgentState):
                 if profile_parts:
                     patient_profile_str = "📋 FICHA PRÉVIA DO PACIENTE (MEMÓRIA DE LONGO PRAZO):\n" + "\n".join(profile_parts) + "\n\n"
 
-                # Se o contato já tem nome ou agendamento prévio e está abrindo conversa nova:
-                if patient_name and (msg_count <= 2 or active_contact.stage == "agendado"):
+                # Dispara saudação de abertura APENAS na primeiríssima mensagem da conversa
+                if is_initial_turn and patient_name:
                     contact_status_str = (
                         f"👤 TIPO DE ATENDIMENTO: PACIENTE RECORRENTE [Nome: {patient_name}]\n"
-                        f"• ACOLHIMENTO DE RETORNO: Como o paciente {patient_name} já tem histórico, inicie com saudação calorosa reconhecendo-o com alegria (ex: 'Olá, {patient_name.split()[0]}! Que alegria falar com você novamente 🌿. Como posso te ajudar hoje?').\n\n"
+                        f"• ACOLHIMENTO DE RETORNO (Apenas se for o início do contato): Como o paciente {patient_name} já tem histórico, acolha com alegria chamando pelo primeiro nome.\n\n"
                     )
-                elif msg_count <= 2:
+                elif is_initial_turn:
                     contact_status_str = (
                         "👤 TIPO DE ATENDIMENTO: NOVO CONTATO / BOAS-VINDAS\n"
-                        "• APRESENTAÇÃO OBRIGATÓRIA: Como é a primeira mensagem da conversa, apresente-se com calor humano dizendo seu nome Amanda, citando a Clínica Respirar e oferecendo ajuda (ex: 'Olá, boa tarde! Sou a Amanda, assistente da Clínica Respirar 🌻. É um prazer te atender! Como posso te ajudar hoje?').\n\n"
+                        "• APRESENTAÇÃO OBRIGATÓRIA (Apenas se for o início do contato): Apresente-se dizendo seu nome Amanda e cite a Clínica Respirar.\n\n"
                     )
             else:
-                contact_status_str = (
-                    "👤 TIPO DE ATENDIMENTO: NOVO CONTATO / BOAS-VINDAS\n"
-                    "• APRESENTAÇÃO OBRIGATÓRIA: Apresente-se dizendo seu nome Amanda, cite a Clínica Respirar e dê as boas-vindas com carinho.\n\n"
-                )
+                if is_initial_turn:
+                    contact_status_str = (
+                        "👤 TIPO DE ATENDIMENTO: NOVO CONTATO / BOAS-VINDAS\n"
+                        "• APRESENTAÇÃO OBRIGATÓRIA (Apenas se for o início do contato): Apresente-se dizendo seu nome Amanda e cite a Clínica Respirar.\n\n"
+                    )
     except Exception as err:
         logger.debug(f"Aviso memória de longo prazo: {err}")
 
