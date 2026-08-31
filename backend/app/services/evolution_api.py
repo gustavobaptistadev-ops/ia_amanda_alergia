@@ -135,6 +135,37 @@ async def send_voice_audio_message(number: str, audio_bytes: bytes):
             logger.error(f"Erro ao enviar áudio para {number}: {e}")
             return None
 
+async def send_document_message(number: str, document_bytes: bytes, filename: str, caption: str = ""):
+    """Envia um arquivo (documento) via EvolutionAPI."""
+    import base64
+    if not document_bytes:
+        return None
+
+    b64_doc = base64.b64encode(document_bytes).decode("utf-8")
+    
+    url = f"{EVOLUTION_API_URL}/send/media"
+    payload = {
+        "number": number,
+        "media": f"data:text/calendar;base64,{b64_doc}",
+        "mediatype": "document",
+        "fileName": filename,
+        "caption": caption,
+        "delay": 1500
+    }
+    
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.post(url, json=payload, headers=get_headers())
+            if response.status_code == 200 or response.status_code == 201:
+                logger.info(f"Documento enviado para {number} com sucesso.")
+                return response.json()
+            else:
+                logger.warning(f"Aviso ao enviar documento para {number} ({response.status_code}): {response.text}")
+                return None
+        except Exception as e:
+            logger.error(f"Erro ao enviar documento para {number}: {e}")
+            return None
+
 async def get_base64_from_media(message_id: str, remote_jid: str = "", message_obj: dict = None) -> bytes:
     """Busca o base64 de uma mensagem de mídia na EvolutionAPI / Ghosthub."""
     import base64
