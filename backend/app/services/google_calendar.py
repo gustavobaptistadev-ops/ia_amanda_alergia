@@ -213,7 +213,7 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
         
         # Encurtando o URL (fallback para o URL longo caso falhe)
         try:
-            req = urllib.request.Request(f"https://is.gd/create.php?format=simple&url={urllib.parse.quote(long_url)}")
+            req = urllib.request.Request(f"https://tinyurl.com/api-create.php?url={urllib.parse.quote(long_url)}")
             with urllib.request.urlopen(req, timeout=3) as response:
                 google_cal_link = response.read().decode('utf-8')
         except Exception as e_short:
