@@ -8,12 +8,13 @@ api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY', 'dev-secret-key-123')
 
-async def get_api_key(request: Request, key: str = Security(api_key_header)):
+async def get_api_key(request: Request):
     # 1. Permite upgrade transparente de conexões WebSocket
     if request.scope.get("type") == "websocket":
         return None
 
     # 2. Valida chave interna direta (X-API-Key)
+    key = request.headers.get(API_KEY_NAME) or request.headers.get(API_KEY_NAME.lower())
     if key and secrets.compare_digest(key, INTERNAL_API_KEY):
         return key
 
