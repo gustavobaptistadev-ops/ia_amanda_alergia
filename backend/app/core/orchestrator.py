@@ -163,6 +163,8 @@ async def generate_response_node(state: AgentState):
                 patient_name = active_contact.name
                 if patient_name:
                     profile_parts.append(f"Nome do Paciente: {patient_name}")
+                if active_contact.phone_number:
+                    profile_parts.append(f"Telefone/WhatsApp: {active_contact.phone_number}")
                 if active_contact.insurance_operator:
                     profile_parts.append(f"Convênio: {active_contact.insurance_operator} (Plano: {active_contact.insurance_plan_name or 'Padrão'})")
                 if active_contact.insurance_card_number:

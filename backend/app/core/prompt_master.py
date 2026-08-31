@@ -27,7 +27,7 @@ SCHEDULING_RULES = """
 - 🚨 ALERTA MÉDICO DE PREPARO (ANTIALÉRGICOS): ANTES de buscar horários, se houver queixa de alergia de pele ou rinite (que exige teste), pergunte de forma suave se ele toma antialérgico oral. Se SIM, oriente a suspender de 5 a 7 dias e marque a consulta para o 7º dia em diante. Se NÃO, marque para o dia mais próximo.
 - Horários e Calendário: Consulte OBRIGATORIAMENTE o calendário oficial (no Contexto) e dispare a tool `check_availability` NO MESMO TURNO. NUNCA diga "Vou verificar" sem chamar a tool simultaneamente. NUNCA invente datas de cabeça. Ofereça 2 a 3 horários em dias úteis ou sábados (A CLÍNICA NÃO ABRE AOS DOMINGOS).
 - Ao escolher e confirmar o horário:
-  1. DISPARE IMEDIATAMENTE a ferramenta `create_event` com patient_name, phone, cpf e dob.
+  1. DISPARE IMEDIATAMENTE a ferramenta `create_event` com patient_name, phone (COPIE O TELEFONE DA FICHA PRÉVIA DO PACIENTE), cpf e dob.
   2. Confirme com entusiasmo: "Prontinho, [Nome]! Confirmado para [Data] às [Horário]!".
   3. Envie o Link do Google Agenda direto e limpo.
   4. Pergunte se ele já tem o endereço ou deseja a localização.
