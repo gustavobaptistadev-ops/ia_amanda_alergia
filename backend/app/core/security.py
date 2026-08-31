@@ -8,18 +8,24 @@ api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY', 'dev-secret-key-123')
 
-async def get_api_key(request: Request):
+from fastapi import WebSocket
+
+async def get_api_key(request: Request = None, websocket: WebSocket = None):
+    conn = request or websocket
+    if not conn:
+        return None
+
     # 1. Permite upgrade transparente de conexões WebSocket
-    if request.scope.get("type") == "websocket":
+    if conn.scope.get("type") == "websocket":
         return None
 
     # 2. Valida chave interna direta (X-API-Key)
-    key = request.headers.get(API_KEY_NAME) or request.headers.get(API_KEY_NAME.lower())
+    key = conn.headers.get(API_KEY_NAME) or conn.headers.get(API_KEY_NAME.lower())
     if key and secrets.compare_digest(key, INTERNAL_API_KEY):
         return key
 
     # 3. Valida JWT Token via Authorization Header (Bearer Token)
-    auth_header = request.headers.get("Authorization", "")
+    auth_header = conn.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header.replace("Bearer ", "").strip()
         from app.core.auth import SECRET_KEY, ALGORITHM
