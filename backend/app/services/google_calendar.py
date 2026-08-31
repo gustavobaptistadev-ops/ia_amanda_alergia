@@ -187,71 +187,16 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
     dob = sanitize_text(dob, max_length=20)
 
     # 3. Persistência no Banco de Dados (Tabela Appointments & Kanban)
-    try:
-        from app.database import AsyncSessionLocal
-        from app.models.chat import Contact, Appointment
-        from sqlalchemy.future import select
-        import asyncio
-
-        # Tenta converter date_str e time_str
-        try:
-            start_dt = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
-        except Exception:
-            start_dt = datetime.datetime.now()
-
-        async def save_appointment_to_db():
-            async with AsyncSessionLocal() as session:
-                contact = None
-                if phone:
-                    clean_phone = re.sub(r"\D", "", phone)
-                    stmt = select(Contact).where(Contact.phone_number.contains(clean_phone[-8:] if len(clean_phone) >= 8 else clean_phone))
-                    res = await session.execute(stmt)
-                    contact = res.scalars().first()
-
-                if not contact:
-                    # Busca por nome se não achou por telefone
-                    stmt_name = select(Contact).where(Contact.name.ilike(f"%{patient_name}%"))
-                    res_name = await session.execute(stmt_name)
-                    contact = res_name.scalars().first()
-
-                if not contact:
-                    contact = Contact(
-                        phone_number=phone or "WhatsApp",
-                        name=patient_name,
-                        stage="agendado",
-                        bot_active=True
-                    )
-                    session.add(contact)
-                    await session.commit()
-                    await session.refresh(contact)
-                else:
-                    contact.stage = "agendado"
-                    if not contact.name:
-                        contact.name = patient_name
-                    await session.commit()
-
-                # Salva o agendamento
-                new_appt = Appointment(
-                    contact_id=contact.id,
-                    patient_name=patient_name,
-                    appointment_time=start_dt,
-                    status="agendado"
-                )
-                session.add(new_appt)
-                await session.commit()
-                logger.info(f"Agendamento de {patient_name} persistido com sucesso no banco de dados!")
-
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(save_appointment_to_db())
-        except RuntimeError:
-            asyncio.run(save_appointment_to_db())
-
-    except Exception as db_err:
-        logger.error(f"Erro ao persistir agendamento no banco: {db_err}")
+    # [DESATIVADO TEMPORARIAMENTE] O uso de sessões async (SQLAlchemy + asyncpg) 
+    # dentro de uma Tool síncrona (executada em ThreadPool pelo LangChain) causa 
+    # erro de 'Task attached to a different loop'. A persistência precisará ser 
+    # movida para uma função async nativa ou uma Tool assíncrona futuramente.
+    # A fonte da verdade atual permanece sendo o Google Calendar oficial.
+    pass
 
     # 4. Geração do Link Oficial de 1 Clique para a Agenda Pessoal do Google do Paciente (Compacto e Limpo)
     import urllib.parse
+    import urllib.request
     google_cal_link = ""
     try:
         dt_local = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
@@ -264,7 +209,17 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
         details_param = urllib.parse.quote("Consulta Médica na Clínica Respirar.\nAv. Paulista, 1000 - Cj 1204.")
         location_param = urllib.parse.quote("Av. Paulista, 1000, Bela Vista, São Paulo")
         
-        google_cal_link = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_param}&dates={dates_param}&details={details_param}&location={location_param}"
+        long_url = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_param}&dates={dates_param}&details={details_param}&location={location_param}"
+        
+        # Encurtando o URL (fallback para o URL longo caso falhe)
+        try:
+            req = urllib.request.Request(f"https://is.gd/create.php?format=simple&url={urllib.parse.quote(long_url)}")
+            with urllib.request.urlopen(req, timeout=3) as response:
+                google_cal_link = response.read().decode('utf-8')
+        except Exception as e_short:
+            logger.warning(f"Erro ao encurtar link: {e_short}")
+            google_cal_link = long_url
+
     except Exception as err:
         logger.warning(f"Erro ao gerar link do Google Calendar: {err}")
 
@@ -278,8 +233,7 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
             f"INSTRUÇÃO PARA A AMANDA:\n"
             f"1. Confirme a data e o horário com carinho no singular.\n"
             f"2. Envie o link do Google Agenda para ele salvar com 1 toque no celular.\n"
-            f"3. Dê a dica rápida sobre suspender antialérgicos antes dos testes de pele.\n"
-            f"4. Pergunte com delicadeza se ele gostaria que você envie o endereço e a localização no mapa / Waze."
+            f"3. Pergunte com delicadeza se ele gostaria que você envie o endereço e a localização no mapa / Waze."
         )
 
     try:
@@ -312,8 +266,7 @@ def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "
             f"INSTRUÇÃO PARA A AMANDA:\n"
             f"1. Confirme a data e o horário com carinho no singular.\n"
             f"2. Envie o link do Google Agenda para ele salvar com 1 toque no celular.\n"
-            f"3. Dê a dica rápida sobre suspender antialérgicos antes dos testes de pele.\n"
-            f"4. Pergunte com delicadeza se ele gostaria que você envie o endereço e a localização no mapa / Waze."
+            f"3. Pergunte com delicadeza se ele gostaria que você envie o endereço e a localização no mapa / Waze."
         )
 
     except Exception as e:
