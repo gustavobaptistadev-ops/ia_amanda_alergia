@@ -15,6 +15,11 @@ class InMemoryLogHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
+            
+            # Filtra requisições de telemetria do próprio painel para evitar spam no terminal
+            if "/api/v1/logs/live" in msg or "/api/v1/logs/worker-stats" in msg:
+                return
+                
             log_entry = {
                 "time": datetime.utcnow().strftime("%H:%M:%S"),
                 "level": record.levelname,
