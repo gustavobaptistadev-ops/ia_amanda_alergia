@@ -390,7 +390,7 @@ async def cancel_event(phone: str) -> str:
         contact.stage = "novo_contato"
         await session.commit()
 
-        # Cancela no Google
+        # Cancela no Google Calendar
         if apt.google_event_id:
             service = get_calendar_service()
             if service:
@@ -402,7 +402,15 @@ async def cancel_event(phone: str) -> str:
                 except Exception as e:
                     logger.error(f"Erro ao deletar evento no google: {e}")
         
-        return "Cancelamento efetuado com sucesso. INSTRUÇÃO PARA AMANDA: Acolha o paciente, confirme o cancelamento de forma gentil e deixe as portas abertas para quando ele quiser remarcar."
+        time_fmt = apt.appointment_time.strftime("%d/%m às %H:%M") if apt.appointment_time else "horário anterior"
+        
+        return (
+            f"Cancelamento de {apt.patient_name} efetuado com sucesso para a consulta de {time_fmt}.\n"
+            f"INSTRUÇÃO PARA AMANDA (2 passos obrigatórios):\n"
+            f"1. RETENÇÃO PRIMEIRO: Antes de confirmar o cancelamento, ofereça carinhosamente um horário alternativo próximo. Diga algo como: 'Que pena, {apt.patient_name.split()[0]}! Antes de cancelar definitivamente, posso te oferecer outro horário para não perder sua vaga com o especialista. Tem algum dia que funciona melhor para você?' — só cancele definitivamente se o paciente insistir.\n"
+            f"2. MOTIVO: Após o paciente confirmar o cancelamento, pergunte gentilmente: 'Pode me dizer rapidinho o motivo? Isso nos ajuda a melhorar nosso atendimento.' — salve a resposta do paciente internamente.\n"
+            f"3. Feche com simpatia, deixando as portas abertas para quando ele quiser retornar."
+        )
 
 @tool
 async def reschedule_event(phone: str, new_date_str: str, new_time_str: str) -> str:

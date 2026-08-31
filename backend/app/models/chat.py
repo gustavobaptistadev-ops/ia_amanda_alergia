@@ -56,6 +56,9 @@ class Appointment(Base):
     follow_up_sent = Column(Boolean, default=False) # Acolhimento 48h pós-consulta
     reschedule_count = Column(Integer, default=0) # Quantas vezes a consulta foi reagendada
     google_event_id = Column(String, nullable=True) # ID do evento no Google Calendar
+    cancellation_reason = Column(String, nullable=True) # Motivo do cancelamento (capturado pela Amanda)
+    nps_sent = Column(Boolean, default=False)      # Se o NPS pós-consulta foi enviado
+    nps_score = Column(Integer, nullable=True)     # Nota de 0-10 do paciente
     created_at = Column(DateTime, default=datetime.utcnow)
 
     contact = relationship("Contact", back_populates="appointments")

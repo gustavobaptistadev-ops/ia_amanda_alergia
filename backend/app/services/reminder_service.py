@@ -36,6 +36,10 @@ async def check_and_send_reminders():
     window_followup_start = now - timedelta(hours=50)
     window_followup_end = now - timedelta(hours=47)
 
+    # 5. Range para NPS 72h pós-consulta (entre 71h e 74h atrás)
+    window_nps_start = now - timedelta(hours=74)
+    window_nps_end = now - timedelta(hours=71)
+
     async with AsyncSessionLocal() as session:
         try:
             total_sent = 0
@@ -180,6 +184,41 @@ async def check_and_send_reminders():
                         level="SUCCESS",
                         title=f"Follow-up 48h enviado: {appt.patient_name}",
                         detail=f"Acolhimento pós-consulta enviado para {appt.contact.phone_number[:6]}****"
+                    ))
+
+            # ----------------------------------------------------
+            # ETAPA 5: NPS AUTOMÁTICO 72H PÓS-CONSULTA
+            # ----------------------------------------------------
+            stmt_nps = (
+                select(Appointment)
+                .options(selectinload(Appointment.contact))
+                .where(
+                    Appointment.status.in_(["confirmado", "concluido", "agendado"]),
+                    Appointment.nps_sent == False,
+                    Appointment.appointment_time >= window_nps_start,
+                    Appointment.appointment_time <= window_nps_end
+                )
+            )
+            res_nps = await session.execute(stmt_nps)
+            appointments_nps = res_nps.scalars().all()
+
+            for appt in appointments_nps:
+                if appt.contact and appt.contact.phone_number:
+                    msg = (
+                        f"Olá, {appt.patient_name}! Aqui é a Amanda da Clínica Respirar. 🌻\n\n"
+                        "Esperamos que sua consulta tenha sido ótima e que você já esteja se sentindo melhor!\n\n"
+                        "De *0 a 10*, o quanto você indicaria a Clínica Respirar para um amigo ou familiar?\n"
+                        "(_Basta responder com o número!_)"
+                    )
+                    await send_text_message(appt.contact.phone_number, msg)
+                    await save_message(appt.contact.phone_number, msg, sender='ia')
+                    appt.nps_sent = True
+                    total_sent += 1
+                    session.add(SystemLog(
+                        category="cron_lembretes",
+                        level="INFO",
+                        title=f"NPS 72h enviado: {appt.patient_name}",
+                        detail=f"Pesquisa de satisfação enviada para {appt.contact.phone_number[:6]}****"
                     ))
 
             session.add(SystemLog(

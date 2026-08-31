@@ -2,6 +2,7 @@ from app.services.evolution_api import send_text_message
 from app.core.orchestrator import process_user_message
 from app.core.guardrails import validar_resposta
 from app.services.db_service import save_message, get_or_create_contact
+from app.core.limiter import check_phone_rate_limit
 import logging
 
 import asyncio
@@ -14,8 +15,53 @@ import redis.asyncio as redis
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
+# Palavras-gatilho de emergência médica real (triagem clínica)
+EMERGENCY_TRIGGERS = [
+    "anafilaxia", "anafil", "não consigo respirar", "nao consigo respirar",
+    "falta de ar grave", "sufocando", "sufoca", "glote", "angioedema",
+    "reação alérgica grave", "reacao alergica grave", "choque alérgico",
+    "internação de emergência", "emergência médica", "samu", "pronto socorro urgente",
+    "meu filho não respira", "minha filha não respira", "dificuldade respiratória severa",
+    "inchando a garganta", "inchando o rosto todo", "urticária com falta de ar"
+]
+
+EMERGENCY_RESPONSE = (
+    "⚠️ Identifiquei que você pode estar passando por uma situação de urgência médica.\n\n"
+    "Se for uma emergência imediata, ligue agora para o *SAMU 192* ou vá ao Pronto-Socorro mais próximo.\n\n"
+    "Assim que você estiver seguro(a), vou estar aqui para agendar sua consulta de acompanhamento com nossos especialistas. Cuide-se! 🙏"
+)
+
 async def process_and_respond(remote_jid: str, text: str, push_name: str, is_audio: bool = False):
     """Executa a logica pesada de IA e envia a resposta de forma estritamente sequencial (lock distribuído via Redis)."""
+
+    # [SEGURANÇA 1.1] Rate Limit por número de telefone — protege contra DDoS semântico
+    is_rate_limited = await check_phone_rate_limit(remote_jid, max_per_minute=20)
+    if is_rate_limited:
+        logger.warning(f"Rate limit atingido para {remote_jid[:6]}****. Mensagem ignorada.")
+        await send_text_message(remote_jid, "Estou recebendo muitas mensagens em seguida. Aguarde um momento e tente novamente! 😊")
+        return
+
+    # [SEGURANÇA 2.3] Triagem de Emergência — detecta urgência real ANTES do processamento da IA
+    text_lower = text.lower() if text else ""
+    is_emergency = any(trigger in text_lower for trigger in EMERGENCY_TRIGGERS)
+    if is_emergency:
+        logger.warning(f"TRIAGEM DE EMERGÊNCIA acionada para {remote_jid[:6]}****. Enviando resposta de segurança imediata.")
+        await send_text_message(remote_jid, EMERGENCY_RESPONSE)
+        await save_message(remote_jid, text, sender='paciente', name=push_name)
+        await save_message(remote_jid, EMERGENCY_RESPONSE, sender='ia')
+        from app.models.chat import SystemLog
+        from app.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as session:
+            session.add(SystemLog(
+                category="triagem_emergencia",
+                level="ALERTA",
+                title=f"Emergência detectada: {push_name or remote_jid[:6]}****",
+                detail=f"Gatilho: '{text[:80]}' | JID: {remote_jid[:6]}****"
+            ))
+            await session.commit()
+        return
+
+
     # Lock distribuído (timeout: liberta a trava se o worker morrer; blocking_timeout: aguarda até 2 mins por outra msg terminar)
     async with redis_client.lock(f"lock:patient:{remote_jid}", timeout=180, blocking_timeout=120):
         try:
@@ -74,6 +120,35 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
                 await send_text_message(remote_jid, ai_response)
 
             await save_message(remote_jid, ai_response, sender='ia')
+
+            # [NPS 2.1] Capturar resposta numérica de NPS se o paciente respondeu com nota de 0-10
+            import re as _re
+            nps_match = _re.fullmatch(r"\s*([0-9]|10)\s*", text.strip())
+            if nps_match:
+                try:
+                    nps_score = int(nps_match.group(1))
+                    from app.database import AsyncSessionLocal as _ASL
+                    from app.models.chat import Appointment as _Appt, Contact as _Cont
+                    from sqlalchemy.future import select as _select
+                    async with _ASL() as _session:
+                        _clean = _re.sub(r"\D", "", remote_jid)
+                        _stmt = _select(_Cont).where(_Cont.phone_number.contains(_clean[-8:] if len(_clean) >= 8 else _clean))
+                        _res = await _session.execute(_stmt)
+                        _contact = _res.scalars().first()
+                        if _contact:
+                            _stmt_apt = _select(_Appt).where(
+                                _Appt.contact_id == _contact.id,
+                                _Appt.nps_sent == True,
+                                _Appt.nps_score == None
+                            ).order_by(_Appt.created_at.desc()).limit(1)
+                            _res_apt = await _session.execute(_stmt_apt)
+                            _apt = _res_apt.scalars().first()
+                            if _apt:
+                                _apt.nps_score = nps_score
+                                await _session.commit()
+                                logger.info(f"NPS registrado: {nps_score}/10 para {remote_jid[:6]}****")
+                except Exception as _e:
+                    logger.warning(f"Aviso ao capturar NPS: {_e}")
             
             from app.api.endpoints.chats import manager
             await manager.broadcast("update")

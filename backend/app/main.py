@@ -46,7 +46,10 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS prep_reminder_sent BOOLEAN DEFAULT FALSE;",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS follow_up_sent BOOLEAN DEFAULT FALSE;",
             "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reschedule_count INTEGER DEFAULT 0;",
-            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS google_event_id VARCHAR;"
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS google_event_id VARCHAR;",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS cancellation_reason VARCHAR;",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS nps_sent BOOLEAN DEFAULT FALSE;",
+            "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS nps_score INTEGER;"
         ]
         for stmt in ddl_statements:
             try:
@@ -113,6 +116,58 @@ async def add_security_headers(request: Request, call_next):
 @app.get("/")
 async def root():
     return {"message": "Bem-vindo à API da IA Amanda - Sistema de Recepção Inteligente"}
+
+@app.get("/health")
+async def health_check():
+    """Health Check enriquecido — verifica todos os componentes críticos do sistema."""
+    import httpx
+    import redis.asyncio as _redis
+    from app.database import engine as _engine
+    from sqlalchemy import text as _text
+
+    status = {"status": "ok", "components": {}}
+
+    # 1. Banco de dados PostgreSQL
+    try:
+        async with _engine.connect() as conn:
+            await conn.execute(_text("SELECT 1"))
+        status["components"]["database"] = "healthy"
+    except Exception as e:
+        status["components"]["database"] = f"unhealthy: {str(e)[:60]}"
+        status["status"] = "degraded"
+
+    # 2. Redis
+    try:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        async with _redis.Redis.from_url(redis_url) as r:
+            await r.ping()
+        status["components"]["redis"] = "healthy"
+    except Exception as e:
+        status["components"]["redis"] = f"unhealthy: {str(e)[:60]}"
+        status["status"] = "degraded"
+
+    # 3. Evolution API
+    try:
+        evolution_url = os.getenv("EVOLUTION_API_URL", "")
+        evolution_key = os.getenv("EVOLUTION_API_KEY", "")
+        if evolution_url:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.get(f"{evolution_url}/instance/fetchInstances", headers={"apikey": evolution_key})
+            status["components"]["evolution_api"] = "healthy" if r.status_code < 500 else f"unhealthy: HTTP {r.status_code}"
+        else:
+            status["components"]["evolution_api"] = "not_configured"
+    except Exception as e:
+        status["components"]["evolution_api"] = f"unhealthy: {str(e)[:60]}"
+        status["status"] = "degraded"
+
+    # 4. OpenAI API
+    try:
+        openai_key = os.getenv("OPENAI_API_KEY", "")
+        status["components"]["openai"] = "configured" if openai_key else "not_configured"
+    except Exception:
+        status["components"]["openai"] = "unknown"
+
+    return status
 
 # Inclusão das rotas da API
 app.include_router(api_router, prefix="/api/v1")
