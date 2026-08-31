@@ -112,8 +112,10 @@ async def get_messages(phone_number: str, db: AsyncSession = Depends(get_db), x_
 async def reset_all_conversations(db: AsyncSession = Depends(get_db)):
     """Reseta e limpa absolutamente todas as conversas, contatos e checkpoints de memoria do LangGraph."""
     from sqlalchemy import delete, text
+    from app.models.chat import Appointment, Message, Contact
     try:
         await db.execute(delete(Message))
+        await db.execute(delete(Appointment))
         await db.execute(delete(Contact))
         
         try:
@@ -141,12 +143,20 @@ async def reset_conversation(phone_number: str, db: AsyncSession = Depends(get_d
     contact = result.scalars().first()
     if contact:
         from sqlalchemy import delete, text
-        # 1. Apaga todas as mensagens desse contato no banco relacional
+        from app.models.chat import Appointment, Message
+        # 1. Apaga todas as mensagens e agendamentos desse contato
         await db.execute(delete(Message).where(Message.contact_id == contact.id))
+        await db.execute(delete(Appointment).where(Appointment.contact_id == contact.id))
         
-        # 2. Reseta o contato para estágio inicial e ativa o bot
+        # 2. Reseta o contato completamente para o estado inicial
         contact.stage = "novo_contato"
         contact.bot_active = True
+        contact.name = None
+        contact.insurance_operator = None
+        contact.insurance_card_number = None
+        contact.insurance_plan_name = None
+        contact.insurance_coverage = None
+        contact.insurance_accommodation = None
         await db.commit()
         
         # 3. Limpa a memória de estado/checkpoints do LangGraph no Postgres para este thread_id (phone_number)
