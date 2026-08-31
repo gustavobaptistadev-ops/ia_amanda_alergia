@@ -31,6 +31,33 @@ IMPORTANTE: Responda estritamente em formato JSON válido conforme as chaves aci
 
 import io
 import pypdf
+import re
+from datetime import datetime
+
+def check_expiration(data: dict):
+    """Verifica se a carteirinha está vencida baseada na string expiration_date e injeta o alerta."""
+    exp_date_str = data.get("expiration_date")
+    if exp_date_str and str(exp_date_str).strip().lower() not in ["null", "none", ""]:
+        nums = re.findall(r'\d+', str(exp_date_str))
+        try:
+            now = datetime.now()
+            is_expired = False
+            if len(nums) == 3:
+                d, m, y = map(int, nums)
+                if y < 100: y += 2000
+                if datetime(y, m, d) < now: is_expired = True
+            elif len(nums) == 2:
+                m, y = map(int, nums)
+                if y < 100: y += 2000
+                if m == 12: next_m, next_y = 1, y+1
+                else: next_m, next_y = m+1, y
+                if datetime(next_y, next_m, 1) <= now: is_expired = True
+            
+            if is_expired:
+                data["is_expired"] = True
+                data["summary_for_chat"] = f"{data.get('summary_for_chat', '')} [ALERTA SISTEMA: A validade impressa ({exp_date_str}) indica que a carteirinha está vencida. Comunique o paciente com empatia.]"
+        except Exception as d_err:
+            logger.warning(f"[VISION OCR] Falha ao fazer parse da validade {exp_date_str}: {d_err}")
 
 PDF_TEXT_PROMPT = """Você é um especialista sênior em faturamento médico e credenciamento hospitalar da Clínica Respirar.
 Sua missão é analisar o texto extraído de um documento PDF enviado por um paciente no WhatsApp e identificar se é uma Carteirinha de Plano de Saúde / Convênio Médico ou documento de saúde.
@@ -86,6 +113,7 @@ async def process_health_card_document(file_bytes: bytes, filename: str = "") ->
                     content = content.split("```")[1].split("```")[0].strip()
                 data = json.loads(content)
                 if data.get("is_health_card"):
+                    check_expiration(data)
                     logger.info(f"[PDF SUCCESS] Carteirinha lida: Operadora={data.get('operator')}, Titular={data.get('patient_name')}, Matrícula={data.get('card_number')}")
                     return data
         except Exception as pdf_err:
@@ -134,6 +162,10 @@ async def process_health_card_image(image_bytes: bytes) -> Dict[str, Any]:
             content = content.split("```")[1].split("```")[0].strip()
             
         data = json.loads(content)
+        
+        # Validação CTO: Checa vencimento da carteirinha
+        check_expiration(data)
+                
         logger.info(f"[VISION OCR SUCCESS] Carteirinha processada: Operadora={data.get('operator')}, Matrícula={data.get('card_number')}, Titular={data.get('patient_name')}")
         return data
         
