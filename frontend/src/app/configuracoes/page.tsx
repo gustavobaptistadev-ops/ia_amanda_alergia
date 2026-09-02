@@ -159,25 +159,22 @@ export default function Configuracoes() {
       const qrRes = await fetchWithAuth(`${apiUrl}/api/v1/evolution/qr`);
       if (qrRes.ok) {
         const qrData = await qrRes.json();
-        if (qrData.error && qrData.error !== 'qr_unavailable') {
-          setErrorMsg(qrData.message || "Erro retornado pela provedora ao gerar QR.");
+        if (qrData.error === 'needs_reconnect') {
+          setErrorMsg("WhatsApp desconectado. Clique em \"Reconectar\" e aguarde 3 segundos.");
         } else if (qrData.base64) {
-          // formato direto: { base64: "..." }
           setQrCodeBase64(qrData.base64);
         } else if (qrData.qrcode?.base64) {
-          // formato normalizado do nosso backend: { qrcode: { base64: "..." } }
           setQrCodeBase64(qrData.qrcode.base64);
         } else if (typeof qrData.qrcode === 'string') {
-          // formato legado string
           setQrCodeBase64(qrData.qrcode);
         } else if (qrData.data?.Qrcode) {
           setQrCodeBase64(qrData.data.Qrcode);
         } else if (qrData.code) {
           setQrCodeBase64(qrData.code);
-        } else if (qrData.error === 'qr_unavailable') {
-          setErrorMsg("QR Code ainda não disponível. Clique em \"Reconectar\" e aguarde 5 segundos.");
+        } else if (qrData.error) {
+          setErrorMsg(qrData.message || "Erro ao gerar QR Code. Clique em Reconectar.");
         } else {
-          setErrorMsg("QR Code veio vazio da provedora. Clique em Reconectar.");
+          setErrorMsg("QR Code veio vazio. Clique em Reconectar.");
         }
       } else {
         setErrorMsg("Não foi possível carregar o QR Code.");
@@ -689,16 +686,32 @@ export default function Configuracoes() {
                 )}
 
                 <button 
-                  onClick={() => fetchStatusAndQr()}
+                  onClick={async () => {
+                    setLoading(true);
+                    setErrorMsg(null);
+                    setQrCodeBase64(null);
+                    try {
+                      // Passo 1: chama reconnect (logout + aguarda + reconnect no servidor)
+                      await fetchWithAuth(`${apiUrl}/api/v1/evolution/reconnect`, { method: "POST" });
+                      // Passo 2: aguarda 3s para o GhostHub gerar o QR
+                      await new Promise(res => setTimeout(res, 3000));
+                      // Passo 3: busca o QR Code
+                      await fetchStatusAndQr();
+                    } catch (e) {
+                      setErrorMsg("Erro ao reconectar. Tente novamente.");
+                      setLoading(false);
+                    }
+                  }}
                   disabled={loading}
                   className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white w-full py-2.5 rounded-lg font-medium shadow-sm text-sm"
                 >
                   <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                  {loading ? "Carregando..." : "Gerar QR Code"}
+                  {loading ? "Reconectando..." : "Reconectar WhatsApp"}
                 </button>
                 <p className="text-[11px] text-slate-500 mt-4 text-center">
                   Vá em Aparelhos Conectados no seu celular para escanear.
                 </p>
+
               </>
             )}
           </div>
