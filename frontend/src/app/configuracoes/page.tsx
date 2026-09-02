@@ -159,16 +159,25 @@ export default function Configuracoes() {
       const qrRes = await fetchWithAuth(`${apiUrl}/api/v1/evolution/qr`);
       if (qrRes.ok) {
         const qrData = await qrRes.json();
-        if (qrData.error) {
+        if (qrData.error && qrData.error !== 'qr_unavailable') {
           setErrorMsg(qrData.message || "Erro retornado pela provedora ao gerar QR.");
         } else if (qrData.base64) {
+          // formato direto: { base64: "..." }
           setQrCodeBase64(qrData.base64);
-        } else if (qrData.qrcode) {
+        } else if (qrData.qrcode?.base64) {
+          // formato normalizado do nosso backend: { qrcode: { base64: "..." } }
+          setQrCodeBase64(qrData.qrcode.base64);
+        } else if (typeof qrData.qrcode === 'string') {
+          // formato legado string
           setQrCodeBase64(qrData.qrcode);
         } else if (qrData.data?.Qrcode) {
           setQrCodeBase64(qrData.data.Qrcode);
+        } else if (qrData.code) {
+          setQrCodeBase64(qrData.code);
+        } else if (qrData.error === 'qr_unavailable') {
+          setErrorMsg("QR Code ainda não disponível. Clique em \"Reconectar\" e aguarde 5 segundos.");
         } else {
-          setErrorMsg("QR Code veio vazio da provedora.");
+          setErrorMsg("QR Code veio vazio da provedora. Clique em Reconectar.");
         }
       } else {
         setErrorMsg("Não foi possível carregar o QR Code.");
