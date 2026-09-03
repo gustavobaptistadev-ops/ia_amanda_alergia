@@ -33,6 +33,13 @@ async def get_cached_response(user_message: str) -> Optional[str]:
         if re.search(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b", user_message) or len(user_message.strip()) < 4:
             return None
 
+        normalized_message = user_message.strip().lower()
+        scheduling_terms = ("agendar", "consulta", "horário", "horario", "marcar", "cpf", "nascimento", "convênio", "convenio", "remarcar", "cancelar")
+        if (any(term in normalized_message for term in scheduling_terms)
+                or re.search(r"\b\d{8,}\b", normalized_message)
+                or len(normalized_message.split()) >= 2 and not normalized_message.endswith("?")):
+            return None
+
         key = generate_cache_key(user_message)
         async with redis.Redis.from_url(REDIS_URL) as r:
             cached_data = await r.get(key)
