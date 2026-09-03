@@ -108,15 +108,32 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
 
 
 def _extract_name_from_history(messages: Sequence[Any]) -> str | None:
-    for message in reversed(messages or []):
+    message_list = list(messages or [])
+    for index in range(len(message_list) - 1, -1, -1):
+        message = message_list[index]
         if getattr(message, "type", None) == "human":
-            content = getattr(message, "content", "")
+            content = _clean_patient_text(getattr(message, "content", ""))
             name = _extract_name(content)
             if name:
                 return name
-            if message is messages[-1] and _looks_like_standalone_name(content):
+            previous_message = message_list[index - 1] if index > 0 else None
+            asked_for_name = (
+                getattr(previous_message, "type", None) == "ai"
+                and "nome completo" in normalize_text(
+                    getattr(previous_message, "content", "")
+                )
+            )
+            if (index == len(message_list) - 1 or asked_for_name) and _looks_like_standalone_name(content):
                 return content.strip(" .,!?")
     return None
+
+
+def _clean_patient_text(text: str) -> str:
+    """Remove o envelope interno antes de aplicar regras de linguagem."""
+    cleaned = str(text or "").strip()
+    if cleaned.startswith("<user_message>") and cleaned.endswith("</user_message>"):
+        cleaned = cleaned[len("<user_message>"):-len("</user_message>")]
+    return cleaned.strip()
 
 
 def _looks_like_standalone_name(text: str) -> bool:

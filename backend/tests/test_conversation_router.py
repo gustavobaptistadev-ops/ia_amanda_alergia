@@ -1,4 +1,4 @@
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.conversation_router import route_message
 
@@ -39,3 +39,19 @@ def test_resposta_curta_mantem_o_fluxo_de_cadastro():
 
     assert decision["intent"] == "AGENDAMENTO"
     assert decision["next_action"] == "COLLECT_CPF"
+
+
+def test_nome_curto_persistido_no_historico_permite_avancar_apos_cpf():
+    history = [
+        HumanMessage(content="Preciso marcar uma consulta"),
+        AIMessage(content="Qual o motivo da consulta?"),
+        HumanMessage(content="Meus braços estão com alergia"),
+        AIMessage(content="Informe seu nome completo, por favor."),
+        HumanMessage(content="Gustavo Henrique Baptista"),
+        AIMessage(content="Agora informe o seu CPF, por favor."),
+    ]
+
+    decision = route_message("00511483155", history)
+
+    assert decision["entities"]["cpf"] == "00511483155"
+    assert decision["next_action"] == "COLLECT_BIRTH_DATE"
