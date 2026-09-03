@@ -14,6 +14,7 @@ from app.core.rag import retrieve_context
 from app.core.prompt_master import PersonaBuilder
 from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, extract_latest_date, extract_payment_type, has_patient_complaint
 from app.core.conversation_router import build_complaint_request, route_message
+from app.core.clinic_location import clinic_location_text
 
 from langgraph.checkpoint.memory import MemorySaver
 import operator
@@ -208,6 +209,8 @@ def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow",
         return "urgency_flow"
     if intent == "OFF_TOPIC":
         return "off_topic_flow"
+    if intent == "LOCATION_REQUEST":
+        return "location_flow"
     if intent in ["AGENDAMENTO", "REAGENDAMENTO", "CANCELAMENTO"]:
         return "schedule_flow"
     return "fetch_context"
@@ -240,6 +243,14 @@ def off_topic_flow_node(state: AgentState):
         "ou prefere seguir com o agendamento?"
     )
     return {"messages": [AIMessage(content=msg)]}
+
+
+def location_flow_node(state: AgentState):
+    """Entrega a localização após confirmação, sem reabrir o cadastro."""
+    return {"messages": [AIMessage(content=(
+        "Claro. Endereço da Clínica Lifeline One:\n"
+        f"{clinic_location_text()}"
+    ))]}
 
 def fetch_context_node(state: AgentState):
     """Consulta a base de conhecimento sem alterar o histórico da conversa."""
@@ -303,6 +314,7 @@ async def schedule_flow_node(state: AgentState):
             f"Resultado da agenda: {agenda_result}\n"
             "Apresente imediatamente as opções retornadas. Não diga que vai verificar, não aguarde confirmação e não invente horários."
         )
+        context += "\n[APENAS_APRESENTAR_HORARIOS]\nNÃ£o crie evento nesta etapa. Aguarde a escolha explÃ­cita do paciente."
 
     return {"context": context}
 
@@ -322,6 +334,22 @@ async def generate_response_node(state: AgentState):
         }
 
     next_action = routing.get("next_action")
+    if intent == "AGENDAMENTO" and next_action == "CHECK_AVAILABILITY" and "[APENAS_APRESENTAR_HORARIOS]" in context:
+        result_match = re.search(r"Resultado da agenda: (.*?)(?:\n\[APENAS_APRESENTAR_HORARIOS\]|$)", context, re.DOTALL)
+        agenda_result = result_match.group(1).strip() if result_match else ""
+        if agenda_result and "erro" not in agenda_result.lower():
+            return {"messages": [AIMessage(content=(
+                "Tenho estes horários disponíveis:\n\n"
+                f"{agenda_result}\n\nQual horário você prefere?"
+            ))]}
+        return {"messages": [AIMessage(content=(
+            "Não consegui consultar os horários agora. Podemos tentar novamente em instantes?"
+        ))]}
+    if intent == "LOCATION_REQUEST":
+        return {"messages": [AIMessage(content=(
+            "Claro. Endereço da Clínica Lifeline One:\n"
+            f"{clinic_location_text()}"
+        ))]}
     if intent == "AGENDAMENTO" and next_action == "CONFIRM_SLOT":
         result_match = re.search(r"Resultado interno da criacao:\s*(.*)", context, re.DOTALL)
         result = result_match.group(1) if result_match else ""
@@ -584,6 +612,7 @@ workflow.add_node("schedule_flow", schedule_flow_node)
 workflow.add_node("handoff_flow", handoff_flow_node)
 workflow.add_node("urgency_flow", urgency_flow_node)
 workflow.add_node("off_topic_flow", off_topic_flow_node)
+workflow.add_node("location_flow", location_flow_node)
 workflow.add_node("generate_response", generate_response_node)
 workflow.add_node("tools", tool_node)
 workflow.add_node("prune_history", prune_history_node)
@@ -595,6 +624,7 @@ workflow.add_edge("schedule_flow", "generate_response")
 workflow.add_edge("handoff_flow", "prune_history")
 workflow.add_edge("urgency_flow", "prune_history")
 workflow.add_edge("off_topic_flow", "prune_history")
+workflow.add_edge("location_flow", "prune_history")
 
 workflow.add_conditional_edges(
     "generate_response",

@@ -93,7 +93,10 @@ def route_message(
     all_patient_text = " ".join(human_history + [normalized])
     is_third_party = any(term in all_patient_text for term in THIRD_PARTY_TERMS)
 
-    if any(re.search(pattern, normalized) for pattern in OFF_TOPIC_PATTERNS):
+    if _is_location_followup(normalized, history):
+        intent = "LOCATION_REQUEST"
+        confidence = 0.99
+    elif any(re.search(pattern, normalized) for pattern in OFF_TOPIC_PATTERNS):
         intent = "OFF_TOPIC"
         confidence = 0.99
     elif semantic_intent == "AGENDAMENTO":
@@ -140,6 +143,9 @@ def route_message(
     elif intent == "OFF_TOPIC":
         missing_fields = []
         next_action = "REDIRECT_TO_CLINIC_FLOW"
+    elif intent == "LOCATION_REQUEST":
+        missing_fields = []
+        next_action = "SEND_LOCATION"
     else:
         missing_fields = []
         next_action = "ANSWER_WITH_KNOWLEDGE_BASE" if intent == "DUVIDA" else intent
@@ -159,6 +165,22 @@ def route_message(
         "missing_fields": missing_fields,
         "next_action": next_action,
     }
+
+
+def _is_location_followup(text: str, messages: Sequence[Any]) -> bool:
+    """Reconhece a resposta de localização somente após o convite da Amanda."""
+    location_terms = ("endereco", "localizacao", "waze", "como chegar")
+    confirmation_terms = ("sim", "pode", "quero", "envia", "mande", "mandar")
+    recent_ai = [
+        normalize_text(getattr(message, "content", ""))
+        for message in reversed(messages or [])
+        if getattr(message, "type", None) == "ai"
+    ]
+    if not recent_ai or not any(term in recent_ai[0] for term in location_terms):
+        return False
+    return any(re.search(rf"\b{re.escape(term)}\b", text) for term in confirmation_terms) or any(
+        term in text for term in location_terms
+    )
 
 
 def _extract_preferred_slot(text: str, messages: Sequence[Any]) -> dict[str, str] | None:
