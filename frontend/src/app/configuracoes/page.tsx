@@ -3,7 +3,6 @@ import { fetchWithAuth } from '../../lib/api';
 
 import { QrCode, Smartphone, RefreshCw, Key, CheckCircle2, AlertCircle, Cpu, Sliders, Save, Sparkles, Loader2, ShieldCheck, UserPlus, Lock, ShieldAlert, Users } from "lucide-react";
 import { useState, useEffect } from "react";
-import Image from "next/image";
 
 interface UserItem {
   id: string;
@@ -161,16 +160,21 @@ export default function Configuracoes() {
         const qrData = await qrRes.json();
         if (qrData.error === 'needs_reconnect') {
           setErrorMsg("WhatsApp desconectado. Clique em \"Reconectar\" e aguarde 3 segundos.");
-        } else if (qrData.base64) {
-          setQrCodeBase64(qrData.base64);
-        } else if (qrData.qrcode?.base64) {
-          setQrCodeBase64(qrData.qrcode.base64);
-        } else if (typeof qrData.qrcode === 'string') {
-          setQrCodeBase64(qrData.qrcode);
-        } else if (qrData.data?.Qrcode) {
-          setQrCodeBase64(qrData.data.Qrcode);
-        } else if (qrData.code) {
-          setQrCodeBase64(qrData.code);
+        } else if (qrData.base64) {
+          setSuccess(false);
+          setQrCodeBase64(qrData.base64);
+        } else if (qrData.qrcode?.base64) {
+          setSuccess(false);
+          setQrCodeBase64(qrData.qrcode.base64);
+        } else if (typeof qrData.qrcode === 'string') {
+          setSuccess(false);
+          setQrCodeBase64(qrData.qrcode);
+        } else if (qrData.data?.Qrcode) {
+          setSuccess(false);
+          setQrCodeBase64(qrData.data.Qrcode);
+        } else if (qrData.code) {
+          setSuccess(false);
+          setQrCodeBase64(qrData.code);
         } else if (qrData.error) {
           setErrorMsg(qrData.message || "Erro ao gerar QR Code. Clique em Reconectar.");
         } else {
@@ -688,7 +692,7 @@ export default function Configuracoes() {
               <>
                 {qrCodeBase64 ? (
                   <div className="mb-4 bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
-                    <Image src={qrCodeBase64} alt="QR Code" width={200} height={200} className="rounded-lg" />
+                    <img src={qrCodeBase64} alt="QR Code para conectar o WhatsApp" width={200} height={200} className="rounded-lg" />
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center bg-slate-100/50 rounded-2xl w-40 h-40 mb-5 border border-slate-200/50">
