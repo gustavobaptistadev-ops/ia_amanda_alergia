@@ -13,7 +13,7 @@ from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import PersonaBuilder
 from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, extract_latest_date, extract_payment_type, has_patient_complaint
-from app.core.conversation_router import route_message
+from app.core.conversation_router import build_complaint_request, route_message
 
 from langgraph.checkpoint.memory import MemorySaver
 import operator
@@ -77,6 +77,21 @@ def _has_effective_complaint(state: AgentState) -> bool:
     routing = state.get("routing", {})
     semantic_value = routing.get("entities", {}).get("complaint_detected")
     return has_patient_complaint(state.get("messages", [])) or semantic_value is True
+
+
+def _complaint_request(messages: Sequence[BaseMessage]) -> str:
+    """Solicita a queixa sem repetir a apresentação após o primeiro turno."""
+    human_turns = sum(1 for message in messages if getattr(message, "type", None) == "human")
+    if human_turns <= 1:
+        return (
+            "Olá! Sou Amanda, recepcionista da Clínica Lifeline One. "
+            "Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
+            "O que você está sentindo ou qual avaliação deseja realizar?"
+        )
+    return (
+        "Entendi. Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
+        "O que você está sentindo ou qual avaliação deseja realizar?"
+    )
 
 def extract_intent_node(state: AgentState):
     """Classifica a mensagem e prioriza dados determinísticos de agendamento."""
@@ -303,13 +318,7 @@ async def generate_response_node(state: AgentState):
     # Esta trava é determinística para não depender de a LLM seguir o prompt.
     if intent == "AGENDAMENTO" and not _has_effective_complaint(state):
         return {
-            "messages": [AIMessage(
-                content=(
-                    "Olá! Sou Amanda, recepcionista da Clínica Lifeline One. "
-                    "Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
-                    "O que você está sentindo ou qual avaliação deseja realizar?"
-                )
-            )]
+            "messages": [AIMessage(content=build_complaint_request(messages))]
         }
 
     next_action = routing.get("next_action")

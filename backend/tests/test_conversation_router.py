@@ -1,6 +1,6 @@
 from langchain_core.messages import AIMessage, HumanMessage
 
-from app.core.conversation_router import route_message
+from app.core.conversation_router import build_complaint_request, route_message
 from app.core.response_quality import assess_response_quality
 
 
@@ -161,3 +161,12 @@ def test_interpretacao_semantica_pode_confirmar_queixa_sem_palavra_gatilho():
     assert decision["intent"] == "AGENDAMENTO"
     assert decision["entities"]["complaint_detected"] is True
     assert decision["next_action"] == "COLLECT_NAME"
+
+
+def test_apresentacao_ocorre_apenas_no_primeiro_turno():
+    assert "Sou Amanda" in build_complaint_request([HumanMessage(content="Quero marcar consulta")])
+    assert "Sou Amanda" not in build_complaint_request([
+        HumanMessage(content="Oi"),
+        AIMessage(content="Olá! Sou Amanda."),
+        HumanMessage(content="Quero marcar consulta"),
+    ])

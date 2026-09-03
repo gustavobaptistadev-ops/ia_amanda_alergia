@@ -21,6 +21,21 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", normalized.lower()).strip()
 
 
+def build_complaint_request(messages: Sequence[Any]) -> str:
+    """Solicita a queixa sem repetir a apresentação após o primeiro turno."""
+    human_turns = sum(1 for message in messages if getattr(message, "type", None) == "human")
+    if human_turns <= 1:
+        return (
+            "Olá! Sou Amanda, recepcionista da Clínica Lifeline One. "
+            "Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
+            "O que você está sentindo ou qual avaliação deseja realizar?"
+        )
+    return (
+        "Entendi. Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
+        "O que você está sentindo ou qual avaliação deseja realizar?"
+    )
+
+
 THIRD_PARTY_TERMS = (
     "meu filho", "minha filha", "meu pai", "minha mae", "minha mãe",
     "meu marido", "minha esposa", "meu esposo", "minha irma", "meu irmao",
