@@ -5,15 +5,14 @@ import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
 
-const PUBLIC_PATHS = ["/login"];
-
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [checking, setChecking] = useState(true);
+  const isPublicRoute = pathname === "/login" || (typeof window !== "undefined" && window.location.pathname === "/login");
 
   useEffect(() => {
-    if (PUBLIC_PATHS.includes(pathname)) {
+    if (isPublicRoute) {
       setChecking(false);
       return;
     }
@@ -36,13 +35,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       }
       setChecking(false);
     }).catch(() => router.replace("/login"));
-  }, [pathname, router]);
+  }, [isPublicRoute, pathname, router]);
 
-  if (checking && !PUBLIC_PATHS.includes(pathname)) {
+  if (checking && !isPublicRoute) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">Validando sessão...</div>;
   }
 
-  if (PUBLIC_PATHS.includes(pathname)) return <>{children}</>;
+  if (isPublicRoute) return <>{children}</>;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900">
