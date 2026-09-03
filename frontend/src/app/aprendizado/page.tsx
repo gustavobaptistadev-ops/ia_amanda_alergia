@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchWithAuth } from "../../lib/api";
 
 export default function AprendizadoPage() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
   const fetchSuggestions = async () => {
     try {
-      const res = await fetch("/api/v1/learning/", {
-        headers: { "x-api-key": "sk_amanda_9f8d7e6c5b4a3f2e1d0c9b8a7f6e5d4c" }
-      });
+      const res = await fetchWithAuth(`${apiUrl}/api/v1/learning/`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setSuggestions(data);
@@ -28,9 +28,8 @@ export default function AprendizadoPage() {
 
   const handleApprove = async (id: string) => {
     try {
-      await fetch(`/api/v1/learning/${id}/approve`, {
+      await fetchWithAuth(`${apiUrl}/api/v1/learning/${id}/approve`, {
         method: "POST",
-        headers: { "x-api-key": "sk_amanda_9f8d7e6c5b4a3f2e1d0c9b8a7f6e5d4c" }
       });
       fetchSuggestions();
     } catch (e) {
@@ -40,9 +39,8 @@ export default function AprendizadoPage() {
 
   const handleReject = async (id: string) => {
     try {
-      await fetch(`/api/v1/learning/${id}/reject`, {
+      await fetchWithAuth(`${apiUrl}/api/v1/learning/${id}/reject`, {
         method: "POST",
-        headers: { "x-api-key": "sk_amanda_9f8d7e6c5b4a3f2e1d0c9b8a7f6e5d4c" }
       });
       fetchSuggestions();
     } catch (e) {

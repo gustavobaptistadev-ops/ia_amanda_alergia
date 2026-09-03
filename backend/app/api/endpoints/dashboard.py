@@ -1,81 +1,46 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-import redis.asyncio as redis
-import os
-import json
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+
 from app.database import get_db
-from app.models.chat import Contact
+from app.models.chat import Appointment, Contact
 
 router = APIRouter()
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-class DashboardStats(BaseModel):
-    novos_contatos: int
-    agendamentos: int
-    em_atendimento: int
 
-@router.get("/stats", response_model=DashboardStats)
-async def get_stats():
-    """Retorna as estatísticas para o dashboard."""
-    # Como a memória está no Redis (LangGraph), poderíamos contar as threads ativas.
-    # Por enquanto, retornaremos dados simulados + contagem real se possível.
-    try:
-        async with redis.Redis.from_url(REDIS_URL) as r:
-            # Busca todas as chaves de thread do langgraph no redis (ex: thread:*)
-            keys = await r.keys("checkpoint*")
-            contatos = len(keys) // 2 # Aproximação de threads
-    except:
-        contatos = 12
+@router.get("/stats")
+async def get_stats(db: AsyncSession = Depends(get_db)):
+    """Retorna estatisticas calculadas exclusivamente a partir do banco real."""
+    total_contacts = await db.scalar(select(func.count(Contact.id))) or 0
+    appointments = await db.scalar(select(func.count(Appointment.id)).where(Appointment.status == "agendado")) or 0
+    human_contacts = await db.scalar(select(func.count(Contact.id)).where(Contact.bot_active == False)) or 0
+    return {"novos_contatos": total_contacts, "agendamentos": appointments, "em_atendimento": human_contacts}
 
-    return {
-        "novos_contatos": contatos if contatos > 0 else 24,
-        "agendamentos": 8,
-        "em_atendimento": 3
-    }
 
 @router.get("/conversations")
-async def get_conversations():
-    """Retorna o histórico de conversas ativas."""
-    # Retorna uma estrutura compatível com a tela de monitoramento.
-    return [
-        {"id": "1", "name": "Carlos Silva", "last_message": "Vou olhar minha agenda...", "time": "10:41", "status": "IA"},
-        {"id": "2", "name": "Fernanda Lima", "last_message": "Qual o valor da consulta?", "time": "10:35", "status": "IA"},
-        {"id": "3", "name": "João Pedro", "last_message": "Obrigado, marcarei depois.", "time": "09:15", "status": "Finalizado"}
-    ]
+async def get_conversations(db: AsyncSession = Depends(get_db)):
+    """Retorna contatos reais, sem dados simulados."""
+    result = await db.execute(select(Contact).limit(100))
+    return [{"id": str(c.id), "name": c.name or c.phone_number, "last_message": "", "time": "", "status": "IA" if c.bot_active else "Humano"} for c in result.scalars().all()]
+
 
 @router.get("/kanban")
 async def get_kanban_patients(db: AsyncSession = Depends(get_db)):
-    """Retorna a lista de pacientes dividida nas colunas do Kanban."""
+    """Retorna pacientes reais divididos por etapa do atendimento."""
     result = await db.execute(select(Contact))
-    contacts = result.scalars().all()
-    
-    kanban = {
-        "triagem": [],
-        "agendado": [],
-        "pos_consulta": [],
-        "retorno": [],
-        "atendimento_humano": []
-    }
-    
-    for c in contacts:
-        nome = c.name or c.phone_number
+    columns = {"triagem": [], "agendado": [], "pos_consulta": [], "retorno": [], "atendimento_humano": []}
+    for c in result.scalars().all():
+        name = c.name or c.phone_number
         if not c.bot_active:
-            kanban["atendimento_humano"].append(nome)
+            columns["atendimento_humano"].append(name)
+        elif c.stage in columns:
+            columns[c.stage].append(name)
         else:
-            if c.stage in kanban:
-                kanban[c.stage].append(nome)
-            elif c.stage == "novo_contato" or not c.stage:
-                kanban["triagem"].append(nome)
-            else:
-                # Fallback to triagem if stage not found
-                kanban["triagem"].append(nome)
-                
+            columns["triagem"].append(name)
     return [
-        {"title": "Novo Contato / Triagem", "color": "bg-blue-500", "patients": kanban["triagem"]},
-        {"title": "Agendamento Confirmado", "color": "bg-emerald-500", "patients": kanban["agendado"]},
-        {"title": "Pós-consulta / Feedback", "color": "bg-purple-500", "patients": kanban["pos_consulta"]},
-        {"title": "Retorno de Paciente", "color": "bg-amber-500", "patients": kanban["retorno"]},
-        {"title": "Atendimento Humano", "color": "bg-rose-500", "patients": kanban["atendimento_humano"]}
+        {"title": "Novo Contato / Triagem", "color": "bg-blue-500", "patients": columns["triagem"]},
+        {"title": "Agendamento Confirmado", "color": "bg-emerald-500", "patients": columns["agendado"]},
+        {"title": "Pos-consulta / Feedback", "color": "bg-purple-500", "patients": columns["pos_consulta"]},
+        {"title": "Retorno de Paciente", "color": "bg-amber-500", "patients": columns["retorno"]},
+        {"title": "Atendimento Humano", "color": "bg-rose-500", "patients": columns["atendimento_humano"]},
     ]

@@ -12,8 +12,16 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   // 2. Injeta a chave de API de serviço interna
   // A autenticação do painel usa exclusivamente o JWT da sessão.
   
-  return fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers
   });
+
+  if (response.status === 401 && typeof window !== "undefined") {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    window.location.href = "/login";
+  }
+
+  return response;
 }
