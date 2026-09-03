@@ -1,3 +1,5 @@
+"""Indicadores operacionais calculados exclusivamente com dados persistidos."""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +13,7 @@ router = APIRouter()
 @router.get("/overview")
 async def get_analytics_overview(db: AsyncSession = Depends(get_db)):
     """Retorna metricas executivas calculadas com dados persistidos."""
+    # Valores de demonstração são proibidos: falhas devem ser observáveis pelo operador.
     total_contacts = await db.scalar(select(func.count(Contact.id))) or 0
     scheduled = await db.scalar(select(func.count(Contact.id)).where(Contact.stage == "agendado")) or 0
     human = await db.scalar(select(func.count(Contact.id)).where(Contact.bot_active == False)) or 0

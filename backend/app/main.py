@@ -1,3 +1,5 @@
+"""Ponto de entrada da API e gerenciamento do ciclo de vida do serviço."""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.api_router import api_router
@@ -29,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Inicializa recursos, migrações e integrações antes de aceitar tráfego."""
     logger.info("Iniciando aplicação e sincronizando tabelas/colunas...")
     
     # 1. Garante que tabelas novas (system_logs, users, etc) sejam criadas
@@ -104,6 +107,7 @@ from starlette.responses import Response
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
+    """Adiciona cabeçalhos de segurança a cada resposta HTTP."""
     """Injeta headers de segurança nível bancário/militar em todas as respostas HTTP."""
     response: Response = await call_next(request)
     response.headers["X-Frame-Options"] = "DENY"
@@ -129,6 +133,7 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    """Verifica dependências críticas sem expor segredos ou dados sensíveis."""
     """Health Check enriquecido — verifica todos os componentes críticos do sistema."""
     import httpx
     import redis.asyncio as _redis

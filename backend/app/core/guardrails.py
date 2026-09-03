@@ -1,3 +1,5 @@
+"""Validação de segurança aplicada antes de uma resposta chegar ao paciente."""
+
 import logging
 
 from app.services.evolution_api import remove_emojis
@@ -9,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_llm_validador():
+    """Cria o avaliador isolado da LLM para auditoria de conformidade."""
     try:
         return ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
     except Exception as exc:
@@ -28,6 +31,7 @@ Resposta:
 
 def validar_resposta(ai_response: str) -> bool:
     """Return True when safe; fail closed when validation is unavailable."""
+    # O conteúdo validado precisa ser o mesmo conteúdo que será enviado.
     ai_response = remove_emojis(ai_response)
     if not ai_response or not ai_response.strip():
         return True

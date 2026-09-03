@@ -1,3 +1,5 @@
+"""Orquestração do atendimento: intenção, contexto, ferramentas e resposta."""
+
 import os
 import logging
 import datetime
@@ -23,6 +25,7 @@ memory = MemorySaver()
 from langgraph.graph.message import add_messages
 
 class AgentState(TypedDict):
+    """Estado serializável compartilhado pelos nós do grafo."""
     messages: Annotated[Sequence[BaseMessage], add_messages]
     context: str
     intent: str
@@ -31,6 +34,7 @@ class AgentState(TypedDict):
 from app.api.endpoints.settings import load_config
 
 def get_llm():
+    """Inicializa a LLM com a configuração persistida da aplicação."""
     cfg = load_config()
     model_name = cfg.get("model", "gpt-4o-mini")
     temp = float(cfg.get("temperature", 0.2))
@@ -39,6 +43,7 @@ def get_llm():
 tools = [check_availability, create_event, cancel_event, reschedule_event, confirm_event]
 
 def extract_intent_node(state: AgentState):
+    """Classifica a mensagem e prioriza dados determinísticos de agendamento."""
     """Nó 1: Classifica a intenção do usuário (Zero-Cost Router NLP/LLM)."""
     messages = state['messages']
     last_msg = messages[-1].content.strip().lower()
@@ -103,6 +108,7 @@ Classificação:"""
     return {"intent": intent}
 
 def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow", "handoff_flow"]:
+    """Direciona o estado para o fluxo especializado correspondente."""
     """Função de roteamento condicional baseada na intenção."""
     intent = state.get("intent")
     if intent == "FRUSTRACAO_HANDOFF":
@@ -114,6 +120,7 @@ def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow",
     return "fetch_context"
 
 def handoff_flow_node(state: AgentState):
+    """Produz a resposta de transferência para a equipe humana."""
     """Nó de Transbordo Humano."""
     msg = (
         "Compreendo perfeitamente. Estou transferindo o seu atendimento agora mesmo para a nossa equipe humana. "
@@ -122,6 +129,7 @@ def handoff_flow_node(state: AgentState):
     return {"messages": [AIMessage(content=msg)]}
 
 def urgency_flow_node(state: AgentState):
+    """Interrompe o fluxo normal e orienta o paciente em urgência."""
     """Nó de Alerta/Urgência: Gera mensagem de acolhimento emergencial e orienta buscar pronto-socorro."""
     msg = (
         "⚠️ Identifiquei que você pode estar passando por uma situação de urgência ou necessitando de atenção imediata.\n\n"
@@ -131,12 +139,14 @@ def urgency_flow_node(state: AgentState):
     return {"messages": [AIMessage(content=msg)]}
 
 def fetch_context_node(state: AgentState):
+    """Consulta a base de conhecimento sem alterar o histórico da conversa."""
     """Nó 2a: Busca o contexto no RAG (para Dúvidas e Corpo Clínico)."""
     last_message = state['messages'][-1].content
     context = retrieve_context(last_message)
     return {"context": context}
 
 async def schedule_flow_node(state: AgentState):
+    """Consulta disponibilidade automaticamente quando os dados permitem agendamento."""
     """Nó 2b: Fluxo dedicado para agendamento com corpo clínico e regras."""
     last_message = state['messages'][-1].content
     context = retrieve_context(f"{last_message} médicos convênios preços")
@@ -166,6 +176,7 @@ async def schedule_flow_node(state: AgentState):
     return {"context": context}
 
 async def generate_response_node(state: AgentState):
+    """Monta o prompt final e solicita resposta com as ferramentas permitidas."""
     """Nó 3: Gera a resposta da Amanda com base no contexto, intenção, perfil do paciente e histórico seguro."""
     intent = state.get('intent', 'duvidas_clinica')
     context = state.get('context', '')
@@ -339,6 +350,7 @@ async def generate_response_node(state: AgentState):
     return {"messages": [response]}
 
 def route_after_generation(state: AgentState) -> Literal["tools", "prune_history"]:
+    """Decide se a LLM solicitou ferramenta ou concluiu a resposta."""
     """Se a LLM chamou uma tool, vá para o nó de tools. Caso contrário, vá para poda do histórico."""
     last_message = state['messages'][-1]
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
@@ -346,6 +358,7 @@ def route_after_generation(state: AgentState) -> Literal["tools", "prune_history
     return "prune_history"
 
 def prune_history_node(state: AgentState):
+    """Reduz o histórico enviado à LLM preservando contexto útil e recente."""
     """Nó 4: Poda o histórico antigo (mantém as últimas 10 mensagens) para evitar estouro da janela de contexto."""
     messages = state['messages']
     if len(messages) > 10:
@@ -394,6 +407,7 @@ _checkpointer = None
 app_graph = None
 
 async def init_checkpointer():
+    """Inicializa o checkpoint persistente que mantém continuidade das conversas."""
     global _checkpointer, app_graph
     if _checkpointer is None:
         from psycopg_pool import AsyncConnectionPool
@@ -410,6 +424,7 @@ async def init_checkpointer():
         app_graph = workflow.compile(checkpointer=_checkpointer)
 
 async def process_user_message(thread_id: str, message: str) -> str:
+    """Executa o grafo completo para uma mensagem e retorna o texto final."""
     # Garante que o checkpointer e o grafo estão inicializados
     if app_graph is None:
         await init_checkpointer()
