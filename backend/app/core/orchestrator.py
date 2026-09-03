@@ -13,7 +13,7 @@ from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import PersonaBuilder
 from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, extract_latest_date, extract_payment_type, has_patient_complaint
-from app.core.conversation_router import build_complaint_request, route_message
+from app.core.conversation_router import build_complaint_request, extract_requested_date, route_message
 from app.core.clinic_location import clinic_location_text
 from app.core.record_validator import validate_patient_record
 
@@ -337,16 +337,37 @@ async def schedule_flow_node(state: AgentState):
 
     if intent == "AGENDAMENTO" and record_validation.get("valid") and registration_complete and payment_type:
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
-        target_date = now.date() + datetime.timedelta(days=1)
-        while target_date.weekday() == 6:
-            target_date += datetime.timedelta(days=1)
-        agenda_result = await check_availability.ainvoke(
-            {"date_str": target_date.isoformat(), "period": "todos"}
-        )
+        requested_date = extract_requested_date(last_message, now.date())
+        if requested_date:
+            target_dates = [requested_date]
+        else:
+            target_dates = []
+            target_date = now.date() + datetime.timedelta(days=1)
+            while len(target_dates) < 2:
+                if target_date.weekday() != 6:
+                    target_dates.append(target_date.isoformat())
+                target_date += datetime.timedelta(days=1)
+
+        agenda_lines = []
+        for target_date_str in target_dates:
+            agenda_result = await check_availability.ainvoke(
+                {"date_str": target_date_str, "period": "todos"}
+            )
+            times = re.findall(r"\b\d{1,2}:\d{2}\b", agenda_result or "")
+            if times:
+                date_obj = datetime.date.fromisoformat(target_date_str)
+                weekday_names = (
+                    "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira",
+                    "Sexta-feira", "Sábado", "Domingo",
+                )
+                agenda_lines.append(
+                    f"{weekday_names[date_obj.weekday()]}, {date_obj.strftime('%d/%m/%Y')}: "
+                    f"{', '.join(times[:3])}"
+                )
+        formatted_agenda = "\n".join(agenda_lines)
         context += (
             "\n\n[AGENDA CONSULTADA AUTOMATICAMENTE]\n"
-            f"Data de referência: {target_date.isoformat()}\n"
-            f"[AGENDA_RESULTADO]\n{agenda_result}\n[FIM_AGENDA_RESULTADO]"
+            f"[AGENDA_RESULTADO]\n{formatted_agenda}\n[FIM_AGENDA_RESULTADO]"
         )
         context += "\n[APENAS_APRESENTAR_HORARIOS]"
 
@@ -401,11 +422,11 @@ async def generate_response_node(state: AgentState):
             link_text = f"\n\nAdicione a consulta na sua agenda: {link}" if link else ""
             first_name = (entities.get("name") or "Paciente").split()[0]
             return {"messages": [AIMessage(content=(
-                f"Prontinho, {first_name}. Sua consulta estÃ¡ confirmada para {formatted_date} Ã s {slot.get('time')}.{link_text}\n\n"
-                "VocÃª jÃ¡ tem o endereÃ§o da clÃ­nica ou deseja que eu envie a localizaÃ§Ã£o?"
+                f"Prontinho, {first_name}. Sua consulta está confirmada para {formatted_date} às {slot.get('time')}.{link_text}\n\n"
+                "Você já tem o endereço da clínica ou deseja que eu envie a localização?"
             ))]}
         return {"messages": [AIMessage(content=(
-            "NÃ£o consegui concluir esse horÃ¡rio agora. Vou verificar a disponibilidade novamente para oferecer uma opÃ§Ã£o vÃ¡lida."
+            "Não consegui concluir esse horário agora. Vou verificar a disponibilidade novamente para oferecer uma opção válida."
         ))]}
     if intent == "AGENDAMENTO" and next_action in {
         "COLLECT_NAME", "COLLECT_CPF", "COLLECT_BIRTH_DATE", "COLLECT_PAYMENT_TYPE"

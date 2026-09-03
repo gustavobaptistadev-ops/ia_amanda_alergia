@@ -16,6 +16,24 @@ def remove_emojis(text: str) -> str:
         return text
     return EMOJI_PATTERN.sub("", text).replace("\uFE0F", "").replace("\u200D", "")
 
+
+def repair_mojibake(text: str) -> str:
+    """Corrige texto legado salvo com UTF-8 interpretado como Windows-1252."""
+    if not text or not any(marker in text for marker in ("Ã", "Â", "â", "ð", "�")):
+        return text
+    repaired = text
+    for _ in range(3):
+        try:
+            candidate = repaired.encode("cp1252").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            break
+        if candidate == repaired:
+            break
+        repaired = candidate
+        if not any(marker in repaired for marker in ("Ã", "Â", "â", "ð", "�")):
+            break
+    return repaired
+
 EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL", "http://localhost:8080")
 # A chave global enviada pelo CTO
 EVOLUTION_GLOBAL_KEY = os.getenv("EVOLUTION_GLOBAL_KEY", "1dcd4e3bc54541449f52c5e319d7eeda")

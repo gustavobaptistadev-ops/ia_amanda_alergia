@@ -57,6 +57,27 @@ WEEKDAYS = {
     "sexta": 4, "sabado": 5, "domingo": 6,
 }
 
+
+def extract_requested_date(text: str, reference_date: datetime.date | None = None) -> str | None:
+    """Converte uma data ou dia da semana pedido pelo paciente para ISO."""
+    normalized = normalize_text(text)
+    reference_date = reference_date or datetime.date.today()
+    explicit = re.search(r"\b(\d{1,2})/(\d{1,2})(?:/(\d{4}))?\b", normalized)
+    if explicit:
+        year = int(explicit.group(3) or reference_date.year)
+        try:
+            return datetime.date(year, int(explicit.group(2)), int(explicit.group(1))).isoformat()
+        except ValueError:
+            return None
+
+    weekday = next((day for day in WEEKDAYS if re.search(rf"\b{day}(?:-feira)?\b", normalized)), None)
+    if weekday is None:
+        return None
+    days_ahead = (WEEKDAYS[weekday] - reference_date.weekday()) % 7
+    if days_ahead == 0:
+        days_ahead = 7
+    return (reference_date + datetime.timedelta(days=days_ahead)).isoformat()
+
 OFF_TOPIC_PATTERNS = (
     r"\b(?:codigo|script|programa|algoritmo)\s+(?:em\s+)?(?:python|javascript|java|sql|html)\b",
     r"\b(?:receita|bolo|torta|comida|culinaria)\b",
@@ -111,8 +132,9 @@ def route_message(
         # Respostas curtas continuam no agendamento quando o histórico mostra
         # que a Amanda estava coletando dados cadastrais.
             registration_context = _has_registration_context(history)
-            intent = "AGENDAMENTO" if registration_context else "DUVIDA"
-            confidence = 0.93 if registration_context else 0.45
+            availability_context = _has_availability_context(history)
+            intent = "AGENDAMENTO" if registration_context or availability_context else "DUVIDA"
+            confidence = 0.93 if registration_context or availability_context else 0.45
 
     if intent == "AGENDAMENTO":
         missing_fields = []
@@ -291,6 +313,19 @@ def _has_registration_context(messages: Sequence[Any]) -> bool:
         ):
             return True
     return False
+
+
+def _has_availability_context(messages: Sequence[Any]) -> bool:
+    """Reconhece respostas de data/horário após a agenda ser apresentada."""
+    return any(
+        getattr(message, "type", None) == "ai"
+        and "horario" in normalize_text(getattr(message, "content", ""))
+        and any(
+            marker in normalize_text(getattr(message, "content", ""))
+            for marker in ("disponivel", "livre", "prefere")
+        )
+        for message in messages or []
+    )
 
 
 class _Message:

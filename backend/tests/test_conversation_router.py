@@ -1,6 +1,6 @@
 from langchain_core.messages import AIMessage, HumanMessage
 
-from app.core.conversation_router import build_complaint_request, route_message
+from app.core.conversation_router import build_complaint_request, extract_requested_date, route_message
 from app.core.response_quality import assess_response_quality
 
 
@@ -204,3 +204,21 @@ def test_apresentacao_ocorre_apenas_no_primeiro_turno():
         AIMessage(content="Olá! Sou Amanda."),
         HumanMessage(content="Quero marcar consulta"),
     ])
+
+
+def test_data_solicitada_pelo_paciente_e_convertida_para_formato_iso():
+    import datetime
+
+    reference = datetime.date(2026, 9, 3)
+
+    assert extract_requested_date("Quero na terça-feira", reference) == "2026-09-08"
+    assert extract_requested_date("Pode ser dia 08/09/2026", reference) == "2026-09-08"
+
+
+def test_resposta_com_apenas_a_data_continua_no_fluxo_de_agendamento():
+    decision = route_message(
+        "terça-feira",
+        [AIMessage(content="Encontrei estes horários disponíveis. Qual dia e horário você prefere?")],
+    )
+
+    assert decision["intent"] == "AGENDAMENTO"

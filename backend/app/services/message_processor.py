@@ -1,4 +1,4 @@
-from app.services.evolution_api import remove_emojis, send_text_message
+from app.services.evolution_api import repair_mojibake, remove_emojis, send_text_message
 from app.core.orchestrator import process_user_message
 from app.core.guardrails import validar_resposta
 from app.services.db_service import save_message, get_or_create_contact
@@ -87,7 +87,8 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
                 logger.exception("Erro ao processar mensagem para %s", remote_jid[:6])
                 ai_response = "Nosso sistema está passando por uma instabilidade momentânea. Um de nossos atendentes humanos já foi notificado e falará com você em breve."
             
-            ai_response = remove_emojis(ai_response)
+            # Normaliza respostas antigas antes do filtro final e do envio ao WhatsApp.
+            ai_response = repair_mojibake(remove_emojis(ai_response))
             is_safe = validar_resposta(ai_response)
             
             if not is_safe:

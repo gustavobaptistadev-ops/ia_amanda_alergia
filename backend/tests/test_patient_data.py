@@ -1,6 +1,7 @@
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, has_patient_complaint
+from app.services.evolution_api import repair_mojibake
 
 
 def test_cpf_with_leading_zeros_is_preserved():
@@ -34,3 +35,9 @@ def test_complaint_can_be_detected_in_same_booking_message():
     messages = [HumanMessage(content="Quero agendar porque estou com alergia e coceira")]
 
     assert has_patient_complaint(messages) is True
+
+
+def test_resposta_legada_com_encoding_quebrado_e_corrigida_na_saida():
+    assert repair_mojibake("Sua consulta estÃƒÂ¡ confirmada. VocÃƒÂª jÃƒÂ¡ pode ir.") == (
+        "Sua consulta está confirmada. Você já pode ir."
+    )
