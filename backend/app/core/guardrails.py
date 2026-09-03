@@ -1,6 +1,7 @@
 """Validação de segurança aplicada antes de uma resposta chegar ao paciente."""
 
 import logging
+import re
 
 from app.services.evolution_api import remove_emojis
 
@@ -46,6 +47,16 @@ def validar_resposta(ai_response: str) -> bool:
     if any(term in lower_response for term in prohibited):
         logger.warning("Resposta bloqueada por prescrição/dosagem")
         return False
+
+    # A auditoria por LLM só é necessária quando há linguagem potencialmente
+    # prescritiva. Evita falsos positivos em respostas administrativas normais.
+    medical_instruction_pattern = re.compile(
+        r"\b(?:tome|tomar|use|usar|aplique|aplicar|suspenda|suspender|"
+        r"prescrev\w*|prescri\w*|posologi\w*|dose|dosagem)\b",
+        re.IGNORECASE,
+    )
+    if not medical_instruction_pattern.search(ai_response):
+        return True
 
     try:
         validator = get_llm_validador()
