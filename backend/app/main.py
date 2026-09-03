@@ -148,7 +148,7 @@ async def health_check():
             await conn.execute(_text("SELECT 1"))
         status["components"]["database"] = "healthy"
     except Exception as e:
-        status["components"]["database"] = f"unhealthy: {str(e)[:60]}"
+        status["components"]["database"] = "unhealthy"
         status["status"] = "degraded"
 
     # 2. Redis
@@ -158,7 +158,7 @@ async def health_check():
             await r.ping()
         status["components"]["redis"] = "healthy"
     except Exception as e:
-        status["components"]["redis"] = f"unhealthy: {str(e)[:60]}"
+        status["components"]["redis"] = "unhealthy"
         status["status"] = "degraded"
 
     # 3. Evolution API
@@ -168,11 +168,11 @@ async def health_check():
         if evolution_url:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 r = await client.get(f"{evolution_url}/instance/fetchInstances", headers={"apikey": evolution_key})
-            status["components"]["evolution_api"] = "healthy" if r.status_code < 500 else f"unhealthy: HTTP {r.status_code}"
+            status["components"]["evolution_api"] = "healthy" if r.status_code < 500 else "unhealthy"
         else:
             status["components"]["evolution_api"] = "not_configured"
     except Exception as e:
-        status["components"]["evolution_api"] = f"unhealthy: {str(e)[:60]}"
+        status["components"]["evolution_api"] = "unhealthy"
         status["status"] = "degraded"
 
     # 4. OpenAI API

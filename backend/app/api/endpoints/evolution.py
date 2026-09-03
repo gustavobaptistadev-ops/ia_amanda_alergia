@@ -137,6 +137,8 @@ async def fix_evolution_webhook(request: Request):
                 if r_v1.status_code in (200, 201):
                     return {"status": "ok", "message": "Webhook (v1) corrigido com sucesso!"}
                     
-                return {"status": "error", "message": f"Falha ao configurar: {r.text}"}
+                logger.warning("Falha ao configurar webhook no provedor: status=%s", r.status_code)
+                return {"status": "error", "message": "Não foi possível configurar o webhook no provedor."}
         except Exception as e:
-            return {"status": "error", "message": f"Erro de comunicacao com Ghosthub: {str(e)}"}
+            logger.exception("Erro de comunicação com o provedor ao configurar webhook")
+            return {"status": "error", "message": "Não foi possível comunicar com o provedor."}
