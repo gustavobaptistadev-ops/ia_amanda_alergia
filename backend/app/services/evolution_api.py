@@ -80,7 +80,7 @@ async def auto_create_instance():
             await db.commit()
             tenants = [default_tenant]
             
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         for tenant in tenants:
             headers = {
                 "apikey": EVOLUTION_GLOBAL_KEY,
@@ -101,7 +101,11 @@ async def auto_create_instance():
                 else:
                     logger.warning(f"Aviso ao criar instância: {res.status_code} - {res.text}")
             except Exception as e:
-                logger.error(f"Erro ao tentar criar instância '{tenant.instance_name}': {e}")
+                logger.error(
+                    "Erro ao tentar criar instância '%s': %s",
+                    tenant.instance_name,
+                    type(e).__name__,
+                )
 
 async def send_text_message(number: str, text: str):
     """Envia uma mensagem de texto via EvolutionAPI."""

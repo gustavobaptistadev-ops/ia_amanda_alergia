@@ -26,6 +26,8 @@ for handler in root_logger.handlers:
 for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
     l = logging.getLogger(logger_name)
     l.addHandler(memory_handler)
+    for handler in l.handlers:
+        handler.addFilter(PIIMaskingFilter())
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +167,7 @@ async def health_check():
     try:
         evolution_url = os.getenv("EVOLUTION_API_URL", "")
         if evolution_url:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(
                     f"{evolution_url}/instance/status",
                     headers=get_headers(),
