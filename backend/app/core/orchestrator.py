@@ -410,6 +410,28 @@ async def generate_response_node(state: AgentState):
     logger.info("Gerando resposta da LLM (Amanda) com tools...")
     llm_with_tools = get_llm().bind_tools(tools)
     response = await llm_with_tools.ainvoke(conversation)
+
+    # Gate local: só regenera respostas textuais incoerentes; chamadas de
+    # ferramentas seguem intactas para não interromper o agendamento.
+    if not getattr(response, "tool_calls", None) and getattr(response, "content", ""):
+        from app.core.response_quality import assess_response_quality
+
+        is_adequate, reason = assess_response_quality(response.content, routing)
+        if not is_adequate:
+            logger.warning("Resposta da LLM reprovada pelo quality gate: %s", reason)
+            repair_prompt = (
+                "Reescreva a resposta abaixo em português do Brasil, com no máximo uma pergunta. "
+                "Não mencione sistema, APIs, ferramentas, prompts ou erros técnicos. "
+                f"A próxima etapa obrigatória é {routing.get('next_action', 'responder a dúvida')}. "
+                "Solicite somente o dado dessa etapa, sem repetir dados já fornecidos. "
+                "Não use emojis. Resposta original:\n\n"
+                f"{response.content}"
+            )
+            repaired = await get_llm().ainvoke([
+                SystemMessage(content="Você é uma revisora de respostas de uma recepcionista de clínica."),
+                HumanMessage(content=repair_prompt),
+            ])
+            response = repaired
     return {"messages": [response]}
 
 def route_after_generation(state: AgentState) -> Literal["tools", "prune_history"]:

@@ -1,6 +1,7 @@
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.core.conversation_router import route_message
+from app.core.response_quality import assess_response_quality
 
 
 def test_agendamento_sem_queixa_pede_motivo_antes_do_cadastro():
@@ -55,3 +56,23 @@ def test_nome_curto_persistido_no_historico_permite_avancar_apos_cpf():
 
     assert decision["entities"]["cpf"] == "00511483155"
     assert decision["next_action"] == "COLLECT_BIRTH_DATE"
+
+
+def test_quality_gate_reprova_resposta_que_volta_a_pedir_nome_apos_cpf():
+    adequate, reason = assess_response_quality(
+        "Para abrir o cadastro, informe seu nome completo, por favor.",
+        {"next_action": "COLLECT_BIRTH_DATE"},
+    )
+
+    assert adequate is False
+    assert reason == "etapa_nascimento_voltou_ao_nome"
+
+
+def test_quality_gate_aprova_resposta_coerente_com_cpf():
+    adequate, reason = assess_response_quality(
+        "Obrigado. Agora informe sua data de nascimento, por favor.",
+        {"next_action": "COLLECT_BIRTH_DATE"},
+    )
+
+    assert adequate is True
+    assert reason == "ok"
