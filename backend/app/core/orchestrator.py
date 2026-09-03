@@ -10,7 +10,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, To
 from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import PersonaBuilder
-from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf
+from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, has_patient_complaint
 
 from langgraph.checkpoint.memory import MemorySaver
 import operator
@@ -181,6 +181,18 @@ async def generate_response_node(state: AgentState):
     intent = state.get('intent', 'duvidas_clinica')
     context = state.get('context', '')
     messages = state['messages']
+
+    # A queixa é obrigatória antes da coleta cadastral de um novo agendamento.
+    # Esta trava é determinística para não depender de a LLM seguir o prompt.
+    if intent == "AGENDAMENTO" and not has_patient_complaint(messages):
+        return {
+            "messages": [AIMessage(
+                content=(
+                    "Claro. Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
+                    "O que você está sentindo ou qual avaliação deseja realizar?"
+                )
+            )]
+        }
     
     # [CONSCIÊNCIA TEMPORAL E CALENDÁRIO ABSOLUTO]
     now_sp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))

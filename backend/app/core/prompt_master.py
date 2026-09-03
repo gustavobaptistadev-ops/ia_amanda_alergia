@@ -48,7 +48,7 @@ SCHEDULING_RULES = """
 
 🧭 FLUXO ADAPTATIVO DE AGENDAMENTO:
 
-- ESCUTA ATIVA: O primeiro passo é perguntar o que o paciente está sentindo. Se ele JÁ disse o sintoma, apenas valide com empatia e SÓ ENTÃO pergunte a modalidade (convênio ou particular).
+- ESCUTA ATIVA: Antes de coletar nome, CPF ou data de nascimento, entenda o motivo da consulta. Se o paciente JÁ descreveu a queixa, valide com empatia e SÓ ENTÃO prossiga para o próximo dado faltante. NUNCA peça cadastro quando a queixa ainda não foi informada.
 
 - 🚨 ALERTA MÉDICO DE PREPARO (ANTIALÉRGICOS): ANTES de buscar horários, se houver queixa de alergia de pele ou rinite (que exige teste), pergunte de forma suave se ele toma antialérgico oral. Se SIM, oriente a suspender de 5 a 7 dias e marque a consulta para o 7º dia em diante. Se NÃO, marque para o dia mais próximo.
 

@@ -1,6 +1,6 @@
 from langchain_core.messages import AIMessage, HumanMessage
 
-from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf
+from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, has_patient_complaint
 
 
 def test_cpf_with_leading_zeros_is_preserved():
@@ -22,3 +22,15 @@ def test_latest_cpf_ignores_ai_messages():
 
 def test_birth_date_is_detected_without_affecting_cpf_format():
     assert contains_date("Nascimento 04/08/1986")
+
+
+def test_complaint_is_required_before_registration():
+    messages = [HumanMessage(content="Preciso marcar uma consulta")]
+
+    assert has_patient_complaint(messages) is False
+
+
+def test_complaint_can_be_detected_in_same_booking_message():
+    messages = [HumanMessage(content="Quero agendar porque estou com alergia e coceira")]
+
+    assert has_patient_complaint(messages) is True

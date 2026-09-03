@@ -5,6 +5,13 @@ from app.core.validators import validate_cpf
 
 CPF_CANDIDATE_PATTERN = re.compile(r"(?<!\d)(?:\d[ .-]?){10}\d(?!\d)")
 DATE_PATTERN = re.compile(r"(?<!\d)(?:\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})(?!\d)")
+COMPLAINT_TERMS = (
+    "alergia", "coceira", "coçar", "mancha", "vermelhidão", "vermelhidao",
+    "rinite", "sinusite", "asma", "tosse", "espirro", "falta de ar",
+    "pele", "urticária", "urticaria", "inchaço", "inchaco", "reação",
+    "reacao", "sintoma", "sintomas", "dor", "queixa", "problema de saúde",
+    "problema de saude", "estou com", "estou sentindo", "sinto",
+)
 
 
 def extract_cpf_from_text(text: str) -> str | None:
@@ -32,3 +39,15 @@ def extract_latest_cpf(messages: Sequence) -> str | None:
 def contains_date(text: str) -> bool:
     """Detect a date supplied by the patient without converting it to a number."""
     return bool(text and DATE_PATTERN.search(text))
+
+
+def has_patient_complaint(messages: Sequence) -> bool:
+    """Return True when the patient described a health complaint in the conversation."""
+    for message in messages or []:
+        if getattr(message, "type", None) != "human":
+            continue
+        text = getattr(message, "content", "") or ""
+        normalized = re.sub(r"\s+", " ", text.lower()).strip()
+        if any(term in normalized for term in COMPLAINT_TERMS):
+            return True
+    return False
