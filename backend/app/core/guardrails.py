@@ -1,5 +1,7 @@
 import logging
 
+from app.services.evolution_api import remove_emojis
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
@@ -26,6 +28,7 @@ Resposta:
 
 def validar_resposta(ai_response: str) -> bool:
     """Return True when safe; fail closed when validation is unavailable."""
+    ai_response = remove_emojis(ai_response)
     if not ai_response or not ai_response.strip():
         return True
 

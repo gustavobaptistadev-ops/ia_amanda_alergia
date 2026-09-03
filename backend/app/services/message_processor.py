@@ -1,4 +1,4 @@
-from app.services.evolution_api import send_text_message
+from app.services.evolution_api import remove_emojis, send_text_message
 from app.core.orchestrator import process_user_message
 from app.core.guardrails import validar_resposta
 from app.services.db_service import save_message, get_or_create_contact
@@ -38,7 +38,7 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
     is_rate_limited = await check_phone_rate_limit(remote_jid, max_per_minute=20)
     if is_rate_limited:
         logger.warning(f"Rate limit atingido para {remote_jid[:6]}****. Mensagem ignorada.")
-        await send_text_message(remote_jid, "Estou recebendo muitas mensagens em seguida. Aguarde um momento e tente novamente! 😊")
+        await send_text_message(remote_jid, "Estou recebendo muitas mensagens em seguida. Aguarde um momento e tente novamente!")
         return
 
     # [SEGURANÇA 2.3] Triagem de Emergência — detecta urgência real ANTES do processamento da IA
@@ -48,7 +48,7 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
         logger.warning(f"TRIAGEM DE EMERGÊNCIA acionada para {remote_jid[:6]}****. Enviando resposta de segurança imediata.")
         await send_text_message(remote_jid, EMERGENCY_RESPONSE)
         await save_message(remote_jid, text, sender='paciente', name=push_name)
-        await save_message(remote_jid, EMERGENCY_RESPONSE, sender='ia')
+        await save_message(remote_jid, remove_emojis(EMERGENCY_RESPONSE), sender='ia')
         from app.models.chat import SystemLog
         from app.database import AsyncSessionLocal
         async with AsyncSessionLocal() as session:
@@ -87,7 +87,8 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
                 logger.error(f"Erro ao processar mensagem no LLM para {remote_jid}: {e}")
                 ai_response = "Nosso sistema está passando por uma instabilidade momentânea. Um de nossos atendentes humanos já foi notificado e falará com você em breve."
             
-            is_safe = validar_resposta(ai_response)
+            ai_response = remove_emojis(ai_response)
+            is_safe = validar_resposta(ai_response)
             
             if not is_safe:
                 # Se for bloqueio real de segurança (prescrição ou jailbreak), responde com prudência médica

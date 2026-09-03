@@ -178,6 +178,7 @@ class PersonaBuilder:
         
 
         final_prompt = "\n\n".join(prompt_blocks)
+        final_prompt += "\n\nREGRA ABSOLUTA DE FORMATAÇÃO: não use emojis, pictogramas ou símbolos decorativos em nenhuma resposta, sem exceção."
 
         
 
