@@ -1,11 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("admin@respirar.com");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,7 +24,7 @@ export default function LoginPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Não foi possível autenticar.");
       localStorage.setItem("token", data.access_token);
-      router.replace(searchParams.get("next") || "/");
+      router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao realizar login.");
     } finally {
