@@ -41,6 +41,17 @@ def contains_date(text: str) -> bool:
     return bool(text and DATE_PATTERN.search(text))
 
 
+def extract_latest_date(messages: Sequence) -> str | None:
+    """Return the newest date supplied by the patient, preserving its format."""
+    for message in reversed(messages or []):
+        if getattr(message, "type", None) != "human":
+            continue
+        match = DATE_PATTERN.search(getattr(message, "content", "") or "")
+        if match:
+            return match.group(0)
+    return None
+
+
 def has_patient_complaint(messages: Sequence) -> bool:
     """Return True when the patient described a health complaint in the conversation."""
     for message in messages or []:

@@ -76,3 +76,25 @@ def test_quality_gate_aprova_resposta_coerente_com_cpf():
 
     assert adequate is True
     assert reason == "ok"
+
+
+def test_escolha_de_horario_avanca_para_confirmacao_do_agendamento():
+    history = [
+        HumanMessage(content="Quero marcar uma consulta"),
+        AIMessage(content="Qual o motivo da consulta?"),
+        HumanMessage(content="Estou com alergia nos braços"),
+        AIMessage(content="Informe seu nome completo, por favor."),
+        HumanMessage(content="Gustavo Henrique Baptista"),
+        AIMessage(content="Agora informe seu CPF."),
+        HumanMessage(content="00511483155"),
+        AIMessage(content="Informe sua data de nascimento."),
+        HumanMessage(content="04/08/1986"),
+        AIMessage(content="Temos horários disponíveis: Sexta-feira, 04/09: 11:00, 15:00, 16:00."),
+    ]
+
+    decision = route_message("Sexta às 15", history)
+
+    assert decision["next_action"] == "CONFIRM_SLOT"
+    assert decision["entities"]["name"] == "Gustavo Henrique Baptista"
+    assert decision["entities"]["cpf"] is None
+    assert decision["entities"]["preferred_slot"] == {"date": "2026-09-04", "time": "15:00"}

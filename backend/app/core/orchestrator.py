@@ -3,6 +3,7 @@
 import os
 import logging
 import datetime
+import re
 from typing import TypedDict, Annotated, Sequence, Literal
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, RemoveMessage
@@ -10,7 +11,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, To
 from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import PersonaBuilder
-from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, has_patient_complaint
+from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, extract_latest_date, has_patient_complaint
 from app.core.conversation_router import route_message
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -170,9 +171,32 @@ async def schedule_flow_node(state: AgentState):
     """Nó 2b: Fluxo dedicado para agendamento com corpo clínico e regras."""
     last_message = state['messages'][-1].content
     intent = state.get("intent", "")
+    routing = state.get("routing", {})
     if intent == "AGENDAMENTO" and not has_patient_complaint(state.get("messages", [])):
         # Não consulta RAG nem agenda antes de conhecer o motivo da consulta.
         return {"context": ""}
+
+    if intent == "AGENDAMENTO" and routing.get("next_action") == "CONFIRM_SLOT":
+        entities = routing.get("entities", {})
+        slot = entities.get("preferred_slot") or {}
+        patient_name = entities.get("name") or ""
+        cpf = entities.get("cpf") or extract_latest_cpf(state.get("messages", []))
+        dob = extract_latest_date(state.get("messages", []))
+        if slot.get("date") and slot.get("time") and patient_name and cpf and dob:
+            booking_result = await create_event.ainvoke({
+                "date_str": slot["date"],
+                "time_str": slot["time"],
+                "patient_name": patient_name,
+                "cpf": cpf,
+                "dob": dob,
+                "phone": state.get("thread_id", ""),
+            })
+            return {
+                "context": (
+                    "[AGENDAMENTO_EXECUTADO]\n"
+                    f"Resultado interno da criacao: {booking_result}"
+                )
+            }
 
     context = retrieve_context(f"{last_message} médicos convênios preços")
     latest_cpf = extract_latest_cpf(state.get("messages", []))
@@ -221,6 +245,25 @@ async def generate_response_node(state: AgentState):
         }
 
     next_action = routing.get("next_action")
+    if intent == "AGENDAMENTO" and next_action == "CONFIRM_SLOT":
+        result_match = re.search(r"Resultado interno da criacao:\s*(.*)", context, re.DOTALL)
+        result = result_match.group(1) if result_match else ""
+        if any(term in result.lower() for term in ("confirmado", "registrado", "sucesso")):
+            entities = routing.get("entities", {})
+            slot = entities.get("preferred_slot") or {}
+            date_parts = slot.get("date", "").split("-")
+            formatted_date = "/".join(reversed(date_parts)) if len(date_parts) == 3 else slot.get("date", "")
+            link_match = re.search(r"https?://\S+", result)
+            link = link_match.group(0).rstrip(".,") if link_match else ""
+            link_text = f"\n\nAdicione a consulta na sua agenda: {link}" if link else ""
+            first_name = (entities.get("name") or "Paciente").split()[0]
+            return {"messages": [AIMessage(content=(
+                f"Prontinho, {first_name}. Sua consulta estÃ¡ confirmada para {formatted_date} Ã s {slot.get('time')}.{link_text}\n\n"
+                "VocÃª jÃ¡ tem o endereÃ§o da clÃ­nica ou deseja que eu envie a localizaÃ§Ã£o?"
+            ))]}
+        return {"messages": [AIMessage(content=(
+            "NÃ£o consegui concluir esse horÃ¡rio agora. Vou verificar a disponibilidade novamente para oferecer uma opÃ§Ã£o vÃ¡lida."
+        ))]}
     if intent == "AGENDAMENTO" and next_action in {
         "COLLECT_NAME", "COLLECT_CPF", "COLLECT_BIRTH_DATE"
     }:

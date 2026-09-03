@@ -2,11 +2,13 @@
 
 import re
 import unicodedata
+import datetime
 from collections.abc import Sequence
 from typing import Any
 
 from app.core.patient_data import (
     contains_date,
+    extract_latest_date,
     extract_latest_cpf,
     has_patient_complaint,
 )
@@ -33,6 +35,11 @@ INTENT_TERMS = {
     "REAGENDAMENTO": ("remarcar", "reagendar", "mudar o dia", "mudar a hora", "mudar a data"),
     "CANCELAMENTO": ("cancelar", "desmarcar"),
     "AGENDAMENTO": ("agendar", "marcar consulta", "marcar horario", "vaga", "consulta"),
+}
+
+WEEKDAYS = {
+    "segunda": 0, "terca": 1, "quarta": 2, "quinta": 3,
+    "sexta": 4, "sabado": 5, "domingo": 6,
 }
 
 
@@ -85,7 +92,9 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
                 "name": "COLLECT_NAME",
                 "cpf": "COLLECT_CPF",
                 "birth_date": "COLLECT_BIRTH_DATE",
-            }.get(missing_fields[0], "CHECK_AVAILABILITY") if missing_fields else "CHECK_AVAILABILITY"
+            }.get(missing_fields[0], "CHECK_AVAILABILITY") if missing_fields else (
+                "CONFIRM_SLOT" if _extract_preferred_slot(text, history) else "CHECK_AVAILABILITY"
+            )
     elif intent in {"CANCELAMENTO", "REAGENDAMENTO"}:
         missing_fields = ["appointment"]
         next_action = "VALIDATE_EXISTING_APPOINTMENT"
@@ -97,13 +106,51 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
         "intent": intent,
         "confidence": round(confidence, 2),
         "entities": {
-            "name": _extract_name(text),
+            "name": _extract_name_from_history(history + [_Message(text)]),
             "cpf": extract_latest_cpf([_Message(text)]),
             "birth_date": text if contains_date(text) else None,
             "third_party": is_third_party,
+            "preferred_slot": _extract_preferred_slot(text, history),
         },
         "missing_fields": missing_fields,
         "next_action": next_action,
+    }
+
+
+def _extract_preferred_slot(text: str, messages: Sequence[Any]) -> dict[str, str] | None:
+    """Extract a day/time choice only after availability was presented."""
+    normalized = normalize_text(text)
+    time_match = re.search(r"\b(?:as|a|pelas?)\s*(\d{1,2})(?::(\d{2}))?\s*h?\b", normalized)
+    if not time_match:
+        return None
+
+    weekday = next(
+        (day for day in WEEKDAYS if re.search(rf"\b{day}(?:-feira)?\b", normalized)),
+        None,
+    )
+    if weekday is None:
+        return None
+
+    offered_text = " ".join(
+        normalize_text(getattr(message, "content", ""))
+        for message in messages or []
+        if getattr(message, "type", None) == "ai"
+    )
+    if not any(marker in offered_text for marker in ("horarios disponiveis", "horarios livres", "horarios")):
+        return None
+
+    offered_match = re.search(rf"{weekday}(?:-feira)?[^\d]{{0,30}}(\d{{1,2}})/(\d{{1,2}})", offered_text)
+    if offered_match:
+        year = datetime.date.today().year
+        date_str = f"{year:04d}-{int(offered_match.group(2)):02d}-{int(offered_match.group(1)):02d}"
+    else:
+        today = datetime.date.today()
+        days_ahead = (WEEKDAYS[weekday] - today.weekday()) % 7 or 7
+        date_str = (today + datetime.timedelta(days=days_ahead)).isoformat()
+
+    return {
+        "date": date_str,
+        "time": f"{int(time_match.group(1)):02d}:{time_match.group(2) or '00'}",
     }
 
 
