@@ -13,6 +13,7 @@ import {
   Terminal,
   X,
   Menu
+  ,LogOut
 } from "lucide-react";
 import clsx from "clsx";
 import { useState, useEffect } from "react";
@@ -20,6 +21,12 @@ import { useState, useEffect } from "react";
 export default function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+
+  function handleLogout() {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    window.location.href = "/login";
+  }
 
   // Fecha a gaveta mobile ao trocar de página
   useEffect(() => {
@@ -110,7 +117,7 @@ export default function Sidebar() {
 
         {/* Perfil do Usuário no Rodapé */}
         <div className="p-4 border-t border-slate-800">
-          <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-800 cursor-pointer transition-colors">
+          <div className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-800 transition-colors">
             <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-lg">
               <span className="font-bold text-xs">GB</span>
             </div>
@@ -118,6 +125,9 @@ export default function Sidebar() {
               <p className="text-sm font-semibold text-slate-200 truncate">Gustavo Baptista</p>
               <p className="text-xs text-slate-500 truncate">Médico(a)</p>
             </div>
+            <button onClick={handleLogout} title="Sair" aria-label="Sair" className="rounded-lg p-2 text-slate-400 hover:bg-slate-700 hover:text-white">
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         </div>
       </aside>
