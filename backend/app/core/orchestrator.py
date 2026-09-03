@@ -136,6 +136,8 @@ def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow",
         return "handoff_flow"
     if intent == "URGENCIA":
         return "urgency_flow"
+    if intent == "OFF_TOPIC":
+        return "off_topic_flow"
     if intent in ["AGENDAMENTO", "REAGENDAMENTO", "CANCELAMENTO"]:
         return "schedule_flow"
     return "fetch_context"
@@ -156,6 +158,16 @@ def urgency_flow_node(state: AgentState):
         "⚠️ Identifiquei que você pode estar passando por uma situação de urgência ou necessitando de atenção imediata.\n\n"
         "Se estiver com sintomas agudos (como falta de ar súbita ou reação alérgica severa), por favor, *procure o Pronto Socorro mais próximo imediatamente*.\n\n"
         "Já notifiquei nossa equipe clínica prioritariamente para assumir seu atendimento por aqui."
+    )
+    return {"messages": [AIMessage(content=msg)]}
+
+
+def off_topic_flow_node(state: AgentState):
+    """Recusa assuntos externos e reconduz o contato ao atendimento clínico."""
+    msg = (
+        "Posso ajudar apenas com informações da Clínica Lifeline One, orientações administrativas "
+        "e agendamento de consultas. Vamos continuar por aqui: você deseja informações sobre a clínica "
+        "ou prefere seguir com o agendamento?"
     )
     return {"messages": [AIMessage(content=msg)]}
 
@@ -507,6 +519,7 @@ workflow.add_node("fetch_context", fetch_context_node)
 workflow.add_node("schedule_flow", schedule_flow_node)
 workflow.add_node("handoff_flow", handoff_flow_node)
 workflow.add_node("urgency_flow", urgency_flow_node)
+workflow.add_node("off_topic_flow", off_topic_flow_node)
 workflow.add_node("generate_response", generate_response_node)
 workflow.add_node("tools", tool_node)
 workflow.add_node("prune_history", prune_history_node)
@@ -517,6 +530,7 @@ workflow.add_edge("fetch_context", "generate_response")
 workflow.add_edge("schedule_flow", "generate_response")
 workflow.add_edge("handoff_flow", "prune_history")
 workflow.add_edge("urgency_flow", "prune_history")
+workflow.add_edge("off_topic_flow", "prune_history")
 
 workflow.add_conditional_edges(
     "generate_response",

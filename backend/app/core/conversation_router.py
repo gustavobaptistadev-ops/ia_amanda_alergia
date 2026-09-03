@@ -42,6 +42,14 @@ WEEKDAYS = {
     "sexta": 4, "sabado": 5, "domingo": 6,
 }
 
+OFF_TOPIC_PATTERNS = (
+    r"\b(?:codigo|script|programa|algoritmo)\s+(?:em\s+)?(?:python|javascript|java|sql|html)\b",
+    r"\b(?:receita|bolo|torta|comida|culinaria)\b",
+    r"\b(?:system prompt|prompt inicial|instrucoes internas|regras internas)\b",
+    r"\b(?:jwt|webhook|api|redis|postgres|banco de dados|chave secreta)\b",
+    r"\b(?:quem te programou|como voce foi programada|qual seu modelo)\b",
+)
+
 
 def _extract_name(text: str) -> str | None:
     """Extrai somente nomes explicitamente apresentados pelo paciente."""
@@ -65,16 +73,20 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
     all_patient_text = " ".join(human_history + [normalized])
     is_third_party = any(term in all_patient_text for term in THIRD_PARTY_TERMS)
 
-    for intent, terms in INTENT_TERMS.items():
-        if any(term in normalized for term in terms):
-            confidence = 0.97 if intent in {"URGENCIA", "CANCELAMENTO", "REAGENDAMENTO"} else 0.94
-            break
+    if any(re.search(pattern, normalized) for pattern in OFF_TOPIC_PATTERNS):
+        intent = "OFF_TOPIC"
+        confidence = 0.99
     else:
+        for intent, terms in INTENT_TERMS.items():
+            if any(term in normalized for term in terms):
+                confidence = 0.97 if intent in {"URGENCIA", "CANCELAMENTO", "REAGENDAMENTO"} else 0.94
+                break
+        else:
         # Respostas curtas continuam no agendamento quando o histórico mostra
         # que a Amanda estava coletando dados cadastrais.
-        registration_context = _has_registration_context(history)
-        intent = "AGENDAMENTO" if registration_context else "DUVIDA"
-        confidence = 0.93 if registration_context else 0.45
+            registration_context = _has_registration_context(history)
+            intent = "AGENDAMENTO" if registration_context else "DUVIDA"
+            confidence = 0.93 if registration_context else 0.45
 
     if intent == "AGENDAMENTO":
         missing_fields = []
@@ -101,6 +113,9 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
     elif intent in {"CANCELAMENTO", "REAGENDAMENTO"}:
         missing_fields = ["appointment"]
         next_action = "VALIDATE_EXISTING_APPOINTMENT"
+    elif intent == "OFF_TOPIC":
+        missing_fields = []
+        next_action = "REDIRECT_TO_CLINIC_FLOW"
     else:
         missing_fields = []
         next_action = "ANSWER_WITH_KNOWLEDGE_BASE" if intent == "DUVIDA" else intent
