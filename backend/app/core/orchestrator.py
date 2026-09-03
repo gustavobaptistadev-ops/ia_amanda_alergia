@@ -376,7 +376,7 @@ async def generate_response_node(state: AgentState):
     for m in messages:
         if not hasattr(m, "content"): # Ignora dicts corrompidos ou tipos desconhecidos
             continue
-        from langchain_core.messages import RemoveMessage, ToolMessage, AIMessage, BaseMessage
+        from langchain_core.messages import RemoveMessage, ToolMessage, BaseMessage
         if isinstance(m, RemoveMessage):
             continue
         
