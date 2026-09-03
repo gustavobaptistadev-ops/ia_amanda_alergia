@@ -2,7 +2,14 @@
 set -euo pipefail
 
 # Fail before migrations if the deployment is missing security configuration.
-required_secrets=(INTERNAL_API_KEY WEBHOOK_SECRET JWT_SECRET_KEY ENCRYPTION_KEY)
+required_secrets=(
+  INTERNAL_API_KEY
+  WEBHOOK_SECRET
+  JWT_SECRET_KEY
+  ENCRYPTION_KEY
+  EVOLUTION_GLOBAL_KEY
+  EVOLUTION_API_KEY
+)
 for secret_name in "${required_secrets[@]}"; do
   secret_value="$(printenv "${secret_name}" || true)"
   if [ "${#secret_value}" -lt 32 ]; then
