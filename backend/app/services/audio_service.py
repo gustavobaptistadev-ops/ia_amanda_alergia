@@ -109,4 +109,4 @@ async def download_audio_from_url(url: str, headers: dict = None) -> bytes:
         logger.error(f"Erro no download do áudio ({url}): {e}")
         return None
 
-
+

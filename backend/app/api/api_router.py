@@ -18,4 +18,4 @@ api_router.include_router(rag.router, prefix="/rag", tags=["RAG (Base de Conheci
 api_router.include_router(settings.router, prefix="/settings", tags=["Configurações de IA"], dependencies=[Depends(get_api_key)])
 api_router.include_router(logs.router, prefix="/logs", tags=["Auditoria & Monitor de Lotes"], dependencies=[Depends(get_api_key)])
 from app.api.endpoints import learning
-api_router.include_router(learning.router, prefix='/learning', tags=['Aprendizado da IA'], dependencies=[Depends(get_api_key)])
+api_router.include_router(learning.router, prefix='/learning', tags=['Aprendizado da IA'], dependencies=[Depends(get_api_key)])

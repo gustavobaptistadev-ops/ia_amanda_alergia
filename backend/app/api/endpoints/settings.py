@@ -51,4 +51,4 @@ async def update_ai_settings(config: AIConfig):
         return {"status": "ok", "message": "Configurações de IA salvas com sucesso!", "config": data}
     except Exception as e:
         logger.error(f"Erro ao salvar configurações de IA: {e}")
-        raise HTTPException(status_code=500, detail="Falha ao salvar configurações.")
+        raise HTTPException(status_code=500, detail="Falha ao salvar configurações.")

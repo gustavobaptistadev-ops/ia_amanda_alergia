@@ -26,4 +26,4 @@ async def generate_speech_audio(text: str, voice: str = "nova") -> bytes:
         return audio_bytes
     except Exception as e:
         logger.error(f"Erro ao gerar áudio TTS: {e}")
-        return None
+        return None

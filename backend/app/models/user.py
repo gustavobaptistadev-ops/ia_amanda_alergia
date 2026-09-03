@@ -12,4 +12,4 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="recepcionista") # 'admin', 'medico', 'recepcionista'
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)

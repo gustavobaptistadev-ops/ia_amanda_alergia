@@ -74,4 +74,4 @@ async def get_analytics_overview(db: AsyncSession = Depends(get_db)):
             "custo_estimado_usd": "$0.114",
             "custo_estimado_brl": "R$ 0,65",
             "economia_gerada_brl": "R$ 83,35"
-        }
+        }

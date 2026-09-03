@@ -36,4 +36,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index(op.f('ix_appointments_appointment_time'), table_name='appointments')
     op.drop_index(op.f('ix_appointments_contact_id'), table_name='appointments')
-    op.drop_table('appointments')
+    op.drop_table('appointments')

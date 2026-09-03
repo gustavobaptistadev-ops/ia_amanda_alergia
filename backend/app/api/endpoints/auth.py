@@ -158,4 +158,4 @@ async def change_password(req: ChangePasswordRequest, db: AsyncSession = Depends
         
     user.hashed_password = get_password_hash(req.new_password)
     await db.commit()
-    return {"status": "ok", "message": "Senha alterada com sucesso!"}
+    return {"status": "ok", "message": "Senha alterada com sucesso!"}

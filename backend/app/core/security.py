@@ -42,4 +42,4 @@ async def get_api_key(request: Request = None, websocket: WebSocket = None):
         detail='Credenciais inválidas ou sessão expirada. Forneça um X-API-Key válido ou Bearer JWT.'
     )
 
-WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', 'webhook-secret-123')
+WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', 'webhook-secret-123')

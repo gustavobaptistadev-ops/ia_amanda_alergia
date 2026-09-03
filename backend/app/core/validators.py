@@ -66,4 +66,4 @@ def mask_cpf_for_logs(cpf: str) -> str:
     digits = re.sub(r"\D", "", str(cpf))
     if len(digits) == 11:
         return f"***.***.{digits[6:9]}-**"
-    return "***"
+    return "***"

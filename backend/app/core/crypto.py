@@ -43,4 +43,4 @@ def decrypt_text(cipher_text: str) -> str:
         return decrypted_bytes.decode("utf-8")
     except Exception as e:
         logger.error(f"Erro ao decriptar texto: {e}")
-        return cipher_text
+        return cipher_text

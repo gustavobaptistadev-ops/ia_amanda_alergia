@@ -140,4 +140,4 @@ def sanitize_and_wrap_user_input(text: str, max_chars: int = 1500) -> str:
     sanitized = sanitized.replace("[INST]", "").replace("[/INST]", "")
     sanitized = sanitized.replace("### System:", "").replace("--- BEGIN SYSTEM ---", "")
 
-    return f"<user_message>\n{sanitized}\n</user_message>"
+    return f"<user_message>\n{sanitized}\n</user_message>"

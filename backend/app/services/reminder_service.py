@@ -240,4 +240,4 @@ async def check_and_send_reminders():
                 ))
                 await session.commit()
             except:
-                pass
+                pass

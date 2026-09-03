@@ -30,4 +30,4 @@ async def check_phone_rate_limit(phone: str, max_per_minute: int = 20) -> bool:
             return count > max_per_minute
     except Exception:
         return False  # fail-open: em caso de falha do Redis, não bloquear
-
+

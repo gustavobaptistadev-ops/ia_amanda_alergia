@@ -17,4 +17,4 @@ class EncryptedText(TypeDecorator):
     def process_result_value(self, value, dialect):
         if value is not None:
             return decrypt_text(value)
-        return value
+        return value
