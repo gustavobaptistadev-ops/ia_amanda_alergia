@@ -1,11 +1,11 @@
-# Política de Segurança — IA Amanda | Clínica Respirar
+# Política de Segurança — IA Amanda | Clínica Lifeline One
 > Versão 1.0 | Data: 31/08/2026 | Classificação: Confidencial
 
 ---
 
 ## 1. Visão Geral
 
-Este documento descreve as camadas de segurança, decisões arquiteturais e conformidade LGPD do sistema **IA Amanda**, recepcionista virtual da Clínica Respirar. Destina-se a fins de auditoria interna, conformidade com o CFM (Conselho Federal de Medicina) e eventuais certificações futuras (ISO 27001, HIPAA).
+Este documento descreve as camadas de segurança, decisões arquiteturais e conformidade LGPD do sistema **IA Amanda**, recepcionista virtual da Clínica Lifeline One. Destina-se a fins de auditoria interna, conformidade com o CFM (Conselho Federal de Medicina) e eventuais certificações futuras (ISO 27001, HIPAA).
 
 ---
 

@@ -1,6 +1,6 @@
-# POLÍTICA DE PRIVACIDADE E PROTEÇÃO DE DADOS - CLÍNICA RESPIRAR
+# POLÍTICA DE PRIVACIDADE E PROTEÇÃO DE DADOS - CLÍNICA LIFELINE ONE
 
-A **Clínica Respirar** (Especialistas em Alergia e Imunologia) está comprometida com a proteção dos dados pessoais, da privacidade e da confidencialidade médica de nossos pacientes. Esta política segue estritamente as diretrizes da Lei Geral de Proteção de Dados Pessoais (LGPD - Lei nº 13.709/2018) e as normas de sigilo médico do Conselho Federal de Medicina (CFM).
+A **Clínica Lifeline One** (Especialistas em Alergia e Imunologia) está comprometida com a proteção dos dados pessoais, da privacidade e da confidencialidade médica de nossos pacientes. Esta política segue estritamente as diretrizes da Lei Geral de Proteção de Dados Pessoais (LGPD - Lei nº 13.709/2018) e as normas de sigilo médico do Conselho Federal de Medicina (CFM).
 
 ## 1. Coleta de Dados via WhatsApp e Inteligência Artificial
 Ao entrar em contato com nossa recepção automatizada via WhatsApp (atendida pela assistente virtual IA Amanda), coletamos apenas os dados estritamente necessários para viabilizar o agendamento e o pré-cadastro no prontuário médico:
@@ -25,7 +25,7 @@ Os dados coletados são usados exclusivamente para:
 Os dados são armazenados de forma criptografada em bancos de dados seguros e em servidores com restrição de acesso rigorosa. Apenas médicos especialistas, profissionais de saúde diretamente envolvidos no atendimento e a equipe administrativa autorizada possuem acesso ao seu prontuário, sempre pautados pelo sigilo profissional.
 
 ## 4. Compartilhamento de Dados
-A Clínica Respirar **não vende, não aluga e não compartilha** seus dados pessoais com terceiros para fins publicitários ou comerciais. O compartilhamento ocorre apenas com:
+A Clínica Lifeline One **não vende, não aluga e não compartilha** seus dados pessoais com terceiros para fins publicitários ou comerciais. O compartilhamento ocorre apenas com:
 - O Plano de Saúde / Operadora, para fins de liberação de senhas, autorização de exames e faturamento (quando aplicável).
 - Laboratórios parceiros de apoio, apenas quando solicitado pedido médico pelo paciente.
 

@@ -1,6 +1,6 @@
 ﻿# 🏢 Sobre a Clínica Respirar - Estrutura e Diferenciais
 
-- **Nome Oficial:** Clínica Respirar - Centro Avançado de Alergia e Imunologia
+- **Nome Oficial:** Clínica Lifeline One - Centro Avançado de Alergia e Imunologia
 - **Endereço:** Connect Towers, sala 3021 - QS 01, Rua 212, Lotes 19, 21 e 23 – Taguatinga Sul, Brasília - DF (Próximo ao Taguatinga Shopping)
 - **Links de Localização:** 
   - **Google Maps:** https://maps.app.goo.gl/search/Connect+Towers+Taguatinga

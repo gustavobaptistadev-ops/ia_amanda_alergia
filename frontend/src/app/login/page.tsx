@@ -39,7 +39,7 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit} className="relative w-full max-w-[440px] rounded-[28px] border border-white/60 bg-white p-8 shadow-[0_30px_80px_rgba(0,0,0,0.28)] sm:p-10">
         <div className="mb-8 flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-xl font-bold text-white shadow-lg shadow-blue-600/30">R</div>
-          <div><p className="text-sm font-bold tracking-[0.18em] text-slate-900">RESPIRAR</p><p className="text-[10px] font-semibold tracking-[0.2em] text-slate-400">CLÍNICA MÉDICA</p></div>
+          <div><p className="text-sm font-bold tracking-[0.18em] text-slate-900">LIFELINE ONE</p><p className="text-[10px] font-semibold tracking-[0.2em] text-slate-400">CLÍNICA MÉDICA</p></div>
         </div>
         <p className="mb-2 text-sm font-semibold text-blue-600">Área restrita</p>
         <h1 className="mb-2 text-3xl font-bold tracking-tight text-slate-950">Acesso ao painel</h1>

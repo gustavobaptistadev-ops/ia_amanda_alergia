@@ -127,8 +127,10 @@ async def reset_all_conversations(db: AsyncSession = Depends(get_db), current_us
             await db.execute(text("DELETE FROM checkpoints"))
             await db.execute(text("DELETE FROM checkpoint_blobs"))
             await db.execute(text("DELETE FROM checkpoint_writes"))
-        except Exception:
-            pass
+        except Exception as checkpoint_error:
+            logger.exception("Falha ao limpar a memória persistente no reset global: %s", checkpoint_error)
+            await db.rollback()
+            raise HTTPException(status_code=503, detail="Não foi possível limpar a memória persistente das conversas.")
             
         await db.commit()
         await manager.broadcast("update")
@@ -170,9 +172,10 @@ async def reset_conversation(phone_number: str, db: AsyncSession = Depends(get_d
             await db.execute(text("DELETE FROM checkpoint_blobs WHERE thread_id = :tid"), {"tid": phone_number})
             await db.execute(text("DELETE FROM checkpoint_writes WHERE thread_id = :tid"), {"tid": phone_number})
             await db.commit()
-        except Exception as e:
-            # Caso as tabelas ainda não existam ou erro pontual
-            pass
+        except Exception as checkpoint_error:
+            logger.exception("Falha ao limpar a memória persistente do contato %s: %s", phone_number[:6], checkpoint_error)
+            await db.rollback()
+            raise HTTPException(status_code=503, detail="Não foi possível limpar a memória persistente desta conversa.")
         
         # Notifica o frontend via websocket
         await manager.broadcast("update")

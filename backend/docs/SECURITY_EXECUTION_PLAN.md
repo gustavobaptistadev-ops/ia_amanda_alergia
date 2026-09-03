@@ -1,6 +1,6 @@
 # Plano de Execução de Segurança
 
-**Sistema:** IA Amanda | Clínica Respirar  
+**Sistema:** IA Amanda | Clínica Lifeline One
 **Versão:** 1.0  
 **Data:** 03/09/2026  
 **Objetivo:** elevar o sistema a um nível de segurança adequado para produção, tratando autenticação, segredos, dados pessoais e de saúde, disponibilidade, prompt injection e capacidade de resposta a incidentes.

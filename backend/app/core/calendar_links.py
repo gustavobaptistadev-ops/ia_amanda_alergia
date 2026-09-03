@@ -15,7 +15,7 @@ def build_google_calendar_url(date_str: str, time_str: str, patient_name: str, a
     dt_utc_start = dt_local + datetime.timedelta(hours=3)
     dt_utc_end = dt_utc_start + datetime.timedelta(hours=1)
     dates = f"{dt_utc_start:%Y%m%dT%H%M%SZ}/{dt_utc_end:%Y%m%dT%H%M%SZ}"
-    title = urllib.parse.quote(f"Consulta Alergia - {patient_name.split()[0] if patient_name else 'Clínica Respirar'}")
-    details = urllib.parse.quote(f"Consulta Médica na Clínica Respirar.\n{address}")
+    title = urllib.parse.quote(f"Consulta Alergia - {patient_name.split()[0] if patient_name else 'Clínica Lifeline One'}")
+    details = urllib.parse.quote(f"Consulta Médica na Clínica Lifeline One.\n{address}")
     location = urllib.parse.quote(address)
     return f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title}&dates={dates}&details={details}&location={location}"

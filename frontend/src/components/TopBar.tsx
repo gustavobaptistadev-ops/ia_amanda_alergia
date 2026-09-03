@@ -19,7 +19,7 @@ export default function TopBar() {
   return (
     <header className="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 pl-16 lg:pl-8 lg:px-8">
       <div>
-        <p className="text-[10px] md:text-xs text-slate-400 font-medium mb-0.5">Painel Respirar / <span className="capitalize">{pathname.replace('/', '') || 'Dashboard'}</span></p>
+        <p className="text-[10px] md:text-xs text-slate-400 font-medium mb-0.5">Painel Lifeline One / <span className="capitalize">{pathname.replace('/', '') || 'Dashboard'}</span></p>
         <h2 className="text-base md:text-xl font-bold text-slate-800 truncate max-w-[200px] sm:max-w-none">{getPageTitle()}</h2>
       </div>
 

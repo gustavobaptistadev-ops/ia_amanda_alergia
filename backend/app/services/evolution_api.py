@@ -54,7 +54,7 @@ async def auto_create_instance():
         if not tenants:
             logger.info("Nenhum tenant encontrado no banco. Criando tenant padrão.")
             default_tenant = Tenant(
-                name="Clínica Alergia Matriz",
+                name="Clínica Lifeline One",
                 instance_name=EVOLUTION_INSTANCE_NAME,
                 instance_token=EVOLUTION_API_KEY
             )

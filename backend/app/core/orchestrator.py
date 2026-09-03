@@ -215,11 +215,6 @@ async def generate_response_node(state: AgentState):
                 res = await session.execute(stmt)
                 active_contact = res.scalars().first()
                 
-            if not active_contact:
-                stmt_recent = select(Contact).order_by(Contact.updated_at.desc()).limit(1)
-                res_recent = await session.execute(stmt_recent)
-                active_contact = res_recent.scalars().first()
-
             # Checa se é o início absoluto da conversa
             msg_count = len(messages) if messages else 0
             # Note: na primeira mensagem o array messages contém apenas 1 item
@@ -239,25 +234,23 @@ async def generate_response_node(state: AgentState):
                 if active_contact.stage == "agendado":
                     profile_parts.append("Status: Já possui agendamento prévio ou histórico na clínica.")
                 
-                if profile_parts:
-                    patient_profile_str = "📋 FICHA PRÉVIA DO PACIENTE (MEMÓRIA DE LONGO PRAZO):\n" + "\n".join(profile_parts) + "\n\n"
+                if profile_parts and not is_initial_turn:
+                    patient_profile_str = "FICHA DO PACIENTE (DADOS CADASTRAIS):\n" + "\n".join(profile_parts) + "\n\n"
 
-                # Dispara saudação de abertura APENAS na primeiríssima mensagem da conversa
-                if is_initial_turn and patient_name:
+                # O primeiro turno sempre apresenta a assistente e a clínica.
+                # O nome recebido do WhatsApp não comprova histórico de atendimento.
+                if is_initial_turn:
+                    name_hint = f" Pode chamar o paciente pelo primeiro nome ({patient_name}), se isso soar natural." if patient_name else ""
                     contact_status_str = (
-                        f"👤 TIPO DE ATENDIMENTO: PACIENTE RECORRENTE [Nome: {patient_name}]\n"
-                        f"• ACOLHIMENTO DE RETORNO (Apenas se for o início do contato): Como o paciente {patient_name} já tem histórico, acolha com alegria chamando pelo primeiro nome.\n\n"
-                    )
-                elif is_initial_turn:
-                    contact_status_str = (
-                        "👤 TIPO DE ATENDIMENTO: NOVO CONTATO / BOAS-VINDAS\n"
-                        "• APRESENTAÇÃO OBRIGATÓRIA (Apenas se for o início do contato): Apresente-se dizendo seu nome Amanda e cite a Clínica Respirar.\n\n"
+                        "TIPO DE ATENDIMENTO: PRIMEIRO TURNO DESTA CONVERSA / BOAS-VINDAS\n"
+                        "APRESENTAÇÃO OBRIGATÓRIA: Apresente-se como Amanda e cite a Clínica Lifeline One."
+                        f"{name_hint} Não diga que o paciente é recorrente apenas por existir um nome cadastrado.\n\n"
                     )
             else:
                 if is_initial_turn:
                     contact_status_str = (
-                        "👤 TIPO DE ATENDIMENTO: NOVO CONTATO / BOAS-VINDAS\n"
-                        "• APRESENTAÇÃO OBRIGATÓRIA (Apenas se for o início do contato): Apresente-se dizendo seu nome Amanda e cite a Clínica Respirar.\n\n"
+                        "TIPO DE ATENDIMENTO: PRIMEIRO TURNO DESTA CONVERSA / BOAS-VINDAS\n"
+                        "APRESENTAÇÃO OBRIGATÓRIA: Apresente-se como Amanda e cite a Clínica Lifeline One.\n\n"
                     )
     except Exception as err:
         logger.debug(f"Aviso memória de longo prazo: {err}")

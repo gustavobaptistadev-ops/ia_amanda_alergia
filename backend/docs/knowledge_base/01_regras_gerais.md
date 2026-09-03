@@ -1,7 +1,7 @@
 # Clínica de Alergia e Imunologia Avançada - Guia de Atendimento Humanizado
 
 ## Informações Gerais
-- **Nome da Clínica:** Clínica Respirar (Especialistas em Alergia, Asma e Imunologia Clínica)
+- **Nome da Clínica:** Clínica Lifeline One (Especialistas em Alergia, Asma e Imunologia Clínica)
 - **Ambiente & Estrutura:** Clínica boutique, ambiente aconchegante, silencioso e acolhedor, com café, água aromatizada, espaço kids e estacionamento com manobrista no local.
 - **Público:** Adultos, idosos e crianças de todas as idades (atendimento pediátrico lúdico e muito cuidadoso).
 - **Serviços Oferecidos:**

@@ -474,7 +474,7 @@ export default function Conversas() {
                 <div className="px-4 py-2 bg-slate-100/70 border-t border-slate-200 flex gap-2 overflow-x-auto text-[11px]">
                   <span className="text-slate-400 font-semibold flex items-center py-1">Atalhos:</span>
                   <button 
-                    onClick={() => setInputText("📍 Endereço da Clínica Respirar: Connect Towers, sala 3021 - QS 01, Rua 212, Lotes 19, 21 e 23 - Taguatinga Sul, Brasília - DF. Como chegar pelo Waze: https://ul.waze.com/ul?ll=-15.84028486%2C-48.04482222&navigate=yes&zoom=17&utm_campaign=default&utm_source=waze_website&utm_medium=lm_share_location")}
+                    onClick={() => setInputText("Endereço da Clínica Lifeline One: Connect Towers, sala 3021 - QS 01, Rua 212, Lotes 19, 21 e 23 - Taguatinga Sul, Brasília - DF. Como chegar pelo Waze: https://ul.waze.com/ul?ll=-15.84028486%2C-48.04482222&navigate=yes&zoom=17&utm_campaign=default&utm_source=waze_website&utm_medium=lm_share_location")}
                     className="bg-white hover:bg-blue-50 hover:text-blue-600 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors whitespace-nowrap flex items-center gap-1 font-medium"
                   >
                     <MapPin className="w-3 h-3 text-blue-500" /> Endereço & Rota
@@ -486,7 +486,7 @@ export default function Conversas() {
                     <FileText className="w-3 h-3 text-purple-500" /> Preparo de Exames
                   </button>
                   <button 
-                    onClick={() => setInputText("💳 Segue nossa chave PIX oficial (CNPJ): 12.345.678/0001-90 - Clínica Respirar Medicina e Imunologia Ltda.")}
+                    onClick={() => setInputText("Segue nossa chave PIX oficial (CNPJ): 12.345.678/0001-90 - Clínica Lifeline One Medicina e Imunologia Ltda.")}
                     className="bg-white hover:bg-blue-50 hover:text-blue-600 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors whitespace-nowrap flex items-center gap-1 font-medium"
                   >
                     <CreditCard className="w-3 h-3 text-emerald-500" /> Dados PIX
@@ -607,7 +607,7 @@ export default function Conversas() {
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ações Rápidas</h4>
               <button
                 onClick={() => {
-                  setInputText("Olá! Seguem as orientações e preparo para sua consulta e exames na Clínica Respirar: 1. Chegar com 10 min de antecedência; 2. Trazer documento com foto.");
+                  setInputText("Olá! Seguem as orientações e preparo para sua consulta e exames na Clínica Lifeline One: 1. Chegar com 10 min de antecedência; 2. Trazer documento com foto.");
                   setShowPatientDrawer(false);
                 }}
                 className="w-full text-left text-xs bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 p-2.5 rounded-xl border border-slate-200 transition-colors font-medium flex items-center gap-2"

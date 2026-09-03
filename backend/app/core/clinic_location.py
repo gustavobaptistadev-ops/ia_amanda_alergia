@@ -1,6 +1,6 @@
 """Canonical clinic location used by reminders, calendar events and assistants."""
 
-CLINIC_NAME = "Clínica Respirar"
+CLINIC_NAME = "Clínica Lifeline One"
 CLINIC_ROOM = "sala 3021"
 CLINIC_ADDRESS = "Connect Towers, sala 3021 - QS 01, Rua 212, Lotes 19, 21 e 23 - Taguatinga Sul, Brasília - DF"
 CLINIC_GOOGLE_MAPS_URL = "https://maps.app.goo.gl/search/Connect+Towers+Taguatinga"

@@ -240,8 +240,8 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
         dt_utc_end = dt_utc_start + datetime.timedelta(hours=1)
         
         dates_param = f"{dt_utc_start.strftime('%Y%m%dT%H%M%SZ')}/{dt_utc_end.strftime('%Y%m%dT%H%M%SZ')}"
-        title_param = urllib.parse.quote(f"Consulta Alergia - {patient_name.split()[0] if patient_name else 'Clínica Respirar'}")
-        details_param = urllib.parse.quote(f"Consulta Médica na Clínica Respirar.\n{CLINIC_ADDRESS}")
+        title_param = urllib.parse.quote(f"Consulta Alergia - {patient_name.split()[0] if patient_name else 'Clínica Lifeline One'}")
+        details_param = urllib.parse.quote(f"Consulta Médica na Clínica Lifeline One.\n{CLINIC_ADDRESS}")
         location_param = urllib.parse.quote(CLINIC_ADDRESS)
         
         long_url = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_param}&dates={dates_param}&details={details_param}&location={location_param}"
@@ -255,13 +255,13 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
             ics_lines = [
                 "BEGIN:VCALENDAR",
                 "VERSION:2.0",
-                "PRODID:-//Clinica Respirar//IA Amanda//PT",
+                "PRODID:-//Clinica Lifeline One//IA Amanda//PT",
                 "BEGIN:VEVENT",
                 f"DTSTAMP:{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
                 f"DTSTART:{dt_utc_start.strftime('%Y%m%dT%H%M%SZ')}",
                 f"DTEND:{dt_utc_end.strftime('%Y%m%dT%H%M%SZ')}",
-                f"SUMMARY:Consulta Alergia - {patient_name.split()[0] if patient_name else 'Respirar'}",
-                f"DESCRIPTION:Consulta Médica na Clínica Respirar.\\n{ics_address}",
+                f"SUMMARY:Consulta Alergia - {patient_name.split()[0] if patient_name else 'Lifeline One'}",
+                f"DESCRIPTION:Consulta Médica na Clínica Lifeline One.\\n{ics_address}",
                 f"LOCATION:{ics_address}",
                 "END:VEVENT",
                 "END:VCALENDAR"
@@ -273,7 +273,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
                 send_document_message(
                     number=clean_phone,
                     document_bytes=ics_bytes,
-                    filename=f"Consulta_{patient_name.split()[0] if patient_name else 'Respirar'}.ics",
+                    filename=f"Consulta_{patient_name.split()[0] if patient_name else 'Lifeline One'}.ics",
                     caption="Toque neste arquivo para salvar na sua agenda automaticamente."
                 )
             )

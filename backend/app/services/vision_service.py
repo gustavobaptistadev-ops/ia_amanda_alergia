@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-VISION_PROMPT = """Você é um especialista sênior em faturamento médico e credenciamento hospitalar da Clínica Respirar.
+VISION_PROMPT = """Você é um especialista sênior em faturamento médico e credenciamento hospitalar da Clínica Lifeline One.
 Sua missão é analisar uma foto/imagem enviada por um paciente no WhatsApp e identificar se é uma Carteirinha de Plano de Saúde / Convênio Médico ou documento pessoal.
 
 Se FOR uma Carteirinha de Convênio, extraia minuciosamente os seguintes dados estruturados:
@@ -59,7 +59,7 @@ def check_expiration(data: dict):
         except Exception as d_err:
             logger.warning(f"[VISION OCR] Falha ao fazer parse da validade {exp_date_str}: {d_err}")
 
-PDF_TEXT_PROMPT = """Você é um especialista sênior em faturamento médico e credenciamento hospitalar da Clínica Respirar.
+PDF_TEXT_PROMPT = """Você é um especialista sênior em faturamento médico e credenciamento hospitalar da Clínica Lifeline One.
 Sua missão é analisar o texto extraído de um documento PDF enviado por um paciente no WhatsApp e identificar se é uma Carteirinha de Plano de Saúde / Convênio Médico ou documento de saúde.
 
 Texto extraído do documento PDF:

@@ -65,7 +65,7 @@ async def check_and_send_reminders():
                 if appt.contact and appt.contact.phone_number:
                     time_fmt = appt.appointment_time.strftime("%d/%m às %H:%M")
                     msg = (
-                        f"Olá, {appt.patient_name}! Aqui é a Amanda da Clínica Respirar. 🌻\n\n"
+                        f"Olá, {appt.patient_name}! Aqui é a Amanda da Clínica Lifeline One.\n\n"
                         f"Sua consulta está agendada para o dia *{time_fmt}*.\n\n"
                         "💡 *Orientação Importante de Preparo:*\n"
                         "Caso o seu médico solicite a realização de *Testes Alérgicos (Prick Test)* durante a consulta, é fundamental suspender o uso de antialérgicos orais (como Desloratadina, Ebastina, Fexofenadina ou Loratadina) de 5 a 7 dias antes para não interferir no resultado do exame.\n\n"
@@ -103,7 +103,7 @@ async def check_and_send_reminders():
                     time_fmt = appt.appointment_time.strftime("%d/%m às %H:%M")
                     msg = (
                         f"Oi, {appt.patient_name}! Tudo bem? 🌿\n\n"
-                        f"Passando para lembrar com carinho da sua consulta amanhã, dia *{time_fmt}*, na Clínica Respirar.\n\n"
+                        f"Passando para lembrar com carinho da sua consulta amanhã, dia *{time_fmt}*, na Clínica Lifeline One.\n\n"
                         "Podemos confirmar a sua presença? Basta me responder com um 'Sim, confirmo' ou me avisar caso precise de outro horário!"
                     )
                     await send_text_message(appt.contact.phone_number, msg)
@@ -173,7 +173,7 @@ async def check_and_send_reminders():
             for appt in appointments_followup:
                 if appt.contact and appt.contact.phone_number:
                     msg = (
-                        f"Olá, {appt.patient_name}! Aqui é a Amanda da Clínica Respirar. 🌻\n\n"
+                        f"Olá, {appt.patient_name}! Aqui é a Amanda da Clínica Lifeline One.\n\n"
                         "Passando para saber como você está se sentindo após a sua consulta e com o início das orientações do médico!\n\n"
                         "Ficou com alguma dúvida sobre seu plano de tratamento ou receitas? Nossa equipe médica está à disposição para cuidar de você."
                     )
@@ -207,9 +207,9 @@ async def check_and_send_reminders():
             for appt in appointments_nps:
                 if appt.contact and appt.contact.phone_number:
                     msg = (
-                        f"Olá, {appt.patient_name}! Aqui é a Amanda da Clínica Respirar. 🌻\n\n"
+                        f"Olá, {appt.patient_name}! Aqui é a Amanda da Clínica Lifeline One.\n\n"
                         "Esperamos que sua consulta tenha sido ótima e que você já esteja se sentindo melhor!\n\n"
-                        "De *0 a 10*, o quanto você indicaria a Clínica Respirar para um amigo ou familiar?\n"
+                        "De *0 a 10*, o quanto você indicaria a Clínica Lifeline One para um amigo ou familiar?\n"
                         "(_Basta responder com o número!_)"
                     )
                     await send_text_message(appt.contact.phone_number, msg)

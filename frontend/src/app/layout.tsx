@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"] });
 import AuthGuard from "@/components/AuthGuard";
 
 export const metadata: Metadata = {
-  title: "Clínica Respirar | Painel de Controle",
+  title: "Clínica Lifeline One | Painel de Controle",
   description: "Sistema de Recepção Inteligente IA Amanda",
 };
 
