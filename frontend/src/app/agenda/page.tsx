@@ -61,12 +61,13 @@ export default function Agenda() {
     setLoading(true);
     try {
       const res = await fetchWithAuth(`${apiUrl}/api/v1/appointments/`);
-      if (res.ok) {
-        const data = await res.json();
-        setAppointments(data);
-      }
+      if (!res.ok) throw new Error(`Falha ao carregar a agenda (${res.status})`);
+      const data = await res.json();
+      setAppointments(data);
+      setErrorMsg("");
     } catch (e) {
       console.error("Erro ao buscar agenda:", e);
+      setErrorMsg("Não foi possível carregar a agenda. Verifique a conexão e tente novamente.");
     } finally {
       setLoading(false);
     }

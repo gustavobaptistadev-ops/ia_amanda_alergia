@@ -29,6 +29,7 @@ export default function Conversas() {
   const [contacts, setContacts] = useState<any[]>([]);
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [errorMsg, setErrorMsg] = useState("");
   const [inputText, setInputText] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "bot" | "human" | "scheduled">("all");
@@ -44,8 +45,10 @@ export default function Conversas() {
   const fetchContacts = async () => {
     try {
       const res = await fetchWithAuth(`${apiUrl}/api/v1/chats/`);
+      if (!res.ok) throw new Error(`Falha ao carregar contatos (${res.status})`);
       const data = await res.json();
       setContacts(data);
+      setErrorMsg("");
       // Mantém sincronizado o contato selecionado com dados novos
       if (selectedContact) {
         const updated = data.find((c: any) => c.phone_number === selectedContact.phone_number);
@@ -53,6 +56,7 @@ export default function Conversas() {
       }
     } catch (e) {
       console.error(e);
+      setErrorMsg("Não foi possível carregar as conversas. Tente atualizar a página.");
     }
   };
 
@@ -269,6 +273,7 @@ export default function Conversas() {
 
   return (
     <div className="flex-1 flex flex-col space-y-4 animate-in fade-in duration-500 min-h-0 h-[calc(100vh-8rem)] lg:h-full">
+      {errorMsg && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMsg}</div>}
       {/* Header Superior */}
       <div className="flex justify-between items-center pt-14 lg:pt-0">
         <div>
