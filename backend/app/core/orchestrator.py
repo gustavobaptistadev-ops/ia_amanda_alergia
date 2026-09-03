@@ -11,6 +11,7 @@ from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import PersonaBuilder
 from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, has_patient_complaint
+from app.core.conversation_router import route_message
 
 from langgraph.checkpoint.memory import MemorySaver
 import operator
@@ -30,6 +31,7 @@ class AgentState(TypedDict):
     context: str
     intent: str
     thread_id: str
+    routing: dict
 
 from app.api.endpoints.settings import load_config
 
@@ -47,6 +49,18 @@ def extract_intent_node(state: AgentState):
     """Nó 1: Classifica a intenção do usuário (Zero-Cost Router NLP/LLM)."""
     messages = state['messages']
     last_msg = messages[-1].content.strip().lower()
+
+    # O router local resolve intenções claras e só deixa mensagens ambíguas para a LLM.
+    routing = route_message(messages[-1].content, messages)
+    if routing["confidence"] >= 0.90:
+        logger.info(
+            "Roteamento determinístico: intenção=%s confiança=%s próxima_ação=%s terceiro=%s",
+            routing["intent"],
+            routing["confidence"],
+            routing["next_action"],
+            routing["entities"]["third_party"],
+        )
+        return {"intent": routing["intent"], "routing": routing}
 
     # CPF is a deterministic scheduling signal; preserve leading zeros outside the LLM.
     if extract_cpf_from_text(last_msg):
@@ -105,7 +119,7 @@ Classificação:"""
         intent = "DUVIDA"
     
     logger.info(f"Intenção identificada via LLM: {intent}")
-    return {"intent": intent}
+    return {"intent": intent, "routing": routing}
 
 def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow", "handoff_flow"]:
     """Direciona o estado para o fluxo especializado correspondente."""
@@ -181,6 +195,7 @@ async def generate_response_node(state: AgentState):
     intent = state.get('intent', 'duvidas_clinica')
     context = state.get('context', '')
     messages = state['messages']
+    routing = state.get("routing", {})
 
     # A queixa é obrigatória antes da coleta cadastral de um novo agendamento.
     # Esta trava é determinística para não depender de a LLM seguir o prompt.
@@ -193,6 +208,38 @@ async def generate_response_node(state: AgentState):
                 )
             )]
         }
+
+    next_action = routing.get("next_action")
+    if intent == "AGENDAMENTO" and next_action in {
+        "COLLECT_NAME", "COLLECT_CPF", "COLLECT_BIRTH_DATE"
+    }:
+        third_party = routing.get("entities", {}).get("third_party", False)
+        prompts = {
+            "COLLECT_NAME": (
+                "Entendi. Para abrir o cadastro, informe o nome completo da pessoa que será consultada."
+                if third_party else
+                "Entendi. Para abrir o cadastro, informe seu nome completo, por favor."
+            ),
+            "COLLECT_CPF": (
+                "Agora informe o CPF da pessoa que será consultada, por favor."
+                if third_party else
+                "Agora informe o seu CPF, por favor."
+            ),
+            "COLLECT_BIRTH_DATE": (
+                "Para finalizar o cadastro, informe a data de nascimento da pessoa que será consultada."
+                if third_party else
+                "Para finalizar o cadastro, informe sua data de nascimento."
+            ),
+        }
+        return {"messages": [AIMessage(content=prompts[next_action])]}
+
+    if routing.get("entities", {}).get("third_party"):
+        patient_profile_str += (
+            "ATENDIMENTO PARA TERCEIRO: o contato atual é o responsável pelo paciente. "
+            "Colete e use o nome, CPF e data de nascimento da pessoa que será consultada. "
+            "Não use automaticamente o nome do responsável como nome do paciente. "
+            "Mantenha o telefone do responsável para contato.\n\n"
+        )
     
     # [CONSCIÊNCIA TEMPORAL E CALENDÁRIO ABSOLUTO]
     now_sp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
