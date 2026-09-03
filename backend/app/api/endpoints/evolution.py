@@ -124,7 +124,7 @@ async def fix_evolution_webhook(request: Request):
             r = await client.post(f"{EVOLUTION_API_URL}/webhook/set/{EVOLUTION_INSTANCE_NAME}", headers=get_headers(), json=payload)
             logger.info(f"POST /webhook/set -> {r.status_code}: {r.text[:120]}")
             if r.status_code in (200, 201):
-                return {"status": "ok", "message": "Webhook corrigido com sucesso!", "url_configurada": webhook_url}
+                return {"status": "ok", "message": "Webhook corrigido com sucesso!"}
             else:
                 # Tenta o formato v1/legacy se o v2 falhar
                 payload_v1 = {
@@ -135,7 +135,7 @@ async def fix_evolution_webhook(request: Request):
                 }
                 r_v1 = await client.post(f"{EVOLUTION_API_URL}/webhook/set/{EVOLUTION_INSTANCE_NAME}", headers=get_headers(), json=payload_v1)
                 if r_v1.status_code in (200, 201):
-                    return {"status": "ok", "message": "Webhook (v1) corrigido com sucesso!", "url_configurada": webhook_url}
+                    return {"status": "ok", "message": "Webhook (v1) corrigido com sucesso!"}
                     
                 return {"status": "error", "message": f"Falha ao configurar: {r.text}"}
         except Exception as e:

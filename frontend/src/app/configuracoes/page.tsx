@@ -669,7 +669,7 @@ export default function Configuracoes() {
                       if (window.confirm("Isso vai reconfigurar o Webhook do WhatsApp automaticamente. Continuar?")) {
                         try {
                           const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
-                          const res = await fetch(`${apiUrl}/api/v1/evolution/fix-webhook`, { method: "POST" });
+                          const res = await fetchWithAuth(`${apiUrl}/api/v1/evolution/fix-webhook`, { method: "POST" });
                           const data = await res.json();
                           alert(data.message || "Tentativa finalizada.");
                         } catch (e) {
