@@ -148,3 +148,16 @@ def test_tentativa_de_obter_dados_tecnicos_e_bloqueada_no_roteador():
 
     assert decision["intent"] == "OFF_TOPIC"
     assert decision["next_action"] == "REDIRECT_TO_CLINIC_FLOW"
+
+
+def test_interpretacao_semantica_pode_confirmar_queixa_sem_palavra_gatilho():
+    decision = route_message(
+        "Tenho umas manchas e isso está me incomodando",
+        [HumanMessage(content="Quero marcar uma consulta")],
+        semantic_complaint=True,
+        semantic_intent="AGENDAMENTO",
+    )
+
+    assert decision["intent"] == "AGENDAMENTO"
+    assert decision["entities"]["complaint_detected"] is True
+    assert decision["next_action"] == "COLLECT_NAME"

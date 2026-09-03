@@ -61,7 +61,12 @@ def _extract_name(text: str) -> str | None:
     return match.group(1).strip(" .,!?") if match else None
 
 
-def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str, Any]:
+def route_message(
+    text: str,
+    messages: Sequence[Any] | None = None,
+    semantic_complaint: bool | None = None,
+    semantic_intent: str | None = None,
+) -> dict[str, Any]:
     """Classifica uma mensagem e informa a próxima etapa sem chamar a LLM."""
     normalized = normalize_text(text)
     history = list(messages or [])
@@ -76,6 +81,9 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
     if any(re.search(pattern, normalized) for pattern in OFF_TOPIC_PATTERNS):
         intent = "OFF_TOPIC"
         confidence = 0.99
+    elif semantic_intent == "AGENDAMENTO":
+        intent = "AGENDAMENTO"
+        confidence = 0.91
     else:
         for intent, terms in INTENT_TERMS.items():
             if any(term in normalized for term in terms):
@@ -90,7 +98,8 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
 
     if intent == "AGENDAMENTO":
         missing_fields = []
-        if not has_patient_complaint(history + [_Message(text)]):
+        complaint_detected = has_patient_complaint(history + [_Message(text)]) or semantic_complaint is True
+        if not complaint_detected:
             next_action = "COLLECT_COMPLAINT"
             confidence = min(confidence, 0.92)
         else:
@@ -128,6 +137,7 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
             "cpf": extract_latest_cpf([_Message(text)]),
             "birth_date": text if contains_date(text) else None,
             "third_party": is_third_party,
+            "complaint_detected": complaint_detected if intent == "AGENDAMENTO" else False,
             "payment_type": extract_payment_type(history + [_Message(text)]),
             "preferred_slot": _extract_preferred_slot(text, history),
         },
