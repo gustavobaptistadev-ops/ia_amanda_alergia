@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter
+from fastapi import APIRouter
 import httpx
 import asyncio
 import logging
@@ -86,3 +86,57 @@ async def logout_instance():
             return {'status': 'error', 'message': f'Erro ao desconectar ({r.status_code})'}
         except Exception as e:
             return {'status': 'error', 'message': 'Erro de comunicacao ao desconectar'}
+
+from fastapi import Request
+from app.core.security import WEBHOOK_SECRET
+from app.services.evolution_api import EVOLUTION_INSTANCE_NAME
+
+@router.post('/fix-webhook')
+async def fix_evolution_webhook(request: Request):
+    """
+    Configura automaticamente o Webhook no GhostHub / Evolution API
+    apontando para o backend atual com o token correto.
+    """
+    # 1. Descobrir a URL base dinamicamente (ex: https://meubackend.railway.app)
+    # Como pode estar atras de um proxy (Railway), precisamos garantir https
+    forwarded_proto = request.headers.get("x-forwarded-proto", "http")
+    forwarded_host = request.headers.get("x-forwarded-host", request.url.hostname)
+    base_url = f"{forwarded_proto}://{forwarded_host}"
+    
+    # Se tiver porta nao padrao (rodando local)
+    if request.url.port and request.url.port not in (80, 443) and not request.headers.get("x-forwarded-host"):
+        base_url += f":{request.url.port}"
+        
+    webhook_url = f"{base_url}/api/v1/webhook/evolution?token={WEBHOOK_SECRET}"
+    
+    payload = {
+        "webhook": {
+            "url": webhook_url,
+            "byEvents": False,
+            "base64": False,
+            "events": ["MESSAGES_UPSERT"],
+            "allowWebhook": True
+        }
+    }
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            r = await client.post(f"{EVOLUTION_API_URL}/webhook/set/{EVOLUTION_INSTANCE_NAME}", headers=get_headers(), json=payload)
+            logger.info(f"POST /webhook/set -> {r.status_code}: {r.text[:120]}")
+            if r.status_code in (200, 201):
+                return {"status": "ok", "message": "Webhook corrigido com sucesso!", "url_configurada": webhook_url}
+            else:
+                # Tenta o formato v1/legacy se o v2 falhar
+                payload_v1 = {
+                    "enabled": True,
+                    "url": webhook_url,
+                    "webhookByEvents": False,
+                    "events": ["MESSAGES_UPSERT"]
+                }
+                r_v1 = await client.post(f"{EVOLUTION_API_URL}/webhook/set/{EVOLUTION_INSTANCE_NAME}", headers=get_headers(), json=payload_v1)
+                if r_v1.status_code in (200, 201):
+                    return {"status": "ok", "message": "Webhook (v1) corrigido com sucesso!", "url_configurada": webhook_url}
+                    
+                return {"status": "error", "message": f"Falha ao configurar: {r.text}"}
+        except Exception as e:
+            return {"status": "error", "message": f"Erro de comunicacao com Ghosthub: {str(e)}"}

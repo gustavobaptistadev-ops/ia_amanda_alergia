@@ -708,6 +708,24 @@ export default function Configuracoes() {
                   <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                   {loading ? "Reconectando..." : "Reconectar WhatsApp"}
                 </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm("Isso vai reconfigurar o Webhook do WhatsApp automaticamente. Continuar?")) {
+                      try {
+                        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+                        const res = await fetch(`${apiUrl}/api/v1/evolution/fix-webhook`, { method: "POST" });
+                        const data = await res.json();
+                        alert(data.message || "Tentativa finalizada.");
+                      } catch (e) {
+                        alert("Erro de conexão ao tentar corrigir webhook.");
+                      }
+                    }
+                  }}
+                  className="mt-3 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white w-full py-2.5 rounded-lg font-medium shadow-sm text-sm"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Corrigir Webhook (Sem Resposta)
+                </button>
                 <p className="text-[11px] text-slate-500 mt-4 text-center">
                   Vá em Aparelhos Conectados no seu celular para escanear.
                 </p>
