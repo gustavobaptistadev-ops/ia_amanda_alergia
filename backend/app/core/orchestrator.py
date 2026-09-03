@@ -44,6 +44,10 @@ def extract_intent_node(state: AgentState):
     
     # 1. Heurística Local Rápida (Zero-Cost NLP)
     import re
+    if any(k in last_msg for k in ["humano", "atendente", "falar com pessoa", "tá difícil", "não entende", "péssimo", "horrível", "burra", "burro", "robo"]):
+        logger.info("Intenção identificada via Heurística: FRUSTRACAO_HANDOFF")
+        return {"intent": "FRUSTRACAO_HANDOFF"}
+
     if any(k in last_msg for k in ["urgência", "urgencia", "emergência", "emergencia", "falta de ar", "sufocando", "glote", "anafilaxia", "grave", "pronto socorro"]):
         logger.info("Intenção identificada via Heurística: URGENCIA")
         return {"intent": "URGENCIA"}
@@ -92,14 +96,24 @@ Classificação:"""
     logger.info(f"Intenção identificada via LLM: {intent}")
     return {"intent": intent}
 
-def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow"]:
+def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow", "handoff_flow"]:
     """Função de roteamento condicional baseada na intenção."""
     intent = state.get("intent")
+    if intent == "FRUSTRACAO_HANDOFF":
+        return "handoff_flow"
     if intent == "URGENCIA":
         return "urgency_flow"
     if intent in ["AGENDAMENTO", "REAGENDAMENTO", "CANCELAMENTO"]:
         return "schedule_flow"
     return "fetch_context"
+
+def handoff_flow_node(state: AgentState):
+    """Nó de Transbordo Humano."""
+    msg = (
+        "Compreendo perfeitamente. Estou transferindo o seu atendimento agora mesmo para a nossa equipe humana. "
+        "Um de nossos recepcionistas já foi notificado e vai dar continuidade ao seu atendimento por aqui em instantes. [TRANSFERIR_HUMANO]"
+    )
+    return {"messages": [AIMessage(content=msg)]}
 
 def urgency_flow_node(state: AgentState):
     """Nó de Alerta/Urgência: Gera mensagem de acolhimento emergencial e orienta buscar pronto-socorro."""
@@ -128,7 +142,14 @@ async def generate_response_node(state: AgentState):
     context = state.get('context', '')
     messages = state['messages']
     
-    hoje = datetime.date.today().strftime("%d/%m/%Y")
+    # [CONSCIÊNCIA TEMPORAL E CALENDÁRIO ABSOLUTO]
+    now_sp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
+    dias_semana = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+    dia_str = dias_semana[now_sp.weekday()]
+    data_str = now_sp.strftime("%d/%m/%Y")
+    hora_str = now_sp.strftime("%H:%M")
+    relogio_anchor = f"\n[RELÓGIO DO SISTEMA]\nHoje é {dia_str}, {data_str}. A hora atual é {hora_str}. Use esta data como referencial para interpretar amanhã e próxima semana.\n"
+
     
     # [ESTADO DO PACIENTE: PRIMEIRO CONTATO VS RECORRENTE]
     patient_profile_str = ""
@@ -304,6 +325,7 @@ tool_node = ToolNode(tools)
 workflow.add_node("extract_intent", extract_intent_node)
 workflow.add_node("fetch_context", fetch_context_node)
 workflow.add_node("schedule_flow", schedule_flow_node)
+workflow.add_node("handoff_flow", handoff_flow_node)
 workflow.add_node("urgency_flow", urgency_flow_node)
 workflow.add_node("generate_response", generate_response_node)
 workflow.add_node("tools", tool_node)
@@ -313,6 +335,7 @@ workflow.add_edge(START, "extract_intent")
 workflow.add_conditional_edges("extract_intent", route_intent)
 workflow.add_edge("fetch_context", "generate_response")
 workflow.add_edge("schedule_flow", "generate_response")
+workflow.add_edge("handoff_flow", "prune_history")
 workflow.add_edge("urgency_flow", "prune_history")
 
 workflow.add_conditional_edges(

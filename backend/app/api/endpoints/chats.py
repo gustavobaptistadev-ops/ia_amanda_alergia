@@ -216,8 +216,23 @@ async def send_human_message(request: Request, phone_number: str, payload: SendM
         )
         db.add(msg)
         # Transição transparente: Atendente assumiu a conversa, pausa o bot temporariamente
+                # Transição transparente: Atendente assumiu a conversa, pausa o bot temporariamente
         contact.bot_active = False
         await db.commit()
         await manager.broadcast("update")
+        
+        # INJEÇÃO NA MEMÓRIA DO LANGGRAPH
+        try:
+            from app.core.orchestrator import app_graph, init_checkpointer
+            from langchain_core.messages import AIMessage
+            if app_graph is None:
+                await init_checkpointer()
+            # Injeta a mensagem humana como se fosse a IA falando (para manter a ilusão contextual)
+            config = {"configurable": {"thread_id": phone_number}}
+            msg_to_inject = AIMessage(content=f"*(Mensagem enviada por humano)*: {clean_text}")
+            await app_graph.aupdate_state(config, {"messages": [msg_to_inject]})
+        except Exception as e:
+            import logging
+            logging.warning(f"Não foi possível atualizar a memória do LangGraph para {phone_number}: {e}")
         
     return {"status": "ok", "bot_active": False}
