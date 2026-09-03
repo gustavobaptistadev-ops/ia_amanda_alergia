@@ -67,7 +67,7 @@ async def check_and_send_reminders():
                     msg = (
                         f"Olá, {appt.patient_name}! Aqui é a Amanda da Clínica Lifeline One.\n\n"
                         f"Sua consulta está agendada para o dia *{time_fmt}*.\n\n"
-                        "💡 *Orientação Importante de Preparo:*\n"
+                        "*Orientação Importante de Preparo:*\n"
                         "Caso o seu médico solicite a realização de *Testes Alérgicos (Prick Test)* durante a consulta, é fundamental suspender o uso de antialérgicos orais (como Desloratadina, Ebastina, Fexofenadina ou Loratadina) de 5 a 7 dias antes para não interferir no resultado do exame.\n\n"
                         "Se tiver qualquer dúvida sobre sua medicação, pode me chamar por aqui!"
                     )
@@ -139,7 +139,7 @@ async def check_and_send_reminders():
                     msg = (
                         f"Oi, {appt.patient_name}! 🩵\n\n"
                         f"Sua consulta com o especialista é hoje às *{time_fmt}* (daqui a pouquinho!).\n\n"
-                        f"📍 *Endereço:* {CLINIC_ADDRESS}\n"
+                        f"*Endereço:* {CLINIC_ADDRESS}\n"
                         f"*Como chegar:* {CLINIC_WAZE_URL}\n"
                         "Nossa equipe já está te esperando com um café quentinho. Tenha uma excelente vinda!"
                     )

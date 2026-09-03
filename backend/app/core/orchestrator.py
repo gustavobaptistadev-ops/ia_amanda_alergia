@@ -7,15 +7,21 @@ import re
 import json
 from typing import TypedDict, Annotated, Sequence, Literal
 from langgraph.graph import StateGraph, START, END
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, RemoveMessage
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, ToolMessage, RemoveMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import PersonaBuilder
-from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, extract_latest_date, extract_payment_type, has_patient_complaint
+from app.core.patient_data import extract_cpf_from_text, extract_latest_cpf
 from app.core.conversation_router import build_complaint_request, extract_requested_date, route_message
 from app.core.clinic_location import clinic_location_text
-from app.core.record_validator import validate_patient_record
+from app.core.booking_state import (
+    booking_is_active,
+    booking_next_action,
+    mark_booking_created,
+    set_offered_slots,
+    update_booking_state,
+    validate_booking_state,
+)
 
 from langgraph.checkpoint.memory import MemorySaver
 import operator
@@ -37,6 +43,7 @@ class AgentState(TypedDict):
     thread_id: str
     routing: dict
     record_validation: dict
+    booking: dict
 
 from app.api.endpoints.settings import load_config
 
@@ -75,27 +82,6 @@ def _interpret_initial_messages(messages: Sequence[BaseMessage]) -> dict:
         return {}
 
 
-def _has_effective_complaint(state: AgentState) -> bool:
-    """Combina a detecção local com a interpretação inicial supervisionada."""
-    routing = state.get("routing", {})
-    semantic_value = routing.get("entities", {}).get("complaint_detected")
-    return has_patient_complaint(state.get("messages", [])) or semantic_value is True
-
-
-def _complaint_request(messages: Sequence[BaseMessage]) -> str:
-    """Solicita a queixa sem repetir a apresentação após o primeiro turno."""
-    human_turns = sum(1 for message in messages if getattr(message, "type", None) == "human")
-    if human_turns <= 1:
-        return (
-            "Olá! Sou Amanda, recepcionista da Clínica Lifeline One. "
-            "Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
-            "O que você está sentindo ou qual avaliação deseja realizar?"
-        )
-    return (
-        "Entendi. Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
-        "O que você está sentindo ou qual avaliação deseja realizar?"
-    )
-
 def extract_intent_node(state: AgentState):
     """Classifica a mensagem e prioriza dados determinísticos de agendamento."""
     """Nó 1: Classifica a intenção do usuário (Zero-Cost Router NLP/LLM)."""
@@ -132,21 +118,32 @@ def extract_intent_node(state: AgentState):
         "balanced": 0.90,
         "intelligent": 0.99,
     }.get(ai_mode, 0.90)
-    record_validation = (
-        validate_patient_record(messages, routing)
-        if routing.get("intent") == "AGENDAMENTO"
-        else {}
+    previous_booking = state.get("booking")
+    protected_intents = {
+        "OFF_TOPIC", "URGENCIA", "FRUSTRACAO_HANDOFF", "LOCATION_REQUEST",
+        "CANCELAMENTO", "REAGENDAMENTO",
+    }
+    if booking_is_active(previous_booking) and routing.get("intent") not in protected_intents:
+        routing["intent"] = "AGENDAMENTO"
+        routing["confidence"] = max(float(routing.get("confidence", 0)), 0.99)
+
+    booking = update_booking_state(
+        previous_booking,
+        messages[-1].content,
+        messages,
+        routing,
     )
+    record_validation = validate_booking_state(booking) if routing.get("intent") == "AGENDAMENTO" else {}
     if record_validation:
         routing["record_validation"] = record_validation
-        if routing.get("next_action") != "COLLECT_COMPLAINT":
-            routing["next_action"] = record_validation["next_action"]
+        routing["next_action"] = booking_next_action(booking)
 
     if routing["confidence"] >= confidence_threshold:
         logger.info(
-            "Roteamento determinístico: intenção=%s confiança=%s próxima_ação=%s terceiro=%s",
+            "Roteamento determinístico: intenção=%s confiança=%s estágio=%s próxima_ação=%s terceiro=%s",
             routing["intent"],
             routing["confidence"],
+            booking.get("stage"),
             routing["next_action"],
             routing["entities"]["third_party"],
         )
@@ -154,37 +151,56 @@ def extract_intent_node(state: AgentState):
             "intent": routing["intent"],
             "routing": routing,
             "record_validation": record_validation,
+            "booking": booking,
         }
 
     # CPF is a deterministic scheduling signal; preserve leading zeros outside the LLM.
     if extract_cpf_from_text(last_msg):
         logger.info("CPF válido recebido; avançando para coleta da data de nascimento")
-        record_validation = validate_patient_record(messages, routing)
+        booking = update_booking_state(state.get("booking"), messages[-1].content, messages, routing)
+        record_validation = validate_booking_state(booking)
         routing["record_validation"] = record_validation
-        routing["next_action"] = record_validation["next_action"]
-        return {"intent": "AGENDAMENTO", "routing": routing, "record_validation": record_validation}
+        routing["next_action"] = booking_next_action(booking)
+        return {
+            "intent": "AGENDAMENTO",
+            "routing": routing,
+            "record_validation": record_validation,
+            "booking": booking,
+        }
     
     # 1. Heurística Local Rápida (Zero-Cost NLP)
-    import re
     if any(k in last_msg for k in ["humano", "atendente", "falar com pessoa", "tá difícil", "não entende", "péssimo", "horrível", "burra", "burro", "robo"]):
         logger.info("Intenção identificada via Heurística: FRUSTRACAO_HANDOFF")
-        return {"intent": "FRUSTRACAO_HANDOFF"}
+        routing["intent"] = "FRUSTRACAO_HANDOFF"
+        return {"intent": "FRUSTRACAO_HANDOFF", "routing": routing, "booking": booking}
 
     if any(k in last_msg for k in ["urgência", "urgencia", "emergência", "emergencia", "falta de ar", "sufocando", "glote", "anafilaxia", "grave", "pronto socorro"]):
         logger.info("Intenção identificada via Heurística: URGENCIA")
-        return {"intent": "URGENCIA"}
+        routing["intent"] = "URGENCIA"
+        return {"intent": "URGENCIA", "routing": routing, "booking": booking}
         
     if any(k in last_msg for k in ["remarcar", "reagendar", "mudar o dia", "mudar a hora", "mudar horario", "mudar a data"]):
         logger.info("Intenção identificada via Heurística: REAGENDAMENTO")
-        return {"intent": "REAGENDAMENTO"}
+        routing["intent"] = "REAGENDAMENTO"
+        return {"intent": "REAGENDAMENTO", "routing": routing, "booking": booking}
 
     if any(k in last_msg for k in ["cancelar", "desmarcar"]):
         logger.info("Intenção identificada via Heurística: CANCELAMENTO")
-        return {"intent": "CANCELAMENTO"}
+        routing["intent"] = "CANCELAMENTO"
+        return {"intent": "CANCELAMENTO", "routing": routing, "booking": booking}
 
     if any(k in last_msg for k in ["agendar", "marcar", "consulta", "horário", "horario", "vaga", "quero ir"]):
         logger.info("Intenção identificada via Heurística: AGENDAMENTO")
-        return {"intent": "AGENDAMENTO"}
+        routing["intent"] = "AGENDAMENTO"
+        record_validation = validate_booking_state(booking)
+        routing["record_validation"] = record_validation
+        routing["next_action"] = booking_next_action(booking)
+        return {
+            "intent": "AGENDAMENTO",
+            "routing": routing,
+            "record_validation": record_validation,
+            "booking": booking,
+        }
         
     # 2. Fallback: Se for ambíguo, invocamos LLM (gpt-4o-mini)
     logger.info("Intenção ambígua. Invocando LLM Fallback (Zero-Cost Router)...")
@@ -216,16 +232,18 @@ Classificação:"""
         intent = "DUVIDA"
     
     logger.info(f"Intenção identificada via LLM: {intent}")
-    record_validation = (
-        validate_patient_record(messages, routing)
-        if intent == "AGENDAMENTO"
-        else {}
-    )
+    routing["intent"] = intent
+    booking = update_booking_state(state.get("booking"), messages[-1].content, messages, routing)
+    record_validation = validate_booking_state(booking) if intent == "AGENDAMENTO" else {}
     if record_validation:
         routing["record_validation"] = record_validation
-        if routing.get("next_action") != "COLLECT_COMPLAINT":
-            routing["next_action"] = record_validation["next_action"]
-    return {"intent": intent, "routing": routing, "record_validation": record_validation}
+        routing["next_action"] = booking_next_action(booking)
+    return {
+        "intent": intent,
+        "routing": routing,
+        "record_validation": record_validation,
+        "booking": booking,
+    }
 
 def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow", "handoff_flow"]:
     """Direciona o estado para o fluxo especializado correspondente."""
@@ -256,7 +274,7 @@ def urgency_flow_node(state: AgentState):
     """Interrompe o fluxo normal e orienta o paciente em urgência."""
     """Nó de Alerta/Urgência: Gera mensagem de acolhimento emergencial e orienta buscar pronto-socorro."""
     msg = (
-        "⚠️ Identifiquei que você pode estar passando por uma situação de urgência ou necessitando de atenção imediata.\n\n"
+        "Identifiquei que você pode estar passando por uma situação de urgência ou necessitando de atenção imediata.\n\n"
         "Se estiver com sintomas agudos (como falta de ar súbita ou reação alérgica severa), por favor, *procure o Pronto Socorro mais próximo imediatamente*.\n\n"
         "Já notifiquei nossa equipe clínica prioritariamente para assumir seu atendimento por aqui."
     )
@@ -280,10 +298,15 @@ def location_flow_node(state: AgentState):
         f"{clinic_location_text()}"
     ))]}
 
-def fetch_context_node(state: AgentState):
+async def fetch_context_node(state: AgentState):
     """Consulta a base de conhecimento sem alterar o histórico da conversa."""
     """Nó 2a: Busca o contexto no RAG (para Dúvidas e Corpo Clínico)."""
     last_message = state['messages'][-1].content
+    from app.services.semantic_cache import get_cached_response
+
+    cached_reply = await get_cached_response(last_message)
+    if cached_reply:
+        return {"context": f"[CACHED_PUBLIC_RESPONSE]\n{cached_reply}"}
     context = retrieve_context(last_message)
     return {"context": context}
 
@@ -293,8 +316,9 @@ async def schedule_flow_node(state: AgentState):
     last_message = state['messages'][-1].content
     intent = state.get("intent", "")
     routing = state.get("routing", {})
-    record_validation = state.get("record_validation") or routing.get("record_validation") or {}
-    if intent == "AGENDAMENTO" and not _has_effective_complaint(state):
+    booking = state.get("booking", {})
+    record_validation = validate_booking_state(booking) if booking else {}
+    if intent == "AGENDAMENTO" and not booking.get("complaint_collected"):
         # Não consulta RAG nem agenda antes de conhecer o motivo da consulta.
         return {"context": ""}
 
@@ -305,11 +329,10 @@ async def schedule_flow_node(state: AgentState):
         return {"context": "[REVISAO_DADOS_PRONTUARIO] A ficha não passou na validação administrativa. Não executar ferramentas."}
 
     if intent == "AGENDAMENTO" and routing.get("next_action") == "CONFIRM_SLOT":
-        entities = routing.get("entities", {})
-        slot = entities.get("preferred_slot") or {}
-        patient_name = entities.get("name") or ""
-        cpf = entities.get("cpf") or extract_latest_cpf(state.get("messages", []))
-        dob = extract_latest_date(state.get("messages", []))
+        slot = booking.get("selected_slot") or {}
+        patient_name = booking.get("patient_name") or ""
+        cpf = booking.get("cpf") or ""
+        dob = booking.get("birth_date") or ""
         if slot.get("date") and slot.get("time") and patient_name and cpf and dob:
             booking_result = await create_event.ainvoke({
                 "date_str": slot["date"],
@@ -319,25 +342,33 @@ async def schedule_flow_node(state: AgentState):
                 "dob": dob,
                 "phone": state.get("thread_id", ""),
             })
+            booking_succeeded = any(
+                term in str(booking_result).lower()
+                for term in ("confirmado", "registrado", "sucesso")
+            )
+            updated_booking = booking
+            if booking_succeeded:
+                appointment_match = re.search(r"/calendar/p/([0-9a-f-]{36})", str(booking_result), re.IGNORECASE)
+                updated_booking = mark_booking_created(
+                    booking,
+                    appointment_match.group(1) if appointment_match else None,
+                )
             return {
                 "context": (
                     "[AGENDAMENTO_EXECUTADO]\n"
                     f"Resultado interno da criacao: {booking_result}"
-                )
+                ),
+                "booking": updated_booking,
             }
 
     context = retrieve_context(f"{last_message} médicos convênios preços")
-    latest_cpf = extract_latest_cpf(state.get("messages", []))
-    registration_complete = latest_cpf and any(
-        contains_date(getattr(message, "content", ""))
-        for message in state.get("messages", [])
-        if getattr(message, "type", None) == "human"
-    )
-    payment_type = routing.get("entities", {}).get("payment_type") or extract_payment_type(state.get("messages", []))
-
-    if intent == "AGENDAMENTO" and record_validation.get("valid") and registration_complete and payment_type:
+    if (
+        intent == "AGENDAMENTO"
+        and routing.get("next_action") == "CHECK_AVAILABILITY"
+        and record_validation.get("valid")
+    ):
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
-        requested_date = extract_requested_date(last_message, now.date())
+        requested_date = booking.get("requested_date") or extract_requested_date(last_message, now.date())
         if requested_date:
             target_dates = [requested_date]
         else:
@@ -349,6 +380,7 @@ async def schedule_flow_node(state: AgentState):
                 target_date += datetime.timedelta(days=1)
 
         agenda_lines = []
+        offered_slots = []
         for target_date_str in target_dates:
             agenda_result = await check_availability.ainvoke(
                 {"date_str": target_date_str, "period": "todos"}
@@ -364,14 +396,19 @@ async def schedule_flow_node(state: AgentState):
                     f"{weekday_names[date_obj.weekday()]}, {date_obj.strftime('%d/%m/%Y')}: "
                     f"{', '.join(times[:3])}"
                 )
+                offered_slots.extend(
+                    {"date": target_date_str, "time": time_value}
+                    for time_value in times[:3]
+                )
         formatted_agenda = "\n".join(agenda_lines)
+        booking = set_offered_slots(booking, offered_slots)
         context += (
             "\n\n[AGENDA CONSULTADA AUTOMATICAMENTE]\n"
             f"[AGENDA_RESULTADO]\n{formatted_agenda}\n[FIM_AGENDA_RESULTADO]"
         )
         context += "\n[APENAS_APRESENTAR_HORARIOS]"
 
-    return {"context": context}
+    return {"context": context, "booking": booking}
 
 async def generate_response_node(state: AgentState):
     """Monta o prompt final e solicita resposta com as ferramentas permitidas."""
@@ -380,15 +417,23 @@ async def generate_response_node(state: AgentState):
     context = state.get('context', '')
     messages = state['messages']
     routing = state.get("routing", {})
+    booking = state.get("booking", {})
+
+    if context.startswith("[CACHED_PUBLIC_RESPONSE]\n"):
+        return {"messages": [AIMessage(content=context.split("\n", 1)[1])]}
 
     # A queixa é obrigatória antes da coleta cadastral de um novo agendamento.
     # Esta trava é determinística para não depender de a LLM seguir o prompt.
-    if intent == "AGENDAMENTO" and not _has_effective_complaint(state):
+    if intent == "AGENDAMENTO" and not booking.get("complaint_collected"):
         return {
             "messages": [AIMessage(content=build_complaint_request(messages))]
         }
 
     next_action = routing.get("next_action")
+    if intent == "AGENDAMENTO" and next_action == "AWAIT_SLOT":
+        return {"messages": [AIMessage(content=(
+            "Não encontrei essa escolha entre os horários apresentados. Informe o dia e o horário desejados, por favor."
+        ))]}
     if next_action == "REVIEW_PATIENT_DATA":
         return {"messages": [AIMessage(content=(
             "Encontrei uma divergência nos dados do cadastro. Por segurança, confirme novamente o nome completo, CPF e data de nascimento da pessoa que será atendida."
@@ -413,14 +458,13 @@ async def generate_response_node(state: AgentState):
         result_match = re.search(r"Resultado interno da criacao:\s*(.*)", context, re.DOTALL)
         result = result_match.group(1) if result_match else ""
         if any(term in result.lower() for term in ("confirmado", "registrado", "sucesso")):
-            entities = routing.get("entities", {})
-            slot = entities.get("preferred_slot") or {}
+            slot = booking.get("selected_slot") or {}
             date_parts = slot.get("date", "").split("-")
             formatted_date = "/".join(reversed(date_parts)) if len(date_parts) == 3 else slot.get("date", "")
             link_match = re.search(r"https?://\S+", result)
             link = link_match.group(0).rstrip(".,") if link_match else ""
             link_text = f"\n\nAdicione a consulta na sua agenda: {link}" if link else ""
-            first_name = (entities.get("name") or "Paciente").split()[0]
+            first_name = (booking.get("patient_name") or "Paciente").split()[0]
             return {"messages": [AIMessage(content=(
                 f"Prontinho, {first_name}. Sua consulta está confirmada para {formatted_date} às {slot.get('time')}.{link_text}\n\n"
                 "Você já tem o endereço da clínica ou deseja que eu envie a localização?"
@@ -431,7 +475,7 @@ async def generate_response_node(state: AgentState):
     if intent == "AGENDAMENTO" and next_action in {
         "COLLECT_NAME", "COLLECT_CPF", "COLLECT_BIRTH_DATE", "COLLECT_PAYMENT_TYPE"
     }:
-        third_party = routing.get("entities", {}).get("third_party", False)
+        third_party = booking.get("patient_type") == "third_party"
         prompts = {
             "COLLECT_NAME": (
                 "Entendi. Para abrir o cadastro, informe o nome completo da pessoa que será consultada."
@@ -454,7 +498,8 @@ async def generate_response_node(state: AgentState):
         }
         return {"messages": [AIMessage(content=prompts[next_action])]}
 
-    if routing.get("entities", {}).get("third_party"):
+    patient_profile_str = ""
+    if booking.get("patient_type") == "third_party":
         patient_profile_str += (
             "ATENDIMENTO PARA TERCEIRO: o contato atual é o responsável pelo paciente. "
             "Colete e use o nome, CPF e data de nascimento da pessoa que será consultada. "
@@ -472,7 +517,6 @@ async def generate_response_node(state: AgentState):
 
     
     # [ESTADO DO PACIENTE: PRIMEIRO CONTATO VS RECORRENTE]
-    patient_profile_str = ""
     contact_status_str = ""
     latest_cpf = extract_latest_cpf(messages)
     if latest_cpf:
@@ -556,10 +600,10 @@ async def generate_response_node(state: AgentState):
     calendario_tabela = "\n".join(calendario_linhas)
 
     temporal_anchor = (
-        f"📅 CALENDÁRIO OFICIAL DA CLÍNICA (RIGOR CRONOLÓGICO ABSOLUTO):\n"
+        f"CALENDÁRIO OFICIAL DA CLÍNICA (RIGOR CRONOLÓGICO ABSOLUTO):\n"
         f"{calendario_tabela}\n"
         f"TURNO ATUAL: {saudacao_turno}\n"
-        f"⚠️ REGRA DE AGENDAMENTO: Ao citar qualquer dia da semana (ex: próxima segunda-feira, amanhã, etc.), consulte OBRIGATORIAMENTE a tabela acima para informar a data correta. NUNCA invente ou calcule de cabeça.\n\n"
+        f"REGRA DE AGENDAMENTO: Ao citar qualquer dia da semana (ex: próxima segunda-feira, amanhã, etc.), consulte OBRIGATORIAMENTE a tabela acima para informar a data correta. NUNCA invente ou calcule de cabeça.\n\n"
     )
 
     enriched_context = temporal_anchor + (contact_status_str if contact_status_str else "") + (patient_profile_str if patient_profile_str else "") + context
@@ -731,7 +775,7 @@ async def process_user_message(thread_id: str, message: str) -> str:
     
     if await detect_adversarial_attempt(message):
         logger.warning(f"[SECURITY SHIELD] Prompt injection interceptado para thread {thread_id}")
-        return "Olá! Sou a Amanda, assistente da clínica. 🌻 Como posso te ajudar hoje com suas dúvidas ou agendamento de consultas?"
+        return "Olá! Sou a Amanda, assistente da clínica. Como posso ajudar com suas dúvidas ou agendamento de consultas?"
         
     config = {"configurable": {"thread_id": thread_id}}
     
@@ -748,13 +792,6 @@ async def process_user_message(thread_id: str, message: str) -> str:
             config["callbacks"] = [langfuse_handler]
         except Exception as e:
             logger.warning(f"Não foi possível inicializar Langfuse: {e}")
-
-    # [CAMADA 1.5: SEMANTIC CACHING] Busca resposta ultra-rápida no Redis se já respondida
-    from app.services.semantic_cache import get_cached_response
-    cached_reply = await get_cached_response(message)
-    if cached_reply:
-        logger.info(f"[SEMANTIC CACHE] Resposta entregue instantaneamente via Cache para thread {thread_id}")
-        return cached_reply
 
     # Envelopa o input com delimitadores seguros para proteger o modelo contra quebras de contexto
     wrapped_message = sanitize_and_wrap_user_input(message)

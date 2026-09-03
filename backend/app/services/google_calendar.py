@@ -180,7 +180,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
         return "Erro de validação: O nome completo do paciente é obrigatório para agendamento. Por favor, solicite o nome completo."
 
     if not cpf or not validate_cpf(cpf):
-        return f"Erro de validação de segurança: O CPF '{cpf or 'não informado'}' é inválido. É obrigatório coletar e validar o CPF oficial do paciente antes de registrar a consulta na agenda médica."
+        return "Erro de validação de segurança: CPF inválido. Solicite a correção antes de registrar a consulta."
 
     # 2. Sanitização Estrita de Inputs (Anti-Injection)
     patient_name = sanitize_text(patient_name, max_length=100)
@@ -196,6 +196,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
     from sqlalchemy.future import select
 
     appointment_id = ""
+    duplicate_appointment = False
     try:
         dt_start = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         clean_phone = re.sub(r"\D", "", phone) if phone else ""
@@ -215,15 +216,25 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
                 await session.flush()
                 contact_id = new_contact.id
 
-            new_apt = Appointment(
-                contact_id=contact_id,
-                patient_name=patient_name,
-                appointment_time=dt_start,
-                status="agendado"
-            )
-            session.add(new_apt)
-            await session.flush()
-            appointment_id = new_apt.id
+            existing_stmt = select(Appointment).where(
+                Appointment.contact_id == contact_id,
+                Appointment.appointment_time == dt_start,
+                Appointment.status.in_(["agendado", "confirmado"]),
+            ).limit(1)
+            existing = (await session.execute(existing_stmt)).scalars().first()
+            if existing:
+                appointment_id = existing.id
+                duplicate_appointment = True
+            else:
+                new_apt = Appointment(
+                    contact_id=contact_id,
+                    patient_name=patient_name,
+                    appointment_time=dt_start,
+                    status="agendado"
+                )
+                session.add(new_apt)
+                await session.flush()
+                appointment_id = new_apt.id
             await session.commit()
     except Exception as db_err:
         logger.error(f"Erro ao salvar no banco: {db_err}")
@@ -246,6 +257,12 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
         
         long_url = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_param}&dates={dates_param}&details={details_param}&location={location_param}"
         patient_calendar_link = create_calendar_link(appointment_id) or long_url
+
+        if duplicate_appointment:
+            return (
+                f"Agendamento de {patient_name} já registrado para o dia {date_str} às {time_str}.\n"
+                f"Link da agenda pessoal:\n{patient_calendar_link}"
+            )
         
         google_cal_link = long_url
 
@@ -298,11 +315,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
         start_dt = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         end_dt = start_dt + datetime.timedelta(hours=1)
         
-        desc = f"Telefone: {phone}"
-        if cpf:
-            desc += f"\nCPF: {cpf}"
-        if dob:
-            desc += f"\nData de Nascimento: {dob}"
+        desc = "Consulta médica. Dados cadastrais mantidos somente no sistema interno da clínica."
 
         event = {
             'summary': f'Consulta - {patient_name}',

@@ -18,6 +18,41 @@ DYNAMIC_CONVERSATION_TERMS = (
     "hoje", "amanha", "ontem",
 )
 
+PUBLIC_FAQ_TERMS = (
+    "procedimento", "especialidade", "exame", "medico", "doutor",
+    "endereco", "localizacao", "waze", "telefone", "funcionamento",
+)
+
+TRANSACTIONAL_RESPONSE_TERMS = (
+    "nome completo", "seu cpf", "sua data de nascimento", "cadastro",
+    "pessoa que sera consultada", "qual horario voce prefere", "ficha",
+    "consulta esta confirmada", "agendamento de", "agenda pessoal",
+)
+
+
+def is_public_faq_message(user_message: str) -> bool:
+    """Allow cache only for impersonal questions about public clinic data."""
+    import unicodedata
+
+    raw = (user_message or "").lower()
+    normalized = unicodedata.normalize("NFKD", raw)
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    insurance_faq = "convenio" in normalized and any(
+        term in normalized for term in ("qual", "quais", "aceita", "aceitam")
+    )
+    return insurance_faq or any(term in normalized for term in PUBLIC_FAQ_TERMS)
+
+
+def is_public_cache_response(ai_response: str) -> bool:
+    """Reject transactional or patient-specific replies from the shared cache."""
+    import unicodedata
+
+    normalized = unicodedata.normalize("NFKD", (ai_response or "").lower())
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    return not any(term in normalized for term in TRANSACTIONAL_RESPONSE_TERMS) and (
+        "/calendar/p/" not in normalized
+    )
+
 
 def is_dynamic_conversation_message(user_message: str) -> bool:
     """Identifica dados que nunca podem receber uma resposta cacheada."""
@@ -43,7 +78,7 @@ def generate_cache_key(text: str) -> str:
     clean = re.sub(r"[^\w\s]", "", clean)
     clean = re.sub(r"\s+", " ", clean)
     digest = hashlib.sha256(clean.encode("utf-8")).hexdigest()[:16]
-    return f"semantic_cache:{digest}"
+    return f"semantic_cache:v2:{digest}"
 
 async def get_cached_response(user_message: str) -> Optional[str]:
     """Busca no Redis uma resposta em cache se a Feature Flag estiver ativada."""
@@ -51,6 +86,9 @@ async def get_cached_response(user_message: str) -> Optional[str]:
         from app.api.endpoints.settings import load_config
         cfg = load_config()
         if not cfg.get("semantic_cache_enabled", True):
+            return None
+
+        if not is_public_faq_message(user_message):
             return None
 
         # Não cachear mensagens com dados clínicos de agendamento ou números de CPF
@@ -95,6 +133,12 @@ async def set_cached_response(user_message: str, ai_response: str):
         from app.api.endpoints.settings import load_config
         cfg = load_config()
         if not cfg.get("semantic_cache_enabled", True):
+            return
+
+        if not is_public_faq_message(user_message):
+            return
+
+        if not is_public_cache_response(ai_response):
             return
 
         # Não cachear agendamentos com dados privados, nomes específicos ou confirmações com datas dinâmicas, nem mensagens de segurança/bloqueio

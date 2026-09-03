@@ -26,9 +26,9 @@ EMERGENCY_TRIGGERS = [
 ]
 
 EMERGENCY_RESPONSE = (
-    "⚠️ Identifiquei que você pode estar passando por uma situação de urgência médica.\n\n"
+    "Identifiquei que você pode estar passando por uma situação de urgência médica.\n\n"
     "Se for uma emergência imediata, ligue agora para o *SAMU 192* ou vá ao Pronto-Socorro mais próximo.\n\n"
-    "Assim que você estiver seguro(a), vou estar aqui para agendar sua consulta de acompanhamento com nossos especialistas. Cuide-se! 🙏"
+    "Assim que você estiver seguro(a), vou estar aqui para agendar sua consulta de acompanhamento com nossos especialistas."
 )
 
 async def process_and_respond(remote_jid: str, text: str, push_name: str, is_audio: bool = False):
@@ -99,7 +99,7 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
                 from app.services.semantic_cache import set_cached_response
                 await set_cached_response(text, ai_response)
 
-            if "⚠️ Identifiquei que você pode estar passando por uma situação de urgência" in ai_response or "[TRANSFERIR_HUMANO]" in ai_response:
+            if "Identifiquei que você pode estar passando por uma situação de urgência" in ai_response or "[TRANSFERIR_HUMANO]" in ai_response:
                 logger.warning(f"Escalando para atendimento humano: {remote_jid}")
                 from app.database import AsyncSessionLocal
                 from app.models.chat import Contact
@@ -507,7 +507,7 @@ async def process_message(data: dict):
         
         # Se for áudio e a transcrição falhou (ex: quota Whisper esgotada ou ruído inaudível), acolhe o paciente
         if is_audio and not text:
-             fallback_audio_msg = "🌻 Olá! Recebi seu áudio, mas no momento não consegui ouvir com total clareza. Você poderia me enviar sua dúvida ou solicitação por mensagem de texto, por favor? Assim já consigo te ajudar rapidinho!"
+             fallback_audio_msg = "Olá! Recebi seu áudio, mas no momento não consegui ouvir com total clareza. Você poderia enviar sua dúvida ou solicitação por mensagem de texto, por favor?"
              await send_text_message(remote_jid, fallback_audio_msg)
              await save_message(remote_jid, fallback_audio_msg, sender='ia')
              return
