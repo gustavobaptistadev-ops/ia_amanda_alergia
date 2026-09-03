@@ -6,6 +6,7 @@ from fastapi.security import APIKeyHeader
 from jose import JWTError, jwt
 
 API_KEY_NAME = "X-API-Key"
+WEBSOCKET_AUTH_PROTOCOL = "bearer"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
 
@@ -24,6 +25,17 @@ def _get_bearer_token(conn) -> str | None:
     auth_header = conn.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         return auth_header[7:].strip()
+    return None
+
+
+def get_websocket_protocol_token(websocket: WebSocket) -> str | None:
+    """Read a JWT from the WebSocket protocol header without exposing it in the URL."""
+    raw_protocols = websocket.headers.get("sec-websocket-protocol", "")
+    protocols = [item.strip() for item in raw_protocols.split(",") if item.strip()]
+    if len(protocols) >= 2 and secrets.compare_digest(
+        protocols[0].lower(), WEBSOCKET_AUTH_PROTOCOL
+    ):
+        return protocols[1]
     return None
 
 
@@ -50,7 +62,7 @@ async def get_api_key(request: Request = None, websocket: WebSocket = None):
 
     token = _get_bearer_token(conn)
     if not token and conn.scope.get("type") == "websocket":
-        token = conn.query_params.get("access_token")
+        token = get_websocket_protocol_token(websocket)
 
     validated_token = _validate_jwt(token)
     if validated_token:

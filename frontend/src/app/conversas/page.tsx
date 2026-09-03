@@ -83,7 +83,7 @@ export default function Conversas() {
       try {
         const token = localStorage.getItem("token") || sessionStorage.getItem("token");
         if (!token) return;
-        ws = new WebSocket(`${wsUrl}/api/v1/chats/ws?access_token=${encodeURIComponent(token)}`);
+        ws = new WebSocket(`${wsUrl}/api/v1/chats/ws`, ["bearer", token]);
 
         ws.onmessage = (event) => {
           if (event.data === "update") {
