@@ -13,11 +13,6 @@ async def get_or_create_contact(phone_number: str, name: str = None) -> Contact:
             session.add(contact)
             await session.commit()
             await session.refresh(contact)
-        elif name and contact.name != name:
-            # Update name if it changed and we didn't have it
-            contact.name = name
-            await session.commit()
-            await session.refresh(contact)
             
         return contact
 
