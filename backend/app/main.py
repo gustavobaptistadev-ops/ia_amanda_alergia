@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.api_router import api_router
 from app.database import engine, Base
 import logging
-from app.services.evolution_api import auto_create_instance
+from app.services.evolution_api import auto_create_instance, get_headers
 from contextlib import asynccontextmanager
 
 from app.core.limiter import limiter, RateLimitExceeded, _rate_limit_exceeded_handler
@@ -164,11 +164,15 @@ async def health_check():
     # 3. Evolution API
     try:
         evolution_url = os.getenv("EVOLUTION_API_URL", "")
-        evolution_key = os.getenv("EVOLUTION_API_KEY", "")
         if evolution_url:
             async with httpx.AsyncClient(timeout=5.0) as client:
-                r = await client.get(f"{evolution_url}/instance/fetchInstances", headers={"apikey": evolution_key})
-            status["components"]["evolution_api"] = "healthy" if r.status_code < 500 else "unhealthy"
+                r = await client.get(
+                    f"{evolution_url}/instance/status",
+                    headers=get_headers(),
+                )
+            status["components"]["evolution_api"] = "healthy" if r.status_code == 200 else "unhealthy"
+            if r.status_code != 200:
+                status["status"] = "degraded"
         else:
             status["components"]["evolution_api"] = "not_configured"
     except Exception as e:
