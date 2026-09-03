@@ -83,8 +83,8 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
 
             try:
                 ai_response = await process_user_message(thread_id=remote_jid, message=text)
-            except Exception as e:
-                logger.error(f"Erro ao processar mensagem no LLM para {remote_jid}: {e}")
+            except Exception:
+                logger.exception("Erro ao processar mensagem para %s", remote_jid[:6])
                 ai_response = "Nosso sistema está passando por uma instabilidade momentânea. Um de nossos atendentes humanos já foi notificado e falará com você em breve."
             
             ai_response = remove_emojis(ai_response)

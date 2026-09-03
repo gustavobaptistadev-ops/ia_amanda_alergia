@@ -169,8 +169,12 @@ async def schedule_flow_node(state: AgentState):
     """Consulta disponibilidade automaticamente quando os dados permitem agendamento."""
     """Nó 2b: Fluxo dedicado para agendamento com corpo clínico e regras."""
     last_message = state['messages'][-1].content
-    context = retrieve_context(f"{last_message} médicos convênios preços")
     intent = state.get("intent", "")
+    if intent == "AGENDAMENTO" and not has_patient_complaint(state.get("messages", [])):
+        # Não consulta RAG nem agenda antes de conhecer o motivo da consulta.
+        return {"context": ""}
+
+    context = retrieve_context(f"{last_message} médicos convênios preços")
     latest_cpf = extract_latest_cpf(state.get("messages", []))
     registration_complete = latest_cpf and any(
         contains_date(getattr(message, "content", ""))
@@ -209,7 +213,8 @@ async def generate_response_node(state: AgentState):
         return {
             "messages": [AIMessage(
                 content=(
-                    "Claro. Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
+                    "Olá! Sou Amanda, recepcionista da Clínica Lifeline One. "
+                    "Antes de iniciar o cadastro, preciso entender o motivo da consulta. "
                     "O que você está sentindo ou qual avaliação deseja realizar?"
                 )
             )]
