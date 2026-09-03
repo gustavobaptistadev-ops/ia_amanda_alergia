@@ -10,7 +10,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   }
 
   // 2. Injeta a chave de API de serviço interna
-  headers.set('X-API-Key', process.env.NEXT_PUBLIC_INTERNAL_API_KEY || 'dev-secret-key-123');
+  // A autenticação do painel usa exclusivamente o JWT da sessão.
   
   return fetch(url, {
     ...options,

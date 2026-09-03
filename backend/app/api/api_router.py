@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends
-from app.api.endpoints import webhook, dashboard, evolution, chats, rag, settings, auth, analytics, appointments, logs
+from app.api.endpoints import webhook, calendar_public, dashboard, evolution, chats, rag, settings, auth, analytics, appointments, logs
 from app.core.security import get_api_key
 
 api_router = APIRouter()
 
 # Webhook e Auth ficam expostos para login e eventos
 api_router.include_router(webhook.router, prefix="/webhook", tags=["Webhook"])
+api_router.include_router(calendar_public.router, prefix="/calendar", tags=["Calendar Link"])
 api_router.include_router(auth.router, prefix="/auth", tags=["Autenticação & RBAC"])
 
 # Demais rotas protegidas pelo INTERNAL_API_KEY

@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.chat import Contact, Message
 from app.services.evolution_api import send_text_message
+from app.core.security import get_api_key
+from app.core.auth import get_current_user
 from pydantic import BaseModel
 from typing import List
 import json
@@ -71,6 +73,7 @@ manager = ConnectionManager()
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    await get_api_key(websocket=websocket)
     await manager.connect(websocket)
     try:
         while True:
@@ -109,10 +112,12 @@ async def get_messages(phone_number: str, db: AsyncSession = Depends(get_db), x_
     return messages
 
 @router.delete("/reset-all")
-async def reset_all_conversations(db: AsyncSession = Depends(get_db)):
+async def reset_all_conversations(db: AsyncSession = Depends(get_db), current_user=Depends(get_current_user)):
     """Reseta e limpa absolutamente todas as conversas, contatos e checkpoints de memoria do LangGraph."""
     from sqlalchemy import delete, text
     from app.models.chat import Appointment, Message, Contact
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem resetar todas as conversas.")
     try:
         await db.execute(delete(Message))
         await db.execute(delete(Appointment))

@@ -39,8 +39,8 @@ async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(
     user = result.scalars().first()
     
     # Se for o primeiro acesso da clínica e não houver usuários, auto-cria o admin padrão
-    initial_admin_pwd = os.getenv("INITIAL_ADMIN_PASSWORD", "admin123")
-    if not user and req.email == "admin@respirar.com" and req.password == initial_admin_pwd:
+    initial_admin_pwd = os.getenv("INITIAL_ADMIN_PASSWORD", "").strip()
+    if not user and initial_admin_pwd and len(initial_admin_pwd) >= 12 and req.email == "admin@respirar.com" and req.password == initial_admin_pwd:
         user = User(
             email="admin@respirar.com",
             name="Dr. Gustavo (Admin)",
@@ -108,8 +108,8 @@ async def create_user(req: RegisterRequest, db: AsyncSession = Depends(get_db), 
     if current_user and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas administradores podem criar novos colaboradores.")
 
-    if len(req.password) < 6:
-        raise HTTPException(status_code=400, detail="A senha deve ter no mínimo 6 caracteres.")
+    if len(req.password) < 12:
+        raise HTTPException(status_code=400, detail="A senha deve ter no mínimo 12 caracteres.")
         
     result = await db.execute(select(User).where(User.email == req.email))
     if result.scalars().first():
@@ -147,8 +147,8 @@ async def change_password(req: ChangePasswordRequest, db: AsyncSession = Depends
     if current_user and current_user.email != req.email and current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Não é permitido alterar a senha de outro usuário.")
 
-    if len(req.new_password) < 6:
-        raise HTTPException(status_code=400, detail="A nova senha deve ter no mínimo 6 caracteres.")
+    if len(req.new_password) < 12:
+        raise HTTPException(status_code=400, detail="A nova senha deve ter no mínimo 12 caracteres.")
         
     result = await db.execute(select(User).where(User.email == req.email))
     user = result.scalars().first()

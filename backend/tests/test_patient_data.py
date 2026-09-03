@@ -1,0 +1,24 @@
+from langchain_core.messages import AIMessage, HumanMessage
+
+from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf
+
+
+def test_cpf_with_leading_zeros_is_preserved():
+    assert extract_cpf_from_text("00511483155") == "00511483155"
+
+
+def test_formatted_cpf_is_normalized():
+    assert extract_cpf_from_text("005.114.831-55") == "00511483155"
+
+
+def test_latest_cpf_ignores_ai_messages():
+    messages = [
+        HumanMessage(content="Meu nome é Gustavo Henrique"),
+        AIMessage(content="Qual é o seu CPF?"),
+        HumanMessage(content="00511483155"),
+    ]
+    assert extract_latest_cpf(messages) == "00511483155"
+
+
+def test_birth_date_is_detected_without_affecting_cpf_format():
+    assert contains_date("Nascimento 04/08/1986")

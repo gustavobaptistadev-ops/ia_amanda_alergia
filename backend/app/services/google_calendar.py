@@ -4,6 +4,8 @@ import json
 import re
 import logging
 from langchain_core.tools import tool
+from app.core.clinic_location import CLINIC_ADDRESS
+from app.core.calendar_links import create_calendar_link
 
 try:
     from google.oauth2 import service_account
@@ -193,6 +195,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
     from app.models.chat import Appointment, Contact
     from sqlalchemy.future import select
 
+    appointment_id = ""
     try:
         dt_start = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         clean_phone = re.sub(r"\D", "", phone) if phone else ""
@@ -219,6 +222,8 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
                 status="agendado"
             )
             session.add(new_apt)
+            await session.flush()
+            appointment_id = new_apt.id
             await session.commit()
     except Exception as db_err:
         logger.error(f"Erro ao salvar no banco: {db_err}")
@@ -227,6 +232,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
     import urllib.parse
     import urllib.request
     google_cal_link = ""
+    patient_calendar_link = ""
     try:
         dt_local = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         # Horário de Brasília (UTC-3) convertido para UTC (YYYYMMDDTHHMMSSZ)
@@ -235,22 +241,17 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
         
         dates_param = f"{dt_utc_start.strftime('%Y%m%dT%H%M%SZ')}/{dt_utc_end.strftime('%Y%m%dT%H%M%SZ')}"
         title_param = urllib.parse.quote(f"Consulta Alergia - {patient_name.split()[0] if patient_name else 'Clínica Respirar'}")
-        details_param = urllib.parse.quote("Consulta Médica na Clínica Respirar.\nConnect Towers, sala 3021 - QS 01, Taguatinga Sul.")
-        location_param = urllib.parse.quote("Connect Towers, QS 01 Rua 212, Taguatinga, Brasília, DF")
+        details_param = urllib.parse.quote(f"Consulta Médica na Clínica Respirar.\n{CLINIC_ADDRESS}")
+        location_param = urllib.parse.quote(CLINIC_ADDRESS)
         
         long_url = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_param}&dates={dates_param}&details={details_param}&location={location_param}"
+        patient_calendar_link = create_calendar_link(appointment_id) or long_url
         
-        # Encurtando o URL (fallback para o URL longo caso falhe)
-        try:
-            req = urllib.request.Request(f"https://tinyurl.com/api-create.php?url={urllib.parse.quote(long_url)}")
-            with urllib.request.urlopen(req, timeout=3) as response:
-                google_cal_link = response.read().decode('utf-8')
-        except Exception as e_short:
-            logger.warning(f"Erro ao encurtar link: {e_short}")
-            google_cal_link = long_url
+        google_cal_link = long_url
 
         # NOVO: Gerar arquivo .ics e enviar diretamente como documento via Evolution API
         if clean_phone:
+            ics_address = CLINIC_ADDRESS.replace(",", "\\,")
             ics_lines = [
                 "BEGIN:VCALENDAR",
                 "VERSION:2.0",
@@ -260,8 +261,8 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
                 f"DTSTART:{dt_utc_start.strftime('%Y%m%dT%H%M%SZ')}",
                 f"DTEND:{dt_utc_end.strftime('%Y%m%dT%H%M%SZ')}",
                 f"SUMMARY:Consulta Alergia - {patient_name.split()[0] if patient_name else 'Respirar'}",
-                f"DESCRIPTION:Consulta Médica na Clínica Respirar.\\nConnect Towers\\, sala 3021 - QS 01\\, Taguatinga Sul.",
-                f"LOCATION:Connect Towers\\, QS 01 Rua 212\\, Taguatinga\\, Brasília\\, DF",
+                f"DESCRIPTION:Consulta Médica na Clínica Respirar.\\n{ics_address}",
+                f"LOCATION:{ics_address}",
                 "END:VEVENT",
                 "END:VCALENDAR"
             ]
@@ -273,7 +274,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
                     number=clean_phone,
                     document_bytes=ics_bytes,
                     filename=f"Consulta_{patient_name.split()[0] if patient_name else 'Respirar'}.ics",
-                    caption="🗓️ Toque neste arquivo para salvar na sua agenda automaticamente!"
+                    caption="Toque neste arquivo para salvar na sua agenda automaticamente."
                 )
             )
 
@@ -281,7 +282,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
         logger.warning(f"Erro ao gerar link/ICS do Google Calendar: {err}")
 
     # Retorno limpo e humanizado para a Amanda entregar ao paciente
-    link_info = f"\n\nLink do Google Agenda (alternativo):\n{google_cal_link}" if google_cal_link else ""
+    link_info = f"\n\nLink da agenda pessoal:\n{patient_calendar_link}" if patient_calendar_link else ""
 
     service = get_calendar_service()
     if not service:
@@ -289,7 +290,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
             f"Agendamento de {patient_name} confirmado no sistema médico para o dia {date_str} às {time_str}!\n"
             f"INSTRUÇÃO PARA A AMANDA:\n"
             f"1. Confirme a data e o horário com carinho no singular.\n"
-            f"2. O arquivo de convite (.ics) já foi disparado, MAS VOCÊ TAMBÉM DEVE INCLUIR ESTE LINK NA MENSAGEM: {google_cal_link}\n"
+            f"2. O arquivo de convite (.ics) já foi disparado. Inclua este link curto para a agenda pessoal: {patient_calendar_link}\n"
             f"3. Pergunte com delicadeza se ele gostaria que você envie o endereço e a localização no mapa / Waze."
         )
 
@@ -339,7 +340,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
             f"Sucesso! O agendamento de {patient_name} foi registrado no Google Agenda médico para o dia {date_str} às {time_str}. Event ID: {event_id}\n"
             f"INSTRUÇÃO PARA A AMANDA:\n"
             f"1. Confirme a data e o horário com entusiasmo (apenas 1 frase, no singular, acolhedora).\n"
-            f"2. O arquivo de convite (.ics) já foi disparado, MAS VOCÊ TAMBÉM DEVE INCLUIR O LINK NA MENSAGEM! Diga algo como: 'Para salvar na agenda, basta clicar no convite abaixo ou neste link: {google_cal_link}'\n"
+            f"2. O arquivo de convite (.ics) já foi disparado. Inclua este link curto para a agenda pessoal: {patient_calendar_link}\n"
             f"3. Pergunte gentilmente se o paciente deseja o endereço da clínica / link do Waze."
         )
 

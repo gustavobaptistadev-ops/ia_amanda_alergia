@@ -8,10 +8,12 @@ from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 import os
 
+from app.core.security import require_secret
+
 from app.database import get_db
 from app.models.user import User
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", os.getenv("INTERNAL_API_KEY", "amanda-jwt-secret-key-32b"))
+SECRET_KEY = require_secret("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 dias
 
@@ -32,8 +34,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     if not token:
-        # Permite chave de API interna como bypass de serviço
-        return None
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Autenticação obrigatória")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")

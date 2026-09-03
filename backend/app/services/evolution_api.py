@@ -1,8 +1,20 @@
 import httpx
 import os
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+EMOJI_PATTERN = re.compile(
+    "[\\U0001F1E6-\\U0001F1FF\\U0001F300-\\U0001FAFF\\u2600-\\u27BF]"
+)
+
+
+def remove_emojis(text: str) -> str:
+    """Keep outbound patient messages free of emoji characters."""
+    if not text:
+        return text
+    return EMOJI_PATTERN.sub("", text).replace("\uFE0F", "").replace("\u200D", "")
 
 EVOLUTION_API_URL = os.getenv("EVOLUTION_API_URL", "http://localhost:8080")
 # A chave global enviada pelo CTO
@@ -75,6 +87,7 @@ async def auto_create_instance():
 
 async def send_text_message(number: str, text: str):
     """Envia uma mensagem de texto via EvolutionAPI."""
+    text = remove_emojis(text)
     url = f"{EVOLUTION_API_URL}/send/text"
     payload = {
         "number": number,

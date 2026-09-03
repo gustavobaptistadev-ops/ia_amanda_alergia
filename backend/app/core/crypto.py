@@ -5,10 +5,12 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+from app.core.security import require_secret
+
 logger = logging.getLogger(__name__)
 
 # Chave secreta de encriptação (com fallback derivado de segredo interno para ambiente dev)
-RAW_SECRET = os.getenv("ENCRYPTION_KEY", os.getenv("INTERNAL_API_KEY", "amanda-enterprise-secret-key-32b"))
+RAW_SECRET = require_secret("ENCRYPTION_KEY")
 
 # Derivação de chave segura de 32 bytes para Fernet (AES-128-CBC com autenticação HMAC / Padrão Seguro)
 kdf = PBKDF2HMAC(

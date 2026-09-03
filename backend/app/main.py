@@ -88,18 +88,15 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 import os
 frontend_url = os.getenv("NEXT_PUBLIC_FRONTEND_URL", "https://ia-amanda-frontend.up.railway.app")
+cors_origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", frontend_url).split(",") if origin.strip()]
 
 # Configuração de CORS para o painel de controle (Next.js)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        frontend_url, 
-        "http://localhost:3000",
-        "https://tranquil-encouragement-production-52cf.up.railway.app"
-    ],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
 
 from starlette.requests import Request
@@ -117,7 +114,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+        "script-src 'self' 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: https: blob:; "
         "connect-src 'self' https: wss: ws:; "

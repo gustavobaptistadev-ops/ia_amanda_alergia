@@ -6,6 +6,7 @@ from app.database import AsyncSessionLocal
 from app.models.chat import Appointment, Contact, SystemLog
 from app.services.evolution_api import send_text_message
 from app.services.message_processor import save_message
+from app.core.clinic_location import CLINIC_ADDRESS, CLINIC_WAZE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,8 @@ async def check_and_send_reminders():
                     msg = (
                         f"Oi, {appt.patient_name}! 🩵\n\n"
                         f"Sua consulta com o especialista é hoje às *{time_fmt}* (daqui a pouquinho!).\n\n"
-                        "📍 *Endereço:* Av. Paulista, 1000 - Conjunto 1204 (Temos manobrista no local).\n"
+                        f"📍 *Endereço:* {CLINIC_ADDRESS}\n"
+                        f"*Como chegar:* {CLINIC_WAZE_URL}\n"
                         "Nossa equipe já está te esperando com um café quentinho. Tenha uma excelente vinda!"
                     )
                     await send_text_message(appt.contact.phone_number, msg)

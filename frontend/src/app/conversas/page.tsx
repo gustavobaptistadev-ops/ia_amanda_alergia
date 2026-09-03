@@ -77,7 +77,9 @@ export default function Conversas() {
 
     const connectWs = () => {
       try {
-        ws = new WebSocket(`${wsUrl}/api/v1/chats/ws`);
+        const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token) return;
+        ws = new WebSocket(`${wsUrl}/api/v1/chats/ws?access_token=${encodeURIComponent(token)}`);
 
         ws.onmessage = (event) => {
           if (event.data === "update") {
@@ -467,7 +469,7 @@ export default function Conversas() {
                 <div className="px-4 py-2 bg-slate-100/70 border-t border-slate-200 flex gap-2 overflow-x-auto text-[11px]">
                   <span className="text-slate-400 font-semibold flex items-center py-1">Atalhos:</span>
                   <button 
-                    onClick={() => setInputText("📍 Endereço da Clínica Respirar: Av. Paulista, 1000 - Cj. 1204, Bela Vista - São Paulo/SP. Temos estacionamento conveniado com manobrista no subsolo!")}
+                    onClick={() => setInputText("📍 Endereço da Clínica Respirar: Connect Towers, sala 3021 - QS 01, Rua 212, Lotes 19, 21 e 23 - Taguatinga Sul, Brasília - DF. Como chegar pelo Waze: https://ul.waze.com/ul?ll=-15.84028486%2C-48.04482222&navigate=yes&zoom=17&utm_campaign=default&utm_source=waze_website&utm_medium=lm_share_location")}
                     className="bg-white hover:bg-blue-50 hover:text-blue-600 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200 transition-colors whitespace-nowrap flex items-center gap-1 font-medium"
                   >
                     <MapPin className="w-3 h-3 text-blue-500" /> Endereço & Rota

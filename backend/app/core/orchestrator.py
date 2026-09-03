@@ -8,6 +8,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, To
 from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import PersonaBuilder
+from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf
 
 from langgraph.checkpoint.memory import MemorySaver
 import operator
@@ -41,6 +42,11 @@ def extract_intent_node(state: AgentState):
     """Nó 1: Classifica a intenção do usuário (Zero-Cost Router NLP/LLM)."""
     messages = state['messages']
     last_msg = messages[-1].content.strip().lower()
+
+    # CPF is a deterministic scheduling signal; preserve leading zeros outside the LLM.
+    if extract_cpf_from_text(last_msg):
+        logger.info("CPF válido recebido; avançando para coleta da data de nascimento")
+        return {"intent": "AGENDAMENTO"}
     
     # 1. Heurística Local Rápida (Zero-Cost NLP)
     import re
@@ -130,10 +136,33 @@ def fetch_context_node(state: AgentState):
     context = retrieve_context(last_message)
     return {"context": context}
 
-def schedule_flow_node(state: AgentState):
+async def schedule_flow_node(state: AgentState):
     """Nó 2b: Fluxo dedicado para agendamento com corpo clínico e regras."""
     last_message = state['messages'][-1].content
     context = retrieve_context(f"{last_message} médicos convênios preços")
+    intent = state.get("intent", "")
+    latest_cpf = extract_latest_cpf(state.get("messages", []))
+    registration_complete = latest_cpf and any(
+        contains_date(getattr(message, "content", ""))
+        for message in state.get("messages", [])
+        if getattr(message, "type", None) == "human"
+    )
+
+    if intent == "AGENDAMENTO" and registration_complete:
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
+        target_date = now.date() + datetime.timedelta(days=1)
+        while target_date.weekday() == 6:
+            target_date += datetime.timedelta(days=1)
+        agenda_result = await check_availability.ainvoke(
+            {"date_str": target_date.isoformat(), "period": "todos"}
+        )
+        context += (
+            "\n\n[AGENDA CONSULTADA AUTOMATICAMENTE]\n"
+            f"Data de referência: {target_date.isoformat()}\n"
+            f"Resultado da agenda: {agenda_result}\n"
+            "Apresente imediatamente as opções retornadas. Não diga que vai verificar, não aguarde confirmação e não invente horários."
+        )
+
     return {"context": context}
 
 async def generate_response_node(state: AgentState):
@@ -154,6 +183,12 @@ async def generate_response_node(state: AgentState):
     # [ESTADO DO PACIENTE: PRIMEIRO CONTATO VS RECORRENTE]
     patient_profile_str = ""
     contact_status_str = ""
+    latest_cpf = extract_latest_cpf(messages)
+    if latest_cpf:
+        patient_profile_str = (
+            "DADO CONFIRMADO PELO PACIENTE: CPF válido recebido nesta conversa "
+            f"({latest_cpf}). Não peça o nome novamente; prossiga solicitando apenas a data de nascimento.\n\n"
+        )
     thread_id = state.get("thread_id", "")
     try:
         from app.database import AsyncSessionLocal

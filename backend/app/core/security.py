@@ -1,45 +1,63 @@
-from fastapi import Security, HTTPException, status, Request
-from fastapi.security import APIKeyHeader
 import os
 import secrets
 
-API_KEY_NAME = 'X-API-Key'
+from fastapi import HTTPException, Request, WebSocket, status
+from fastapi.security import APIKeyHeader
+from jose import JWTError, jwt
+
+API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
-INTERNAL_API_KEY = os.getenv('INTERNAL_API_KEY', 'dev-secret-key-123')
 
-from fastapi import WebSocket
+def require_secret(name: str, minimum_length: int = 32) -> str:
+    value = os.getenv(name, "").strip()
+    if len(value) < minimum_length:
+        raise RuntimeError(f"{name} must be configured with at least {minimum_length} characters")
+    return value
+
+
+INTERNAL_API_KEY = require_secret("INTERNAL_API_KEY")
+WEBHOOK_SECRET = require_secret("WEBHOOK_SECRET")
+
+
+def _get_bearer_token(conn) -> str | None:
+    auth_header = conn.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[7:].strip()
+    return None
+
+
+def _validate_jwt(token: str | None) -> str | None:
+    if not token:
+        return None
+    try:
+        from app.core.auth import ALGORITHM, SECRET_KEY
+
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return token if payload.get("sub") else None
+    except JWTError:
+        return None
+
 
 async def get_api_key(request: Request = None, websocket: WebSocket = None):
     conn = request or websocket
     if not conn:
-        return None
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Autenticação obrigatória")
 
-    # 1. Permite upgrade transparente de conexões WebSocket
-    if conn.scope.get("type") == "websocket":
-        return None
-
-    # 2. Valida chave interna direta (X-API-Key)
     key = conn.headers.get(API_KEY_NAME) or conn.headers.get(API_KEY_NAME.lower())
     if key and secrets.compare_digest(key, INTERNAL_API_KEY):
         return key
 
-    # 3. Valida JWT Token via Authorization Header (Bearer Token)
-    auth_header = conn.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        token = auth_header.replace("Bearer ", "").strip()
-        from app.core.auth import SECRET_KEY, ALGORITHM
-        from jose import jwt, JWTError
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            if payload.get("sub"):
-                return token
-        except JWTError:
-            pass
+    token = _get_bearer_token(conn)
+    if not token and conn.scope.get("type") == "websocket":
+        token = conn.query_params.get("access_token")
 
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, 
-        detail='Credenciais inválidas ou sessão expirada. Forneça um X-API-Key válido ou Bearer JWT.'
-    )
+    validated_token = _validate_jwt(token)
+    if validated_token:
+        return validated_token
 
-WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', 'webhook-secret-123')
+    if conn.scope.get("type") == "websocket":
+        await conn.close(code=1008, reason="Authentication required")
+        raise RuntimeError("WebSocket authentication failed")
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas ou sessão expirada.")
