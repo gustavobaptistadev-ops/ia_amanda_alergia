@@ -50,11 +50,17 @@ async def run_reminders_job(ctx):
     from app.services.reminder_service import check_and_send_reminders
     await check_and_send_reminders()
 
+async def run_learning_evaluator_job(ctx):
+    logger.info("Executando Cron Job de Autoavaliação de IA...")
+    from app.services.learning_service import evaluate_recent_chats
+    await evaluate_recent_chats()
+
 class WorkerSettings:
-    functions = [process_message_job, run_reminders_job]
+    functions = [process_message_job, run_reminders_job, run_learning_evaluator_job]
     # Executa a cada 15 minutos (:00, :15, :30, :45)
     cron_jobs = [
-        cron(run_reminders_job, minute={0, 15, 30, 45})
+        cron(run_reminders_job, minute={0, 15, 30, 45}),
+        cron(run_learning_evaluator_job, minute={5, 35}) # Roda aos 5 e 35 minutos
     ]
     redis_settings = redis_settings
     # Quantidade de jobs simultâneos
