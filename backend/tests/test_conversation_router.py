@@ -102,6 +102,28 @@ def test_escolha_de_horario_avanca_para_confirmacao_do_agendamento():
     assert decision["entities"]["preferred_slot"] == {"date": "2026-09-04", "time": "15:00"}
 
 
+def test_escolha_de_horario_sem_repetir_dia_quando_ha_uma_data_oferecida():
+    history = [
+        HumanMessage(content="Quero marcar consulta"),
+        AIMessage(content="Qual o motivo da consulta?"),
+        HumanMessage(content="Estou com alergia"),
+        AIMessage(content="Informe seu nome completo."),
+        HumanMessage(content="Gustavo Henrique Baptista"),
+        AIMessage(content="Informe seu CPF."),
+        HumanMessage(content="00511483155"),
+        AIMessage(content="Informe sua data de nascimento."),
+        HumanMessage(content="04/08/1986"),
+        AIMessage(content="Você prefere atendimento particular ou por convênio?"),
+        HumanMessage(content="Plano Bradesco"),
+        AIMessage(content="Tenho estes horários disponíveis: Horários livres para 2026-09-04: 16:00, 17:00. Qual horário você prefere?"),
+    ]
+
+    decision = route_message("Às 16 horas", history)
+
+    assert decision["next_action"] == "CONFIRM_SLOT"
+    assert decision["entities"]["preferred_slot"] == {"date": "2026-09-04", "time": "16:00"}
+
+
 def test_forma_de_atendimento_e_obrigatoria_antes_da_agenda():
     history = [
         HumanMessage(content="Quero marcar uma consulta"),

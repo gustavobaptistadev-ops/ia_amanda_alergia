@@ -311,10 +311,9 @@ async def schedule_flow_node(state: AgentState):
         context += (
             "\n\n[AGENDA CONSULTADA AUTOMATICAMENTE]\n"
             f"Data de referência: {target_date.isoformat()}\n"
-            f"Resultado da agenda: {agenda_result}\n"
-            "Apresente imediatamente as opções retornadas. Não diga que vai verificar, não aguarde confirmação e não invente horários."
+            f"[AGENDA_RESULTADO]\n{agenda_result}\n[FIM_AGENDA_RESULTADO]"
         )
-        context += "\n[APENAS_APRESENTAR_HORARIOS]\nNÃ£o crie evento nesta etapa. Aguarde a escolha explÃ­cita do paciente."
+        context += "\n[APENAS_APRESENTAR_HORARIOS]"
 
     return {"context": context}
 
@@ -335,7 +334,7 @@ async def generate_response_node(state: AgentState):
 
     next_action = routing.get("next_action")
     if intent == "AGENDAMENTO" and next_action == "CHECK_AVAILABILITY" and "[APENAS_APRESENTAR_HORARIOS]" in context:
-        result_match = re.search(r"Resultado da agenda: (.*?)(?:\n\[APENAS_APRESENTAR_HORARIOS\]|$)", context, re.DOTALL)
+        result_match = re.search(r"\[AGENDA_RESULTADO\]\s*(.*?)\s*\[FIM_AGENDA_RESULTADO\]", context, re.DOTALL)
         agenda_result = result_match.group(1).strip() if result_match else ""
         if agenda_result and "erro" not in agenda_result.lower():
             return {"messages": [AIMessage(content=(

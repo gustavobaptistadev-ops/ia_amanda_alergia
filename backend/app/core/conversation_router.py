@@ -190,33 +190,50 @@ def _extract_preferred_slot(text: str, messages: Sequence[Any]) -> dict[str, str
     if not time_match:
         return None
 
-    weekday = next(
-        (day for day in WEEKDAYS if re.search(rf"\b{day}(?:-feira)?\b", normalized)),
-        None,
+    weekday = next((day for day in WEEKDAYS if re.search(rf"\b{day}(?:-feira)?\b", normalized)), None)
+    availability_message = next(
+        (
+            normalize_text(getattr(message, "content", ""))
+            for message in reversed(messages or [])
+            if getattr(message, "type", None) == "ai"
+            and "horario" in normalize_text(getattr(message, "content", ""))
+        ),
+        "",
     )
-    if weekday is None:
-        return None
-
-    offered_text = " ".join(
-        normalize_text(getattr(message, "content", ""))
-        for message in messages or []
-        if getattr(message, "type", None) == "ai"
-    )
+    offered_text = availability_message
     if not any(marker in offered_text for marker in ("horarios disponiveis", "horarios livres", "horarios")):
         return None
 
-    offered_match = re.search(rf"{weekday}(?:-feira)?[^\d]{{0,30}}(\d{{1,2}})/(\d{{1,2}})", offered_text)
+    if not weekday:
+        # Quando existe apenas uma data na lista, "às 16" é uma escolha válida.
+        offered_dates = re.findall(r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2})\b", offered_text)
+        if len(set(offered_dates)) != 1:
+            return None
+        offered_match = None
+    else:
+        offered_match = re.search(rf"{weekday}(?:-feira)?[^\d]{{0,30}}(\d{{1,2}})/(\d{{1,2}})", offered_text)
     if offered_match:
         year = datetime.date.today().year
         date_str = f"{year:04d}-{int(offered_match.group(2)):02d}-{int(offered_match.group(1)):02d}"
+    elif not weekday:
+        offered_date = re.findall(r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2})\b", offered_text)[0]
+        if "-" in offered_date:
+            date_str = offered_date
+        else:
+            day, month = offered_date.split("/")
+            date_str = f"{datetime.date.today().year:04d}-{int(month):02d}-{int(day):02d}"
     else:
         today = datetime.date.today()
         days_ahead = (WEEKDAYS[weekday] - today.weekday()) % 7 or 7
         date_str = (today + datetime.timedelta(days=days_ahead)).isoformat()
 
+    time_str = f"{int(time_match.group(1)):02d}:{time_match.group(2) or '00'}"
+    if not re.search(rf"\b{re.escape(time_str)}\b", offered_text):
+        return None
+
     return {
         "date": date_str,
-        "time": f"{int(time_match.group(1)):02d}:{time_match.group(2) or '00'}",
+        "time": time_str,
     }
 
 
