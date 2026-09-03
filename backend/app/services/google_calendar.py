@@ -167,7 +167,7 @@ def check_availability(date_str: str, period: str = "todos") -> str:
         return "Erro ao consultar agenda."
 
 @tool
-async def create_event(date_str: str, time_str: str, patient_name: str, phone: str = "", cpf: str = "", dob: str = "") -> str:
+async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str, dob: str, phone: str = "") -> str:
     """
     Cria um agendamento na agenda do Google com validação estrita de dados e idempotência.
     """

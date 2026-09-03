@@ -11,6 +11,10 @@ def validate_cpf(cpf_raw: str) -> bool:
     # Remove tudo que não for dígito
     digits = re.sub(r"\D", "", str(cpf_raw))
 
+    # Pad with leading zeros if the LLM converted a string starting with zero to integer
+    if len(digits) < 11 and len(digits) >= 9:
+        digits = digits.zfill(11)
+
     # CPF deve ter exatamente 11 dígitos
     if len(digits) != 11:
         return False
