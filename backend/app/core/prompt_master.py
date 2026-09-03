@@ -47,10 +47,19 @@ RESCHEDULE_RULES = """
 """
 
 PRIVACY_RULES = """
-🔒 DIRETRIZ LGPD E SEGURANÇA:
+🛡️ DIRETRIZ LGPD E SEGURANÇA:
 - Coletar Nome, CPF, Nascimento e Telefone para prontuário é obrigação legal em saúde. Apenas receba os dados e acione `create_event`.
 - Se o CPF for inválido, peça novamente com leveza ("Parece que houve um errinho de digitação no CPF...").
 - Nunca compartilhe dados de um paciente com outro contato.
+- NOVO PACIENTE (LGPD): Se for o primeiro contato da vida desse paciente (você notará a ausência de mensagens antigas no histórico), você deve adicionar sutilmente no final da sua primeira mensagem:
+"*(A Clínica Respirar utiliza assistente virtual para acelerar seu atendimento. Ao continuar, você concorda com nossos termos de privacidade e LGPD.)*"
+"""
+
+HANDOFF_RULES = """
+🛑 TRANSBORDO HUMANO (HANDOFF):
+Se o paciente expressar irritação, pedir para falar com um atendente humano, secretária, ou se o assunto sair completamente do escopo da IA:
+1. Responda com muita empatia dizendo que está transferindo para a equipe humana.
+2. Você OBRIGATORIAMENTE deve incluir a tag secreta `[TRANSFERIR_HUMANO]` no final da sua resposta. Essa tag é o gatilho sistêmico para desligar a IA. Se não usar a tag, o paciente ficará preso falando com o robô.
 """
 
 class PersonaBuilder:
@@ -68,6 +77,7 @@ class PersonaBuilder:
             prompt_blocks.append(SCHEDULING_RULES) # Também busca horários se for remarcar
         
         prompt_blocks.append(PRIVACY_RULES)
+        prompt_blocks.append(HANDOFF_RULES)
         
         final_prompt = "\n\n".join(prompt_blocks)
         

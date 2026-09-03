@@ -85,6 +85,18 @@ export default function Conversas() {
             if (selectedContactRef.current) {
               fetchMessages(selectedContactRef.current.phone_number);
             }
+          } else if (event.data.startsWith("urgency:")) {
+            fetchContacts();
+            try {
+              const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+              const oscillator = audioCtx.createOscillator();
+              oscillator.type = 'sine';
+              oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+              oscillator.connect(audioCtx.destination);
+              oscillator.start();
+              oscillator.stop(audioCtx.currentTime + 0.4);
+            } catch(e) {}
+            // Also force UI visual update if needed, but fetchContacts covers it.
           }
         };
 

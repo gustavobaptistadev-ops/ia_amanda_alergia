@@ -81,18 +81,26 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
                 await save_message(remote_jid, resp, sender='ia')
                 return
 
-            ai_response = await process_user_message(thread_id=remote_jid, message=text)
+            try:
+                ai_response = await process_user_message(thread_id=remote_jid, message=text)
+            except Exception as e:
+                logger.error(f"Erro ao processar mensagem no LLM para {remote_jid}: {e}")
+                ai_response = "Nosso sistema está passando por uma instabilidade momentânea. Um de nossos atendentes humanos já foi notificado e falará com você em breve."
+            
             is_safe = validar_resposta(ai_response)
             
             if not is_safe:
                 # Se for bloqueio real de segurança (prescrição ou jailbreak), responde com prudência médica
                 ai_response = "Por diretrizes do Conselho de Medicina e segurança clínica, prescrições de remédios e orientações de posologia são realizadas exclusivamente pelo médico durante a sua consulta. Posso te ajudar a agendar um horário com nossos especialistas?"
 
-            if "⚠️ Identifiquei que você pode estar passando por uma situação de urgência" in ai_response:
-                logger.warning(f"Urgência detectada para {remote_jid}. Pausando IA e escalando para atendimento humano...")
+            if "⚠️ Identifiquei que você pode estar passando por uma situação de urgência" in ai_response or "[TRANSFERIR_HUMANO]" in ai_response:
+                logger.warning(f"Escalando para atendimento humano: {remote_jid}")
                 from app.database import AsyncSessionLocal
                 from app.models.chat import Contact
                 from sqlalchemy.future import select
+                
+                # Remover a tag secreta antes de enviar ao paciente
+                ai_response = ai_response.replace("[TRANSFERIR_HUMANO]", "").strip()
                 
                 async with AsyncSessionLocal() as session:
                     res = await session.execute(select(Contact).where(Contact.phone_number == remote_jid))
@@ -101,6 +109,9 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
                         c.bot_active = False
                         c.stage = "atendimento_humano"
                         await session.commit()
+                
+                # Disparar alerta visual/sonoro via WebSocket
+                await manager.broadcast(f"urgency:{remote_jid}")
 
             # [MULTIMODAL] Se o paciente mandou áudio e a opção de voz estiver ligada, responder com áudio TTS
             from app.api.endpoints.settings import load_config
