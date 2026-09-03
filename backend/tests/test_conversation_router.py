@@ -89,6 +89,8 @@ def test_escolha_de_horario_avanca_para_confirmacao_do_agendamento():
         HumanMessage(content="00511483155"),
         AIMessage(content="Informe sua data de nascimento."),
         HumanMessage(content="04/08/1986"),
+        AIMessage(content="Você prefere atendimento particular ou por convênio?"),
+        HumanMessage(content="Prefiro particular"),
         AIMessage(content="Temos horários disponíveis: Sexta-feira, 04/09: 11:00, 15:00, 16:00."),
     ]
 
@@ -98,3 +100,36 @@ def test_escolha_de_horario_avanca_para_confirmacao_do_agendamento():
     assert decision["entities"]["name"] == "Gustavo Henrique Baptista"
     assert decision["entities"]["cpf"] is None
     assert decision["entities"]["preferred_slot"] == {"date": "2026-09-04", "time": "15:00"}
+
+
+def test_forma_de_atendimento_e_obrigatoria_antes_da_agenda():
+    history = [
+        HumanMessage(content="Quero marcar uma consulta"),
+        AIMessage(content="Qual o motivo da consulta?"),
+        HumanMessage(content="Estou com alergia nos braços"),
+        AIMessage(content="Informe seu nome completo."),
+        HumanMessage(content="Gustavo Henrique Baptista"),
+        AIMessage(content="Informe seu CPF."),
+        HumanMessage(content="00511483155"),
+        AIMessage(content="Informe sua data de nascimento."),
+        HumanMessage(content="04/08/1986"),
+    ]
+
+    decision = route_message("", history)
+
+    assert decision["next_action"] == "COLLECT_PAYMENT_TYPE"
+
+
+def test_particular_liberar_consulta_de_horarios():
+    history = [
+        HumanMessage(content="Quero marcar consulta"),
+        HumanMessage(content="Estou com alergia"),
+        HumanMessage(content="Gustavo Henrique Baptista"),
+        HumanMessage(content="00511483155"),
+        HumanMessage(content="04/08/1986"),
+    ]
+
+    decision = route_message("Prefiro particular", history)
+
+    assert decision["entities"]["payment_type"] == "particular"
+    assert decision["next_action"] == "CHECK_AVAILABILITY"

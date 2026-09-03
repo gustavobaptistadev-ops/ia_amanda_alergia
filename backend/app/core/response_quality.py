@@ -16,6 +16,7 @@ EXPECTED_TERMS = {
     "COLLECT_NAME": ("nome completo", "nome da pessoa"),
     "COLLECT_CPF": ("cpf",),
     "COLLECT_BIRTH_DATE": ("nascimento", "data de nascimento"),
+    "COLLECT_PAYMENT_TYPE": ("particular", "convênio", "convenio", "plano"),
 }
 
 

@@ -11,7 +11,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, To
 from langchain_openai import ChatOpenAI
 from app.core.rag import retrieve_context
 from app.core.prompt_master import PersonaBuilder
-from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, extract_latest_date, has_patient_complaint
+from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, extract_latest_date, extract_payment_type, has_patient_complaint
 from app.core.conversation_router import route_message
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -205,8 +205,9 @@ async def schedule_flow_node(state: AgentState):
         for message in state.get("messages", [])
         if getattr(message, "type", None) == "human"
     )
+    payment_type = routing.get("entities", {}).get("payment_type") or extract_payment_type(state.get("messages", []))
 
-    if intent == "AGENDAMENTO" and registration_complete:
+    if intent == "AGENDAMENTO" and registration_complete and payment_type:
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
         target_date = now.date() + datetime.timedelta(days=1)
         while target_date.weekday() == 6:
@@ -265,7 +266,7 @@ async def generate_response_node(state: AgentState):
             "NÃ£o consegui concluir esse horÃ¡rio agora. Vou verificar a disponibilidade novamente para oferecer uma opÃ§Ã£o vÃ¡lida."
         ))]}
     if intent == "AGENDAMENTO" and next_action in {
-        "COLLECT_NAME", "COLLECT_CPF", "COLLECT_BIRTH_DATE"
+        "COLLECT_NAME", "COLLECT_CPF", "COLLECT_BIRTH_DATE", "COLLECT_PAYMENT_TYPE"
     }:
         third_party = routing.get("entities", {}).get("third_party", False)
         prompts = {
@@ -283,6 +284,9 @@ async def generate_response_node(state: AgentState):
                 "Para finalizar o cadastro, informe a data de nascimento da pessoa que será consultada."
                 if third_party else
                 "Para finalizar o cadastro, informe sua data de nascimento."
+            ),
+            "COLLECT_PAYMENT_TYPE": (
+                "Para finalizar, você prefere atendimento particular ou utilizar um convênio?"
             ),
         }
         return {"messages": [AIMessage(content=prompts[next_action])]}

@@ -8,8 +8,8 @@ from typing import Any
 
 from app.core.patient_data import (
     contains_date,
-    extract_latest_date,
     extract_latest_cpf,
+    extract_payment_type,
     has_patient_complaint,
 )
 
@@ -88,10 +88,13 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
                 missing_fields.append("cpf")
             if not any(contains_date(getattr(message, "content", "")) for message in history + [_Message(text)] if getattr(message, "type", None) == "human"):
                 missing_fields.append("birth_date")
+            if not extract_payment_type(history + [_Message(text)]):
+                missing_fields.append("payment_type")
             next_action = {
                 "name": "COLLECT_NAME",
                 "cpf": "COLLECT_CPF",
                 "birth_date": "COLLECT_BIRTH_DATE",
+                "payment_type": "COLLECT_PAYMENT_TYPE",
             }.get(missing_fields[0], "CHECK_AVAILABILITY") if missing_fields else (
                 "CONFIRM_SLOT" if _extract_preferred_slot(text, history) else "CHECK_AVAILABILITY"
             )
@@ -110,6 +113,7 @@ def route_message(text: str, messages: Sequence[Any] | None = None) -> dict[str,
             "cpf": extract_latest_cpf([_Message(text)]),
             "birth_date": text if contains_date(text) else None,
             "third_party": is_third_party,
+            "payment_type": extract_payment_type(history + [_Message(text)]),
             "preferred_slot": _extract_preferred_slot(text, history),
         },
         "missing_fields": missing_fields,

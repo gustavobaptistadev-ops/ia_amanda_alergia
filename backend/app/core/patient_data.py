@@ -1,4 +1,5 @@
 import re
+import unicodedata
 from collections.abc import Sequence
 
 from app.core.validators import validate_cpf
@@ -11,6 +12,11 @@ COMPLAINT_TERMS = (
     "pele", "urticária", "urticaria", "inchaço", "inchaco", "reação",
     "reacao", "sintoma", "sintomas", "dor", "queixa", "problema de saúde",
     "problema de saude", "estou com", "estou sentindo", "sinto",
+)
+
+INSURANCE_OPERATORS = (
+    "amil", "unimed", "bradesco", "sulamerica", "sul america", "assefaz",
+    "ipsemg", "geap", "cassi", "notredame", "hapvida", "amil",
 )
 
 
@@ -49,6 +55,24 @@ def extract_latest_date(messages: Sequence) -> str | None:
         match = DATE_PATTERN.search(getattr(message, "content", "") or "")
         if match:
             return match.group(0)
+    return None
+
+
+def extract_payment_type(messages: Sequence) -> str | None:
+    """Detect an explicit private/insurance choice made by the patient."""
+    for message in reversed(messages or []):
+        if getattr(message, "type", None) != "human":
+            continue
+        raw_text = (getattr(message, "content", "") or "").lower()
+        text = unicodedata.normalize("NFKD", raw_text)
+        text = "".join(char for char in text if not unicodedata.combining(char))
+        text = re.sub(r"\s+", " ", text).strip()
+        if re.search(r"\b(particular|vou pagar particular|sem convenio|sem plano)\b", text):
+            return "particular"
+        if any(operator in text for operator in INSURANCE_OPERATORS):
+            return "convenio"
+        if re.search(r"\b(meu convenio|tenho convenio|pelo convenio|por convenio|meu plano|plano de saude)\b", text):
+            return "convenio"
     return None
 
 
