@@ -107,7 +107,6 @@ PRIVACY_RULES = """
 
 - NOVO PACIENTE (LGPD): Se for o primeiro contato da vida desse paciente (você notará a ausência de mensagens antigas no histórico), você deve adicionar sutilmente no final da sua primeira mensagem:
 
-"*(A Clínica Respirar utiliza assistente virtual para acelerar seu atendimento. Ao continuar, você concorda com nossos termos de privacidade e LGPD.)*"
 
 """
 
@@ -178,7 +177,7 @@ class PersonaBuilder:
         
 
         final_prompt = "\n\n".join(prompt_blocks)
-        final_prompt += "\n\nREGRA ABSOLUTA DE FORMATAÇÃO: não use emojis, pictogramas ou símbolos decorativos em nenhuma resposta, sem exceção."
+        final_prompt += "\n\nREGRA ABSOLUTA: não use emojis, pictogramas ou símbolos decorativos e não inclua a mensagem automática de consentimento LGPD nesta versão do atendimento."
 
         
 
