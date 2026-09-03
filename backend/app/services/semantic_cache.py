@@ -47,6 +47,21 @@ async def get_cached_response(user_message: str) -> Optional[str]:
 async def set_cached_response(user_message: str, ai_response: str):
     """Armazena a pergunta e a resposta no Redis para reuso econômico."""
     try:
+        import re
+
+        normalized_message = user_message.strip().lower()
+        scheduling_terms = (
+            "agendar", "consulta", "horário", "horario", "marcar", "cpf",
+            "nascimento", "convênio", "convenio", "remarcar", "cancelar",
+        )
+        # Respostas personalizadas não podem ser reutilizadas entre pacientes.
+        if (
+            any(term in normalized_message for term in scheduling_terms)
+            or re.search(r"\b\d{8,}\b", normalized_message)
+            or len(normalized_message.split()) >= 2 and not normalized_message.endswith("?")
+        ):
+            return
+
         from app.api.endpoints.settings import load_config
         cfg = load_config()
         if not cfg.get("semantic_cache_enabled", True):

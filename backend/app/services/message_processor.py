@@ -90,9 +90,13 @@ async def process_and_respond(remote_jid: str, text: str, push_name: str, is_aud
             ai_response = remove_emojis(ai_response)
             is_safe = validar_resposta(ai_response)
             
-            if not is_safe:
-                # Se for bloqueio real de segurança (prescrição ou jailbreak), responde com prudência médica
-                ai_response = "Por diretrizes do Conselho de Medicina e segurança clínica, prescrições de remédios e orientações de posologia são realizadas exclusivamente pelo médico durante a sua consulta. Posso te ajudar a agendar um horário com nossos especialistas?"
+            if not is_safe:
+                # Se for bloqueio real de segurança (prescrição ou jailbreak), responde com prudência médica
+                ai_response = "Por diretrizes do Conselho de Medicina e segurança clínica, prescrições de remédios e orientações de posologia são realizadas exclusivamente pelo médico durante a sua consulta. Posso te ajudar a agendar um horário com nossos especialistas?"
+
+            if is_safe:
+                from app.services.semantic_cache import set_cached_response
+                await set_cached_response(text, ai_response)
 
             if "⚠️ Identifiquei que você pode estar passando por uma situação de urgência" in ai_response or "[TRANSFERIR_HUMANO]" in ai_response:
                 logger.warning(f"Escalando para atendimento humano: {remote_jid}")

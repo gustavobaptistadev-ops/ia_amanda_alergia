@@ -446,7 +446,7 @@ async def process_user_message(thread_id: str, message: str) -> str:
             logger.warning(f"Não foi possível inicializar Langfuse: {e}")
 
     # [CAMADA 1.5: SEMANTIC CACHING] Busca resposta ultra-rápida no Redis se já respondida
-    from app.services.semantic_cache import get_cached_response, set_cached_response
+    from app.services.semantic_cache import get_cached_response
     cached_reply = await get_cached_response(message)
     if cached_reply:
         logger.info(f"[SEMANTIC CACHE] Resposta entregue instantaneamente via Cache para thread {thread_id}")
@@ -463,8 +463,5 @@ async def process_user_message(thread_id: str, message: str) -> str:
     
     final_state = await app_graph.ainvoke(input_state, config=config)
     ai_content = final_state['messages'][-1].content
-    
-    # Grava no Cache Semântico em background para economia futura
-    await set_cached_response(message, ai_content)
     
     return ai_content
