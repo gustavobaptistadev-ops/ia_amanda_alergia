@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -10,6 +11,7 @@ router = APIRouter()
 CONFIG_FILE = os.path.join(os.path.dirname(__file__), "../../../settings_ai.json")
 
 class AIConfig(BaseModel):
+    ai_mode: Literal["economic", "balanced", "intelligent"] = "balanced"
     model: str = "gpt-4o-mini"
     temperature: float = 0.35
     max_tokens: int = 1000
@@ -20,6 +22,7 @@ class AIConfig(BaseModel):
 
 def load_config() -> dict:
     default_cfg = {
+        "ai_mode": "balanced",
         "model": "gpt-4o-mini",
         "temperature": 0.35,
         "max_tokens": 1000,

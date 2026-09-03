@@ -52,7 +52,13 @@ def extract_intent_node(state: AgentState):
 
     # O router local resolve intenções claras e só deixa mensagens ambíguas para a LLM.
     routing = route_message(messages[-1].content, messages)
-    if routing["confidence"] >= 0.90:
+    ai_mode = load_config().get("ai_mode", "balanced")
+    confidence_threshold = {
+        "economic": 0.90,
+        "balanced": 0.90,
+        "intelligent": 0.99,
+    }.get(ai_mode, 0.90)
+    if routing["confidence"] >= confidence_threshold:
         logger.info(
             "Roteamento determinístico: intenção=%s confiança=%s próxima_ação=%s terceiro=%s",
             routing["intent"],

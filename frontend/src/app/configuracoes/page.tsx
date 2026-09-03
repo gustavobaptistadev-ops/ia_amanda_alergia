@@ -21,7 +21,8 @@ export default function Configuracoes() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // AI Settings State
-  const [aiModel, setAiModel] = useState("gpt-4o-mini");
+  const [aiMode, setAiMode] = useState("balanced");
+  const [aiModel, setAiModel] = useState("gpt-4o-mini");
   const [temperature, setTemperature] = useState(0.35);
   const [personaName, setPersonaName] = useState("Amanda");
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
@@ -97,7 +98,8 @@ export default function Configuracoes() {
       const res = await fetchWithAuth(`${apiUrl}/api/v1/settings/`);
       if (res.ok) {
         const data = await res.json();
-        if (data.model) setAiModel(data.model);
+        if (data.ai_mode) setAiMode(data.ai_mode);
+        if (data.model) setAiModel(data.model);
         if (data.temperature !== undefined) setTemperature(data.temperature);
         if (data.persona_name) setPersonaName(data.persona_name);
         if (data.voice_reply_enabled !== undefined) setVoiceReplyEnabled(data.voice_reply_enabled);
@@ -117,7 +119,8 @@ export default function Configuracoes() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: aiModel,
+          ai_mode: aiMode,
+          model: aiModel,
           temperature: parseFloat(temperature.toString()),
           persona_name: personaName,
           voice_reply_enabled: voiceReplyEnabled,
@@ -480,7 +483,33 @@ export default function Configuracoes() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+            <div className="space-y-3 md:col-span-2 rounded-2xl border border-blue-100 bg-blue-50/60 p-6">
+
+              <div className="flex items-center justify-between gap-4">
+
+                <div>
+
+                  <label className="block text-sm font-semibold text-slate-700">Modo de operação da IA</label>
+
+                  <p className="mt-1 text-xs text-slate-500">O modo equilibrado prioriza o roteador determinístico e usa a LLM em casos ambíguos ou complexos.</p>
+
+                </div>
+
+                <select
+                  value={aiMode}
+                  onChange={(e) => setAiMode(e.target.value)}
+                  className="rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="balanced">Equilibrado (Recomendado)</option>
+                  <option value="economic">Econômico</option>
+                  <option value="intelligent">Mais LLM</option>
+                </select>
+
+              </div>
+
+            </div>
             {/* Seleção do Modelo */}
             <div className="space-y-3">
               <label className="block text-sm font-semibold text-slate-700">Modelo OpenAI</label>
