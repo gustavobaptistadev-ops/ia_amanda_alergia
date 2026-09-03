@@ -426,8 +426,6 @@ async def generate_response_node(state: AgentState):
         from app.database import AsyncSessionLocal
         from app.models.chat import Contact
         from sqlalchemy.future import select
-        import re
-        
         async with AsyncSessionLocal() as session:
             active_contact = None
             if thread_id:
