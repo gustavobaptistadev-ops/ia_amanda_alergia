@@ -100,7 +100,8 @@ PRIVACY_RULES = """
 
 - Coletar Nome, CPF, Nascimento e Telefone para prontuário é obrigação legal em saúde. Apenas receba os dados e acione `create_event`.
 
-- Se o CPF for inválido, peça novamente com leveza ("Parece que houve um errinho de digitação no CPF...").
+- NUNCA TENTE VALIDAR O CPF POR CONTA PRÓPRIA. Assuma que os números que o paciente enviar estão corretos, agradeça e prossiga para coletar a Data de Nascimento. O sistema validará no final.
+- Para agendar, você PRECISA OBRIGATORIAMENTE dos 3 dados: Nome, CPF e Data de Nascimento. Se faltar algum, pergunte.
 
 - Nunca compartilhe dados de um paciente com outro contato.
 
