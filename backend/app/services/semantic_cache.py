@@ -11,6 +11,31 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 CACHE_TTL_SECONDS = 60 * 60 * 24 * 7 # 7 dias de retenção
 
 # Normalização de texto para chave de cache
+DYNAMIC_CONVERSATION_TERMS = (
+    "agendar", "consulta", "horario", "marcar", "cpf", "nascimento",
+    "convenio", "particular", "plano", "remarcar", "cancelar",
+    "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo",
+    "hoje", "amanha", "ontem",
+)
+
+
+def is_dynamic_conversation_message(user_message: str) -> bool:
+    """Identifica dados que nunca podem receber uma resposta cacheada."""
+    import re
+    import unicodedata
+
+    raw = (user_message or "").lower()
+    normalized = unicodedata.normalize("NFKD", raw)
+    normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+    if any(term in normalized for term in DYNAMIC_CONVERSATION_TERMS):
+        return True
+    if re.search(r"\b\d{1,2}/\d{1,2}(?:/\d{2,4})?\b", normalized):
+        return True
+    if re.search(r"\b\d{1,2}(?::\d{2})?\s*h?\b", normalized):
+        return True
+    return bool(re.search(r"\b\d{8,}\b", normalized))
+
+
 def generate_cache_key(text: str) -> str:
     """Gera uma chave determinística normalizada para perguntas frequentes."""
     import re, unicodedata
@@ -35,8 +60,7 @@ async def get_cached_response(user_message: str) -> Optional[str]:
 
         normalized_message = user_message.strip().lower()
         scheduling_terms = ("agendar", "consulta", "horário", "horario", "marcar", "cpf", "nascimento", "convênio", "convenio", "remarcar", "cancelar")
-        if (any(term in normalized_message for term in scheduling_terms)
-                or re.search(r"\b\d{8,}\b", normalized_message)
+        if (is_dynamic_conversation_message(normalized_message)
                 or len(normalized_message.split()) >= 2 and not normalized_message.endswith("?")):
             return None
 
@@ -63,8 +87,7 @@ async def set_cached_response(user_message: str, ai_response: str):
         )
         # Respostas personalizadas não podem ser reutilizadas entre pacientes.
         if (
-            any(term in normalized_message for term in scheduling_terms)
-            or re.search(r"\b\d{8,}\b", normalized_message)
+            is_dynamic_conversation_message(normalized_message)
             or len(normalized_message.split()) >= 2 and not normalized_message.endswith("?")
         ):
             return
