@@ -15,6 +15,7 @@ from app.core.prompt_master import PersonaBuilder
 from app.core.patient_data import contains_date, extract_cpf_from_text, extract_latest_cpf, extract_latest_date, extract_payment_type, has_patient_complaint
 from app.core.conversation_router import build_complaint_request, route_message
 from app.core.clinic_location import clinic_location_text
+from app.core.record_validator import validate_patient_record
 
 from langgraph.checkpoint.memory import MemorySaver
 import operator
@@ -35,6 +36,7 @@ class AgentState(TypedDict):
     intent: str
     thread_id: str
     routing: dict
+    record_validation: dict
 
 from app.api.endpoints.settings import load_config
 
@@ -130,6 +132,16 @@ def extract_intent_node(state: AgentState):
         "balanced": 0.90,
         "intelligent": 0.99,
     }.get(ai_mode, 0.90)
+    record_validation = (
+        validate_patient_record(messages, routing)
+        if routing.get("intent") == "AGENDAMENTO"
+        else {}
+    )
+    if record_validation:
+        routing["record_validation"] = record_validation
+        if routing.get("next_action") != "COLLECT_COMPLAINT":
+            routing["next_action"] = record_validation["next_action"]
+
     if routing["confidence"] >= confidence_threshold:
         logger.info(
             "Roteamento determinístico: intenção=%s confiança=%s próxima_ação=%s terceiro=%s",
@@ -138,12 +150,19 @@ def extract_intent_node(state: AgentState):
             routing["next_action"],
             routing["entities"]["third_party"],
         )
-        return {"intent": routing["intent"], "routing": routing}
+        return {
+            "intent": routing["intent"],
+            "routing": routing,
+            "record_validation": record_validation,
+        }
 
     # CPF is a deterministic scheduling signal; preserve leading zeros outside the LLM.
     if extract_cpf_from_text(last_msg):
         logger.info("CPF válido recebido; avançando para coleta da data de nascimento")
-        return {"intent": "AGENDAMENTO"}
+        record_validation = validate_patient_record(messages, routing)
+        routing["record_validation"] = record_validation
+        routing["next_action"] = record_validation["next_action"]
+        return {"intent": "AGENDAMENTO", "routing": routing, "record_validation": record_validation}
     
     # 1. Heurística Local Rápida (Zero-Cost NLP)
     import re
@@ -197,7 +216,16 @@ Classificação:"""
         intent = "DUVIDA"
     
     logger.info(f"Intenção identificada via LLM: {intent}")
-    return {"intent": intent, "routing": routing}
+    record_validation = (
+        validate_patient_record(messages, routing)
+        if intent == "AGENDAMENTO"
+        else {}
+    )
+    if record_validation:
+        routing["record_validation"] = record_validation
+        if routing.get("next_action") != "COLLECT_COMPLAINT":
+            routing["next_action"] = record_validation["next_action"]
+    return {"intent": intent, "routing": routing, "record_validation": record_validation}
 
 def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow", "handoff_flow"]:
     """Direciona o estado para o fluxo especializado correspondente."""
@@ -265,9 +293,16 @@ async def schedule_flow_node(state: AgentState):
     last_message = state['messages'][-1].content
     intent = state.get("intent", "")
     routing = state.get("routing", {})
+    record_validation = state.get("record_validation") or routing.get("record_validation") or {}
     if intent == "AGENDAMENTO" and not _has_effective_complaint(state):
         # Não consulta RAG nem agenda antes de conhecer o motivo da consulta.
         return {"context": ""}
+
+    if intent == "AGENDAMENTO" and routing.get("next_action") == "REVIEW_PATIENT_DATA":
+        return {"context": "[REVISAO_DADOS_PRONTUARIO] Existem dados conflitantes ou inválidos. Solicitar correção sem expor valores internos."}
+
+    if intent == "AGENDAMENTO" and routing.get("next_action") == "CONFIRM_SLOT" and not record_validation.get("valid"):
+        return {"context": "[REVISAO_DADOS_PRONTUARIO] A ficha não passou na validação administrativa. Não executar ferramentas."}
 
     if intent == "AGENDAMENTO" and routing.get("next_action") == "CONFIRM_SLOT":
         entities = routing.get("entities", {})
@@ -300,7 +335,7 @@ async def schedule_flow_node(state: AgentState):
     )
     payment_type = routing.get("entities", {}).get("payment_type") or extract_payment_type(state.get("messages", []))
 
-    if intent == "AGENDAMENTO" and registration_complete and payment_type:
+    if intent == "AGENDAMENTO" and record_validation.get("valid") and registration_complete and payment_type:
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
         target_date = now.date() + datetime.timedelta(days=1)
         while target_date.weekday() == 6:
@@ -333,6 +368,10 @@ async def generate_response_node(state: AgentState):
         }
 
     next_action = routing.get("next_action")
+    if next_action == "REVIEW_PATIENT_DATA":
+        return {"messages": [AIMessage(content=(
+            "Encontrei uma divergência nos dados do cadastro. Por segurança, confirme novamente o nome completo, CPF e data de nascimento da pessoa que será atendida."
+        ))]}
     if intent == "AGENDAMENTO" and next_action == "CHECK_AVAILABILITY" and "[APENAS_APRESENTAR_HORARIOS]" in context:
         result_match = re.search(r"\[AGENDA_RESULTADO\]\s*(.*?)\s*\[FIM_AGENDA_RESULTADO\]", context, re.DOTALL)
         agenda_result = result_match.group(1).strip() if result_match else ""
