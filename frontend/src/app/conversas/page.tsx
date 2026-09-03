@@ -266,9 +266,9 @@ export default function Conversas() {
   };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col space-y-4 animate-in fade-in duration-500">
+    <div className="flex-1 flex flex-col space-y-4 animate-in fade-in duration-500 min-h-0 h-[calc(100vh-8rem)] lg:h-full">
       {/* Header Superior */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center pt-14 lg:pt-0">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-slate-800">Monitoramento Clínico Omnichannel</h2>
           <p className="text-slate-500 text-xs md:text-sm mt-0.5">Acompanhe as triagens da Amanda IA em tempo real e assuma quando necessário.</p>
@@ -384,8 +384,8 @@ export default function Conversas() {
           {selectedContact ? (
             <>
               {/* Header do Chat */}
-              <div className="p-3 md:p-4 px-4 md:px-6 border-b border-slate-200 bg-white flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="p-3 md:p-4 px-4 md:px-6 border-b border-slate-200 bg-white flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 pr-2 shrink-0">
                   <button 
                     onClick={() => setIsMobileChatOpen(false)}
                     className="md:hidden p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100"
@@ -505,7 +505,7 @@ export default function Conversas() {
                   </div>
                 ) : (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-500 text-center flex items-center justify-center gap-2">
-                    <Bot className="w-4 h-4 text-blue-600" /> Amanda IA está atendendo este paciente. Clique em <b>"Assumir"</b> para responder manualmente.
+                    <Bot className="w-4 h-4 text-blue-600 flex-shrink-0" /> <span>Amanda IA está atendendo este paciente. Clique em <b>"Assumir"</b> para responder manualmente.</span>
                   </div>
                 )}
               </div>
