@@ -2,6 +2,8 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Sidebar from "@/components/Sidebar";
+import TopBar from "@/components/TopBar";
 
 const PUBLIC_PATHS = ["/login"];
 
@@ -18,7 +20,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const token = localStorage.getItem("token") || sessionStorage.getItem("token");
     if (!token) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+      router.replace("/login");
       return;
     }
 
@@ -29,7 +31,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       if (!response.ok) {
         localStorage.removeItem("token");
         sessionStorage.removeItem("token");
-        router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        router.replace("/login");
         return;
       }
       setChecking(false);
@@ -40,5 +42,17 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500">Validando sessão...</div>;
   }
 
-  return <>{children}</>;
+  if (PUBLIC_PATHS.includes(pathname)) return <>{children}</>;
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-900">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <TopBar />
+        <main className="flex-1 overflow-y-auto bg-slate-50 p-3 sm:p-4 md:p-6 lg:p-8">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
 }
