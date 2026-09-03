@@ -235,8 +235,8 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
         
         dates_param = f"{dt_utc_start.strftime('%Y%m%dT%H%M%SZ')}/{dt_utc_end.strftime('%Y%m%dT%H%M%SZ')}"
         title_param = urllib.parse.quote(f"Consulta Alergia - {patient_name.split()[0] if patient_name else 'Clínica Respirar'}")
-        details_param = urllib.parse.quote("Consulta Médica na Clínica Respirar.\nAv. Paulista, 1000 - Cj 1204.")
-        location_param = urllib.parse.quote("Av. Paulista, 1000, Bela Vista, São Paulo")
+        details_param = urllib.parse.quote("Consulta Médica na Clínica Respirar.\nConnect Towers, sala 3021 - QS 01, Taguatinga Sul.")
+        location_param = urllib.parse.quote("Connect Towers, QS 01 Rua 212, Taguatinga, Brasília, DF")
         
         long_url = f"https://calendar.google.com/calendar/render?action=TEMPLATE&text={title_param}&dates={dates_param}&details={details_param}&location={location_param}"
         
@@ -260,8 +260,8 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
                 f"DTSTART:{dt_utc_start.strftime('%Y%m%dT%H%M%SZ')}",
                 f"DTEND:{dt_utc_end.strftime('%Y%m%dT%H%M%SZ')}",
                 f"SUMMARY:Consulta Alergia - {patient_name.split()[0] if patient_name else 'Respirar'}",
-                f"DESCRIPTION:Consulta Médica na Clínica Respirar.\\nAv. Paulista\\, 1000 - Cj 1204.",
-                f"LOCATION:Av. Paulista\\, 1000\\, Bela Vista\\, São Paulo",
+                f"DESCRIPTION:Consulta Médica na Clínica Respirar.\\nConnect Towers\\, sala 3021 - QS 01\\, Taguatinga Sul.",
+                f"LOCATION:Connect Towers\\, QS 01 Rua 212\\, Taguatinga\\, Brasília\\, DF",
                 "END:VEVENT",
                 "END:VCALENDAR"
             ]
@@ -289,7 +289,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
             f"Agendamento de {patient_name} confirmado no sistema médico para o dia {date_str} às {time_str}!\n"
             f"INSTRUÇÃO PARA A AMANDA:\n"
             f"1. Confirme a data e o horário com carinho no singular.\n"
-            f"2. O arquivo de convite (.ics) já foi enviado automaticamente pelo sistema! Apenas diga: 'Já enviei o arquivo de convite logo abaixo para você salvar na sua agenda com 1 toque!'\n"
+            f"2. O arquivo de convite (.ics) já foi disparado, MAS VOCÊ TAMBÉM DEVE INCLUIR ESTE LINK NA MENSAGEM: {google_cal_link}\n"
             f"3. Pergunte com delicadeza se ele gostaria que você envie o endereço e a localização no mapa / Waze."
         )
 
@@ -339,7 +339,7 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
             f"Sucesso! O agendamento de {patient_name} foi registrado no Google Agenda médico para o dia {date_str} às {time_str}. Event ID: {event_id}\n"
             f"INSTRUÇÃO PARA A AMANDA:\n"
             f"1. Confirme a data e o horário com entusiasmo (apenas 1 frase, no singular, acolhedora).\n"
-            f"2. O arquivo de convite (.ics) já foi disparado! Apenas avise: 'Já enviei o convite logo abaixo para você salvar na sua agenda do celular com 1 clique!'\n"
+            f"2. O arquivo de convite (.ics) já foi disparado, MAS VOCÊ TAMBÉM DEVE INCLUIR O LINK NA MENSAGEM! Diga algo como: 'Para salvar na agenda, basta clicar no convite abaixo ou neste link: {google_cal_link}'\n"
             f"3. Pergunte gentilmente se o paciente deseja o endereço da clínica / link do Waze."
         )
 
