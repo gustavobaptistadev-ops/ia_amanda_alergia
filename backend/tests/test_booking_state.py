@@ -9,6 +9,10 @@ from app.core.booking_state import (
     update_booking_state,
     validate_booking_state,
 )
+from app.core.conversation_router import extract_requested_date
+
+FRIDAY_DATE = extract_requested_date("Sexta")
+SATURDAY_DATE = extract_requested_date("Sabado")
 
 
 def _routing(*, complaint=False, third_party=False, name=None):
@@ -35,7 +39,7 @@ def _complete_registration():
     state = _advance(None, "Quero marcar consulta")
     assert booking_next_action(state) == "COLLECT_COMPLAINT"
 
-    state = _advance(state, "Estou com alergia nos bracos", _routing(complaint=True))
+    state = _advance(state, "Estou com alergia nos bracos há 3 dias e já tomei antialérgico", _routing(complaint=True))
     assert booking_next_action(state) == "COLLECT_NAME"
 
     state = _advance(state, "Gustavo Henrique Baptista")
@@ -46,9 +50,15 @@ def _complete_registration():
     assert booking_next_action(state) == "COLLECT_BIRTH_DATE"
 
     state = _advance(state, "04/08/1986")
+    assert booking_next_action(state) == "COLLECT_EMAIL"
+
+    state = _advance(state, "gustavo@email.com")
     assert booking_next_action(state) == "COLLECT_PAYMENT_TYPE"
 
     state = _advance(state, "Plano Bradesco")
+    assert booking_next_action(state) == "COLLECT_INSURANCE_CARD"
+
+    state = _advance(state, "12345")
     assert booking_next_action(state) == "CHECK_AVAILABILITY"
     return state
 
@@ -63,13 +73,13 @@ def test_fluxo_completo_nao_regride_quando_historico_foi_podado():
     assert state["insurance_operator"] == "Bradesco"
 
     state = set_offered_slots(state, [
-        {"date": "2026-09-04", "time": "17:00"},
-        {"date": "2026-09-05", "time": "08:30"},
+        {"date": FRIDAY_DATE, "time": "17:00"},
+        {"date": SATURDAY_DATE, "time": "08:30"},
     ])
     state = _advance(state, "Sexta as 17")
 
     assert booking_next_action(state) == "CONFIRM_SLOT"
-    assert state["selected_slot"] == {"date": "2026-09-04", "time": "17:00"}
+    assert state["selected_slot"] == {"date": FRIDAY_DATE, "time": "17:00"}
     assert state["patient_name"] == "Gustavo Henrique Baptista"
     assert state["cpf"] == "00511483155"
     assert state["birth_date"] == "1986-08-04"
@@ -77,8 +87,8 @@ def test_fluxo_completo_nao_regride_quando_historico_foi_podado():
 
 def test_horario_so_e_aceito_quando_foi_oferecido():
     state = set_offered_slots(_complete_registration(), [
-        {"date": "2026-09-04", "time": "17:00"},
-        {"date": "2026-09-05", "time": "08:30"},
+        {"date": FRIDAY_DATE, "time": "17:00"},
+        {"date": SATURDAY_DATE, "time": "08:30"},
     ])
 
     state = _advance(state, "Sexta as 16")
@@ -89,21 +99,21 @@ def test_horario_so_e_aceito_quando_foi_oferecido():
 
 def test_mesmo_horario_em_dois_dias_exige_identificacao_do_dia():
     state = set_offered_slots(_complete_registration(), [
-        {"date": "2026-09-04", "time": "17:00"},
-        {"date": "2026-09-05", "time": "17:00"},
+        {"date": FRIDAY_DATE, "time": "17:00"},
+        {"date": SATURDAY_DATE, "time": "17:00"},
     ])
 
     ambiguous = _advance(state, "As 17")
     selected = _advance(state, "Sabado as 17")
 
     assert booking_next_action(ambiguous) == "AWAIT_SLOT"
-    assert selected["selected_slot"] == {"date": "2026-09-05", "time": "17:00"}
+    assert selected["selected_slot"] == {"date": SATURDAY_DATE, "time": "17:00"}
 
 
 def test_pedido_de_outro_dia_dispara_nova_consulta_de_disponibilidade():
     state = set_offered_slots(_complete_registration(), [
-        {"date": "2026-09-04", "time": "17:00"},
-        {"date": "2026-09-05", "time": "08:30"},
+        {"date": FRIDAY_DATE, "time": "17:00"},
+        {"date": SATURDAY_DATE, "time": "08:30"},
     ])
 
     state = _advance(state, "Prefiro dia 08/09/2026")
@@ -120,7 +130,7 @@ def test_agendamento_para_terceiro_preserva_o_tipo_do_paciente():
     )
     state = _advance(
         state,
-        "Ela esta com alergia",
+        "Ela esta com alergia há 3 dias e ja tomou antialergico",
         _routing(complaint=True, third_party=True),
     )
 

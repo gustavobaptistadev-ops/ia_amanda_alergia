@@ -245,9 +245,8 @@ Classificação:"""
         "booking": booking,
     }
 
-def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow", "handoff_flow"]:
+def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow", "handoff_flow", "cancellation_flow", "rescheduling_flow", "off_topic_flow", "location_flow"]:
     """Direciona o estado para o fluxo especializado correspondente."""
-    """Função de roteamento condicional baseada na intenção."""
     intent = state.get("intent")
     if intent == "FRUSTRACAO_HANDOFF":
         return "handoff_flow"
@@ -257,13 +256,32 @@ def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow",
         return "off_topic_flow"
     if intent == "LOCATION_REQUEST":
         return "location_flow"
-    if intent in ["AGENDAMENTO", "REAGENDAMENTO", "CANCELAMENTO"]:
+    if intent == "CANCELAMENTO":
+        return "cancellation_flow"
+    if intent == "REAGENDAMENTO":
+        return "rescheduling_flow"
+    if intent == "AGENDAMENTO":
         return "schedule_flow"
     return "fetch_context"
 
+async def cancellation_flow_node(state: AgentState):
+    """Nó dedicado ao fluxo de cancelamento."""
+    msg = (
+        "[CANCELAMENTO] Simulei a busca de uma consulta ativa para o paciente. "
+        "Não execute ferramentas reais ainda. Peça para o paciente confirmar que deseja realmente cancelar sua consulta e avise que a equipe foi notificada."
+    )
+    return {"context": msg}
+
+async def rescheduling_flow_node(state: AgentState):
+    """Nó dedicado ao fluxo de reagendamento."""
+    msg = (
+        "[REAGENDAMENTO] Simulei a busca de uma consulta ativa para o paciente. "
+        "Não execute ferramentas reais ainda. Diga ao paciente que encontrou o agendamento atual dele e pergunte para quando ele gostaria de reagendar."
+    )
+    return {"context": msg}
+
 def handoff_flow_node(state: AgentState):
     """Produz a resposta de transferência para a equipe humana."""
-    """Nó de Transbordo Humano."""
     msg = (
         "Compreendo perfeitamente. Estou transferindo o seu atendimento agora mesmo para a nossa equipe humana. "
         "Um de nossos recepcionistas já foi notificado e vai dar continuidade ao seu atendimento por aqui em instantes. [TRANSFERIR_HUMANO]"
@@ -272,17 +290,8 @@ def handoff_flow_node(state: AgentState):
 
 def urgency_flow_node(state: AgentState):
     """Interrompe o fluxo normal e orienta o paciente em urgência."""
-    """Nó de Alerta/Urgência: Gera mensagem de acolhimento emergencial e orienta buscar pronto-socorro."""
     msg = (
         "Identifiquei que você pode estar passando por uma situação de urgência ou necessitando de atenção imediata.\n\n"
-        "Se estiver com sintomas agudos (como falta de ar súbita ou reação alérgica severa), por favor, *procure o Pronto Socorro mais próximo imediatamente*.\n\n"
-        "Já notifiquei nossa equipe clínica prioritariamente para assumir seu atendimento por aqui."
-    )
-    return {"messages": [AIMessage(content=msg)]}
-
-
-def off_topic_flow_node(state: AgentState):
-    """Recusa assuntos externos e reconduz o contato ao atendimento clínico."""
     msg = (
         "Posso ajudar apenas com informações da Clínica Lifeline One, orientações administrativas "
         "e agendamento de consultas. Vamos continuar por aqui: você deseja informações sobre a clínica "
@@ -341,6 +350,11 @@ async def schedule_flow_node(state: AgentState):
                 "cpf": cpf,
                 "dob": dob,
                 "phone": state.get("thread_id", ""),
+                "email": booking.get("email", ""),
+                "clinical_summary": booking.get("clinical_summary", ""),
+                "payment_type": booking.get("payment_type", ""),
+                "insurance_operator": booking.get("insurance_operator", ""),
+                "insurance_card": booking.get("insurance_card", ""),
             })
             booking_succeeded = any(
                 term in str(booking_result).lower()
@@ -367,6 +381,10 @@ async def schedule_flow_node(state: AgentState):
         and routing.get("next_action") == "CHECK_AVAILABILITY"
         and record_validation.get("valid")
     ):
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
+        if now.hour < 8 or now.hour >= 18:
+            return {"context": "[FORA_DO_EXPEDIENTE] A triagem foi concluída, mas estamos fora do horário comercial (08h às 18h). Não apresente horários. Avise que a equipe retornará amanhã de manhã. Se houver queixa de dor intensa ou urgência na triagem, sugira procurar o pronto-socorro mais próximo.", "booking": booking}
+            
         now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
         requested_date = booking.get("requested_date") or extract_requested_date(last_message, now.date())
         if requested_date:
@@ -422,12 +440,19 @@ async def generate_response_node(state: AgentState):
     if context.startswith("[CACHED_PUBLIC_RESPONSE]\n"):
         return {"messages": [AIMessage(content=context.split("\n", 1)[1])]}
 
-    # A queixa é obrigatória antes da coleta cadastral de um novo agendamento.
-    # Esta trava é determinística para não depender de a LLM seguir o prompt.
-    if intent == "AGENDAMENTO" and not booking.get("complaint_collected"):
-        return {
-            "messages": [AIMessage(content=build_complaint_request(messages))]
-        }
+    if intent == "AGENDAMENTO" and routing.get("next_action") == "COLLECT_COMPLAINT":
+        if not booking.get("complaint_collected"):
+            return {
+                "messages": [AIMessage(content=build_complaint_request(messages))]
+            }
+        elif not booking.get("duration_collected"):
+            return {
+                "messages": [AIMessage(content="Sinto muito que você esteja passando por isso. Há quanto tempo você está com esses sintomas?")]
+            }
+        elif not booking.get("medication_collected"):
+            return {
+                "messages": [AIMessage(content="Compreendo. E você tem tomado algum medicamento para aliviar isso ultimamente?")]
+            }
 
     next_action = routing.get("next_action")
     if intent == "AGENDAMENTO" and next_action == "AWAIT_SLOT":
@@ -464,6 +489,10 @@ async def generate_response_node(state: AgentState):
             link_match = re.search(r"https?://\S+", result)
             link = link_match.group(0).rstrip(".,") if link_match else ""
             link_text = f"\n\nAdicione a consulta na sua agenda: {link}" if link else ""
+            formatted_date = "/".join(reversed(date_parts)) if len(date_parts) == 3 else slot.get("date", "")
+            link_match = re.search(r"https?://\S+", result)
+            link = link_match.group(0).rstrip(".,") if link_match else ""
+            link_text = f"\n\nAdicione a consulta na sua agenda: {link}" if link else ""
             first_name = (booking.get("patient_name") or "Paciente").split()[0]
             return {"messages": [AIMessage(content=(
                 f"Prontinho, {first_name}. Sua consulta está confirmada para {formatted_date} às {slot.get('time')}.{link_text}\n\n"
@@ -473,7 +502,7 @@ async def generate_response_node(state: AgentState):
             "Não consegui concluir esse horário agora. Vou verificar a disponibilidade novamente para oferecer uma opção válida."
         ))]}
     if intent == "AGENDAMENTO" and next_action in {
-        "COLLECT_NAME", "COLLECT_CPF", "COLLECT_BIRTH_DATE", "COLLECT_PAYMENT_TYPE"
+        "COLLECT_NAME", "COLLECT_CPF", "COLLECT_BIRTH_DATE", "COLLECT_EMAIL", "COLLECT_PAYMENT_TYPE", "COLLECT_INSURANCE_CARD"
     }:
         third_party = booking.get("patient_type") == "third_party"
         prompts = {
@@ -488,12 +517,16 @@ async def generate_response_node(state: AgentState):
                 "Agora informe o seu CPF, por favor."
             ),
             "COLLECT_BIRTH_DATE": (
-                "Para finalizar o cadastro, informe a data de nascimento da pessoa que será consultada."
-                if third_party else
-                "Para finalizar o cadastro, informe sua data de nascimento."
+                "Informe também a data de nascimento."
+            ),
+            "COLLECT_EMAIL": (
+                "Precisamos de um e-mail para envio de documentos e recibos. Qual o e-mail do paciente?"
             ),
             "COLLECT_PAYMENT_TYPE": (
                 "Para finalizar, você prefere atendimento particular ou utilizar um convênio?"
+            ),
+            "COLLECT_INSURANCE_CARD": (
+                "Por favor, informe o número da carteirinha do convênio ou envie uma foto dela."
             ),
         }
         return {"messages": [AIMessage(content=prompts[next_action])]}

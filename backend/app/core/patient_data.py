@@ -19,6 +19,20 @@ INSURANCE_OPERATORS = (
     "ipsemg", "geap", "cassi", "notredame", "hapvida", "amil",
 )
 
+MEDICATION_TERMS = (
+    "antialergico", "antialérgico", "corticoide", "corticóide", "alegra", "allegra",
+    "polaramine", "loratadina", "desloratadina", "fexofenadina", "cetirizina",
+    "prednisona", "prednisolona", "dexametasona", "betametasona", "remedio", "remédio",
+    "pomada", "creme", "xarope", "bombinha", "aerolin", "clenil", "flixotide",
+    "seretide", "alenia", "symbicort", "foster",
+)
+
+DURATION_TERMS = (
+    "dia", "dias", "semana", "semanas", "mes", "meses", "mês", "ano", "anos",
+    "desde", "tempo", "hoje", "ontem", "anteontem", "agora", "horas"
+)
+
+
 
 def extract_cpf_from_text(text: str) -> str | None:
     """Extract a valid CPF as text, preserving leading zeros."""
@@ -57,6 +71,16 @@ def extract_latest_date(messages: Sequence) -> str | None:
             return match.group(0)
     return None
 
+EMAIL_PATTERN = re.compile(r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)")
+
+def extract_email(text: str) -> str | None:
+    if not text:
+        return None
+    match = EMAIL_PATTERN.search(text)
+    if match:
+        return match.group(1).lower()
+    return None
+
 
 def extract_payment_type(messages: Sequence) -> str | None:
     """Detect an explicit private/insurance choice made by the patient."""
@@ -86,3 +110,61 @@ def has_patient_complaint(messages: Sequence) -> bool:
         if any(term in normalized for term in COMPLAINT_TERMS):
             return True
     return False
+
+
+def extract_medications(messages: Sequence) -> list[str]:
+    """Return a list of medication keywords mentioned by the patient."""
+    meds = set()
+    for message in messages or []:
+        if getattr(message, "type", None) != "human":
+            continue
+        text = getattr(message, "content", "") or ""
+        normalized = unicodedata.normalize("NFKD", text.lower())
+        normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+        
+        for term in MEDICATION_TERMS:
+            norm_term = unicodedata.normalize("NFKD", term.lower())
+            norm_term = "".join(char for char in norm_term if not unicodedata.combining(char))
+            if re.search(r"\b" + re.escape(norm_term) + r"\b", normalized):
+                meds.add(term)
+    return list(meds)
+
+
+def has_symptom_duration(messages: Sequence) -> bool:
+    """Return True if the patient mentions temporal words usually indicating duration."""
+    for message in messages or []:
+        if getattr(message, "type", None) != "human":
+            continue
+        text = getattr(message, "content", "") or ""
+        normalized = unicodedata.normalize("NFKD", text.lower())
+        normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+        
+        for term in DURATION_TERMS:
+            norm_term = unicodedata.normalize("NFKD", term.lower())
+            norm_term = "".join(char for char in norm_term if not unicodedata.combining(char))
+            if re.search(r"\b" + re.escape(norm_term) + r"\b", normalized):
+                return True
+    return False
+
+def extract_clinical_summary(messages: Sequence) -> str:
+    """Return a concatenated string of the patient's messages that contain medical terms."""
+    summary = []
+    for message in messages or []:
+        if getattr(message, "type", None) != "human":
+            continue
+        text = getattr(message, "content", "") or ""
+        normalized = unicodedata.normalize("NFKD", text.lower())
+        normalized = "".join(char for char in normalized if not unicodedata.combining(char))
+        
+        has_term = False
+        for term in COMPLAINT_TERMS + DURATION_TERMS + MEDICATION_TERMS:
+            norm_term = unicodedata.normalize("NFKD", term.lower())
+            norm_term = "".join(char for char in norm_term if not unicodedata.combining(char))
+            if re.search(r"\b" + re.escape(norm_term) + r"\b", normalized):
+                has_term = True
+                break
+        
+        if has_term:
+            summary.append(text.strip())
+            
+    return " | ".join(summary) if summary else ""

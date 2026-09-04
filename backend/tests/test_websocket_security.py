@@ -1,25 +1,44 @@
 from types import SimpleNamespace
 
-from app.core.security import get_websocket_protocol_token
+import pytest
+from fastapi import HTTPException
+
+from app.core.security import validate_cookie_origin
 
 
-def _websocket_with_protocol(value: str):
-    return SimpleNamespace(headers={"sec-websocket-protocol": value})
+def _connection(origin: str, connection_type: str = "websocket", method: str = "GET"):
+    return SimpleNamespace(
+        headers={"origin": origin},
+        scope={"type": connection_type},
+        method=method,
+    )
 
 
-def test_websocket_recebe_token_pelo_protocolo_do_handshake():
-    websocket = _websocket_with_protocol("bearer, header.payload.signature")
+def test_websocket_aceita_origem_do_frontend(monkeypatch):
+    monkeypatch.setenv("CORS_ORIGINS", "https://painel.example.com")
 
-    assert get_websocket_protocol_token(websocket) == "header.payload.signature"
-
-
-def test_websocket_rejeita_cabecalho_sem_protocolo_bearer():
-    websocket = _websocket_with_protocol("chat, header.payload.signature")
-
-    assert get_websocket_protocol_token(websocket) is None
+    validate_cookie_origin(_connection("https://painel.example.com"))
 
 
-def test_websocket_rejeita_token_ausente():
-    websocket = _websocket_with_protocol("bearer")
+def test_websocket_rejeita_origem_externa(monkeypatch):
+    monkeypatch.setenv("CORS_ORIGINS", "https://painel.example.com")
 
-    assert get_websocket_protocol_token(websocket) is None
+    with pytest.raises(HTTPException) as error:
+        validate_cookie_origin(_connection("https://site-malicioso.example"))
+
+    assert error.value.status_code == 403
+
+
+def test_requisicao_mutavel_por_cookie_exige_origem_permitida(monkeypatch):
+    monkeypatch.setenv("CORS_ORIGINS", "https://painel.example.com")
+
+    with pytest.raises(HTTPException) as error:
+        validate_cookie_origin(
+            _connection("https://site-malicioso.example", "http", "POST")
+        )
+
+    assert error.value.status_code == 403
+
+
+def test_leitura_http_nao_exige_origin():
+    validate_cookie_origin(_connection("", "http", "GET"))

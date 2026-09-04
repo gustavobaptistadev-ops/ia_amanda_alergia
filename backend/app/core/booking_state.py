@@ -13,6 +13,10 @@ from app.core.patient_data import (
     extract_latest_date,
     extract_payment_type,
     has_patient_complaint,
+    extract_medications,
+    has_symptom_duration,
+    extract_email,
+    extract_clinical_summary,
 )
 
 
@@ -21,7 +25,9 @@ ACTIVE_STAGES = {
     "AWAITING_PATIENT_NAME",
     "AWAITING_CPF",
     "AWAITING_BIRTH_DATE",
+    "AWAITING_EMAIL",
     "AWAITING_PAYMENT",
+    "AWAITING_INSURANCE_CARD",
     "READY_FOR_AVAILABILITY",
     "AWAITING_SLOT",
     "READY_TO_BOOK",
@@ -33,7 +39,9 @@ ACTION_BY_STAGE = {
     "AWAITING_PATIENT_NAME": "COLLECT_NAME",
     "AWAITING_CPF": "COLLECT_CPF",
     "AWAITING_BIRTH_DATE": "COLLECT_BIRTH_DATE",
+    "AWAITING_EMAIL": "COLLECT_EMAIL",
     "AWAITING_PAYMENT": "COLLECT_PAYMENT_TYPE",
+    "AWAITING_INSURANCE_CARD": "COLLECT_INSURANCE_CARD",
     "READY_FOR_AVAILABILITY": "CHECK_AVAILABILITY",
     "AWAITING_SLOT": "AWAIT_SLOT",
     "READY_TO_BOOK": "CONFIRM_SLOT",
@@ -48,11 +56,16 @@ def new_booking_state() -> dict[str, Any]:
         "stage": "NEW",
         "patient_type": "self",
         "complaint_collected": False,
+        "duration_collected": False,
+        "medication_collected": False,
+        "clinical_summary": None,
         "patient_name": None,
         "cpf": None,
         "birth_date": None,
+        "email": None,
         "payment_type": None,
         "insurance_operator": None,
+        "insurance_card": None,
         "offered_slots": [],
         "selected_slot": None,
         "requested_date": None,
@@ -168,7 +181,7 @@ def _derive_stage(booking: dict[str, Any]) -> str:
         return "BOOKED"
     if booking.get("conflicts"):
         return "HUMAN_REVIEW"
-    if not booking.get("complaint_collected"):
+    if not booking.get("complaint_collected") or not booking.get("duration_collected") or not booking.get("medication_collected"):
         return "AWAITING_COMPLAINT"
     if not booking.get("patient_name"):
         return "AWAITING_PATIENT_NAME"
@@ -176,8 +189,12 @@ def _derive_stage(booking: dict[str, Any]) -> str:
         return "AWAITING_CPF"
     if not booking.get("birth_date"):
         return "AWAITING_BIRTH_DATE"
+    if not booking.get("email"):
+        return "AWAITING_EMAIL"
     if not booking.get("payment_type"):
         return "AWAITING_PAYMENT"
+    if booking.get("payment_type") == "convenio" and not booking.get("insurance_card"):
+        return "AWAITING_INSURANCE_CARD"
     if booking.get("selected_slot"):
         return "READY_TO_BOOK"
     if booking.get("requested_date") or not booking.get("offered_slots"):
@@ -205,6 +222,16 @@ def update_booking_state(
         booking.get("complaint_collected")
         or entities.get("complaint_detected")
         or has_patient_complaint(messages)
+    )
+    booking["duration_collected"] = bool(
+        booking.get("duration_collected")
+        or entities.get("duration_detected")
+        or has_symptom_duration(messages)
+    )
+    booking["medication_collected"] = bool(
+        booking.get("medication_collected")
+        or entities.get("medication_detected")
+        or len(extract_medications(messages)) > 0
     )
 
     # On NEW, accept only names explicitly extracted by the router (for example,
@@ -242,10 +269,26 @@ def update_booking_state(
             if _is_correction(clean_text):
                 booking["conflicts"] = [item for item in booking.get("conflicts", []) if item != "birth_date_conflict"]
 
+    if booking.get("complaint_collected") and booking.get("duration_collected") and booking.get("medication_collected") and not booking.get("clinical_summary"):
+        booking["clinical_summary"] = extract_clinical_summary(messages)
+
+    new_email = extract_email(clean_text)
+    if new_email:
+        if booking.get("email") and booking["email"] != new_email and not _is_correction(clean_text):
+            booking["conflicts"] = sorted(set(booking.get("conflicts", []) + ["email_conflict"]))
+        else:
+            booking["email"] = new_email
+            if _is_correction(clean_text):
+                booking["conflicts"] = [item for item in booking.get("conflicts", []) if item != "email_conflict"]
+
     payment_type = extract_payment_type([_HumanMessage(clean_text)])
     if payment_type:
         booking["payment_type"] = payment_type
         booking["insurance_operator"] = _insurance_operator(clean_text, payment_type)
+        
+    if booking.get("stage") == "AWAITING_INSURANCE_CARD":
+        if len(clean_text) >= 5: # basic validation for card number
+            booking["insurance_card"] = clean_text
 
     selected_slot = _select_offered_slot(clean_text, booking.get("offered_slots", []))
     if selected_slot:
@@ -288,10 +331,14 @@ def booking_is_active(booking: dict[str, Any] | None) -> bool:
 
 
 def validate_booking_state(booking: dict[str, Any]) -> dict[str, Any]:
-    required = ("patient_name", "cpf", "birth_date", "payment_type")
+    required = ["patient_name", "cpf", "birth_date", "email", "payment_type"]
     missing = [field for field in required if not booking.get(field)]
+    
+    if booking.get("payment_type") == "convenio" and not booking.get("insurance_card"):
+        missing.append("insurance_card")
+        
     return {
-        "valid": bool(booking.get("complaint_collected")) and not missing and not booking.get("conflicts"),
+        "valid": bool(booking.get("complaint_collected") and booking.get("duration_collected") and booking.get("medication_collected")) and not missing and not booking.get("conflicts"),
         "patient_type": booking.get("patient_type", "self"),
         "missing_fields": missing,
         "conflicts": list(booking.get("conflicts", [])),

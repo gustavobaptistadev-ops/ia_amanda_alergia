@@ -19,11 +19,13 @@ export default function LoginPage() {
       const response = await fetch(`${apiUrl}/api/v1/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Não foi possível autenticar.");
-      localStorage.setItem("token", data.access_token);
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
       router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao realizar login.");

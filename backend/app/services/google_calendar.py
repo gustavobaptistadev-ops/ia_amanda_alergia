@@ -169,7 +169,19 @@ def check_availability(date_str: str, period: str = "todos") -> str:
         return "Erro ao consultar agenda."
 
 @tool
-async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str, dob: str, phone: str = "") -> str:
+async def create_event(
+    date_str: str, 
+    time_str: str, 
+    patient_name: str, 
+    cpf: str, 
+    dob: str, 
+    phone: str = "",
+    clinical_summary: str = "",
+    email: str = "",
+    payment_type: str = "",
+    insurance_operator: str = "",
+    insurance_card: str = ""
+) -> str:
     """
     Cria um agendamento na agenda do Google com validação estrita de dados e idempotência.
     """
@@ -314,9 +326,25 @@ async def create_event(date_str: str, time_str: str, patient_name: str, cpf: str
     try:
         start_dt = datetime.datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
         end_dt = start_dt + datetime.timedelta(hours=1)
+        desc = (
+            f"Consulta médica.\n\n"
+            f"--- DADOS DO PACIENTE ---\n"
+            f"Nome: {patient_name}\n"
+            f"CPF: {cpf}\n"
+            f"Nascimento: {dob}\n"
+            f"Telefone: {phone}\n"
+            f"Email: {email}\n\n"
+            f"--- DADOS DA CONSULTA ---\n"
+            f"Modalidade: {payment_type}\n"
+        )
+        if payment_type == "convenio":
+            desc += f"Convênio: {insurance_operator}\nCarteirinha: {insurance_card}\n"
         
-        desc = "Consulta médica. Dados cadastrais mantidos somente no sistema interno da clínica."
-
+        if clinical_summary:
+            desc += f"\n--- RESUMO CLÍNICO (Pré-Triagem) ---\n{clinical_summary}\n"
+            
+        desc += "\nDados cadastrais mantidos somente no sistema interno da clínica."
+        
         event = {
             'summary': f'Consulta - {patient_name}',
             'description': desc,

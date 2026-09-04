@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.chat import Contact, Message
 from app.services.evolution_api import send_text_message
-from app.core.security import WEBSOCKET_AUTH_PROTOCOL, get_api_key
+from app.core.security import get_api_key
 from app.core.auth import get_current_user
 from pydantic import BaseModel
 from typing import List
@@ -33,7 +33,7 @@ class ConnectionManager:
         self.listener_task = None
 
     async def connect(self, websocket: WebSocket):
-        await websocket.accept(subprotocol=WEBSOCKET_AUTH_PROTOCOL)
+        await websocket.accept()
         self.active_connections.append(websocket)
         # Inicia a task de listen do Redis PubSub apenas se houver conexões locais ativas
         if not self.listener_task or self.listener_task.done():

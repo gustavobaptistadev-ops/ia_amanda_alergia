@@ -41,3 +41,23 @@ def test_resposta_legada_com_encoding_quebrado_e_corrigida_na_saida():
     assert repair_mojibake("Sua consulta estÃƒÂ¡ confirmada. VocÃƒÂª jÃƒÂ¡ pode ir.") == (
         "Sua consulta está confirmada. Você já pode ir."
     )
+
+
+from app.core.patient_data import has_symptom_duration, extract_medications
+
+def test_has_symptom_duration():
+    messages = [HumanMessage(content="Estou sentindo essa dor há cerca de 3 dias.")]
+    assert has_symptom_duration(messages) is True
+    
+    messages = [HumanMessage(content="Só estou com muita tosse e cansaço.")]
+    assert has_symptom_duration(messages) is False
+
+def test_extract_medications():
+    messages = [HumanMessage(content="Tenho tomado antialérgico de 8 em 8 horas.")]
+    assert len(extract_medications(messages)) > 0
+
+    messages = [HumanMessage(content="Não estou tomando nenhum remédio.")]
+    assert len(extract_medications(messages)) > 0
+
+    messages = [HumanMessage(content="Sinto dor de cabeça e febre.")]
+    assert len(extract_medications(messages)) == 0

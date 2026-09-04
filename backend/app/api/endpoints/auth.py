@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -6,7 +6,18 @@ import logging
 
 from app.database import get_db
 from app.models.user import User
-from app.core.auth import verify_password, get_password_hash, create_access_token, get_current_user
+from app.core.auth import (
+    SESSION_COOKIE_NAME,
+    clear_session_cookie,
+    create_access_token,
+    get_current_user,
+    get_password_hash,
+    get_request_token,
+    oauth2_scheme,
+    revoke_access_token,
+    set_session_cookie,
+    verify_password,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -29,12 +40,17 @@ class UserResponse(BaseModel):
 
 import os
 from app.core.limiter import limiter
-from fastapi import Request
-
+from app.core.security import validate_cookie_origin
 @router.post("/login")
 @limiter.limit("5/minute")
-async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """Autentica usuário e retorna JWT token com permissões (RBAC) e proteção contra força bruta."""
+async def login(
+    request: Request,
+    response: Response,
+    req: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Autentica o usuário e cria uma sessão HttpOnly protegida contra força bruta."""
+    validate_cookie_origin(request)
     result = await db.execute(select(User).where(User.email == req.email))
     user = result.scalars().first()
     
@@ -57,10 +73,9 @@ async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(
             detail="E-mail ou senha incorretos."
         )
 
-    access_token = create_access_token(data={"sub": user.email, "role": user.role, "name": user.name})
+    access_token = create_access_token(data={"sub": user.id})
+    set_session_cookie(response, access_token)
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
         "user": {
             "id": user.id,
             "email": user.email,
@@ -68,6 +83,22 @@ async def login(request: Request, req: LoginRequest, db: AsyncSession = Depends(
             "role": user.role
         }
     }
+
+
+@router.post("/logout")
+async def logout(
+    request: Request,
+    response: Response,
+    bearer_token: str = Depends(oauth2_scheme),
+):
+    """Revoga a sessão atual no servidor e remove o cookie do navegador."""
+    token = get_request_token(request, bearer_token)
+    if token:
+        if request.cookies.get(SESSION_COOKIE_NAME):
+            validate_cookie_origin(request)
+        await revoke_access_token(token)
+    clear_session_cookie(response)
+    return {"status": "ok"}
 
 @router.get("/me")
 async def get_me(user: User = Depends(get_current_user)):

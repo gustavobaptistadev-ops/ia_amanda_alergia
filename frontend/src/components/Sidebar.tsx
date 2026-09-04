@@ -22,10 +22,18 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
-  function handleLogout() {
-    localStorage.removeItem("token");
-    sessionStorage.removeItem("token");
-    window.location.href = "/login";
+  async function handleLogout() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+    try {
+      await fetch(`${apiUrl}/api/v1/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+      window.location.href = "/login";
+    }
   }
 
   // Fecha a gaveta mobile ao trocar de página

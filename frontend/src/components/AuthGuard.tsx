@@ -17,15 +17,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-    if (!token) {
-      router.replace("/login");
-      return;
-    }
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
     fetch(`${apiUrl}/api/v1/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+      credentials: "include",
     }).then((response) => {
       if (!response.ok) {
         localStorage.removeItem("token");

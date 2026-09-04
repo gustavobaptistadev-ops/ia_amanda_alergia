@@ -46,7 +46,7 @@ THIRD_PARTY_TERMS = (
 
 INTENT_TERMS = {
     "FRUSTRACAO_HANDOFF": ("humano", "atendente", "pessoa", "falar com alguém", "falar com alguem"),
-    "URGENCIA": ("urgencia", "emergencia", "falta de ar", "sufocando", "anafilaxia", "pronto socorro"),
+    "URGENCIA": ("urgencia", "emergencia", "falta de ar", "falta de ar severa", "sufocando", "anafilaxia", "garganta fechando", "pronto socorro", "choque anafilatico", "choque anafilático"),
     "REAGENDAMENTO": ("remarcar", "reagendar", "mudar o dia", "mudar a hora", "mudar a data"),
     "CANCELAMENTO": ("cancelar", "desmarcar"),
     "AGENDAMENTO": ("agendar", "marcar consulta", "marcar horario", "vaga", "consulta"),

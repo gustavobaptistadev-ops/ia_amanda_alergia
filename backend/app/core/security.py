@@ -6,8 +6,8 @@ from fastapi.security import APIKeyHeader
 from jose import JWTError, jwt
 
 API_KEY_NAME = "X-API-Key"
-WEBSOCKET_AUTH_PROTOCOL = "bearer"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+COOKIE_AUTH_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 def require_secret(name: str, minimum_length: int = 32) -> str:
@@ -28,27 +28,45 @@ def _get_bearer_token(conn) -> str | None:
     return None
 
 
-def get_websocket_protocol_token(websocket: WebSocket) -> str | None:
-    """Read a JWT from the WebSocket protocol header without exposing it in the URL."""
-    raw_protocols = websocket.headers.get("sec-websocket-protocol", "")
-    protocols = [item.strip() for item in raw_protocols.split(",") if item.strip()]
-    if len(protocols) >= 2 and secrets.compare_digest(
-        protocols[0].lower(), WEBSOCKET_AUTH_PROTOCOL
-    ):
-        return protocols[1]
-    return None
-
-
-def _validate_jwt(token: str | None) -> str | None:
+async def _validate_jwt(token: str | None) -> str | None:
     if not token:
         return None
     try:
-        from app.core.auth import ALGORITHM, SECRET_KEY
+        from app.core.auth import (
+            ALGORITHM,
+            SECRET_KEY,
+            SESSION_TOKEN_VERSION,
+            is_access_token_revoked,
+        )
 
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return token if payload.get("sub") else None
+        if (
+            not payload.get("sub")
+            or payload.get("ver") != SESSION_TOKEN_VERSION
+            or await is_access_token_revoked(token)
+        ):
+            return None
+        return token
     except JWTError:
         return None
+
+
+def _allowed_browser_origins() -> set[str]:
+    frontend_url = os.getenv(
+        "NEXT_PUBLIC_FRONTEND_URL",
+        "https://ia-amanda-frontend.up.railway.app",
+    )
+    configured = os.getenv("CORS_ORIGINS", frontend_url)
+    return {origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()}
+
+
+def validate_cookie_origin(conn) -> None:
+    """Prevent CSRF and cross-site WebSocket hijacking for cookie sessions."""
+    origin = (conn.headers.get("origin") or "").rstrip("/")
+    is_websocket = conn.scope.get("type") == "websocket"
+    is_mutation = getattr(conn, "method", "GET").upper() in COOKIE_AUTH_METHODS
+    if (is_websocket or is_mutation) and origin not in _allowed_browser_origins():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Origem não permitida")
 
 
 async def get_api_key(request: Request = None, websocket: WebSocket = None):
@@ -61,10 +79,16 @@ async def get_api_key(request: Request = None, websocket: WebSocket = None):
         return key
 
     token = _get_bearer_token(conn)
+    cookie_token = None
     if not token and conn.scope.get("type") == "websocket":
-        token = get_websocket_protocol_token(websocket)
+        cookie_token = websocket.cookies.get("lifeline_session")
+    elif not token:
+        cookie_token = request.cookies.get("lifeline_session")
+    if cookie_token:
+        validate_cookie_origin(conn)
+        token = cookie_token
 
-    validated_token = _validate_jwt(token)
+    validated_token = await _validate_jwt(token)
     if validated_token:
         return validated_token
 
