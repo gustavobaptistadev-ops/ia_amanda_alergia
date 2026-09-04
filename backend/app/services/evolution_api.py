@@ -110,11 +110,14 @@ async def auto_create_instance():
 async def send_text_message(number: str, text: str):
     """Envia uma mensagem de texto via EvolutionAPI."""
     text = remove_emojis(text)
-    url = f"{EVOLUTION_API_URL}/send/text"
+    url = f"{EVOLUTION_API_URL}/message/sendText/{EVOLUTION_INSTANCE_NAME}"
     payload = {
         "number": number,
         "text": text,
-        "delay": 1200 # 1.2 segundos de delay digitando
+        "delay": 1200,
+        "options": {
+            "delay": 1200
+        }
     }
     
     async with httpx.AsyncClient() as client:
@@ -129,20 +132,21 @@ async def send_text_message(number: str, text: str):
             return None
 
 async def send_voice_audio_message(number: str, audio_bytes: bytes):
-    """Envia uma mensagem de áudio (formato de nota de voz WhatsApp) via EvolutionAPI / Ghosthub."""
+    """Envia uma mensagem de áudio (formato de nota de voz WhatsApp) via EvolutionAPI."""
     import base64
     if not audio_bytes:
         return None
 
     b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
     
-    # 1. Tenta endpoint padrão /send/media
-    url = f"{EVOLUTION_API_URL}/send/media"
+    url = f"{EVOLUTION_API_URL}/message/sendWhatsAppAudio/{EVOLUTION_INSTANCE_NAME}"
     payload = {
         "number": number,
-        "media": f"data:audio/ogg;base64,{b64_audio}",
-        "mediatype": "audio",
-        "delay": 1500
+        "audio": f"data:audio/ogg;base64,{b64_audio}",
+        "delay": 1500,
+        "options": {
+            "delay": 1500
+        }
     }
     
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -154,12 +158,16 @@ async def send_voice_audio_message(number: str, audio_bytes: bytes):
             else:
                 logger.warning(f"Aviso /send/media ({response.status_code}): {response.text}. Tentando endpoint alternativo /send/audio...")
                 
-                # 2. Fallback para /send/audio (se suportado pelo provedor Ghosthub)
-                alt_url = f"{EVOLUTION_API_URL}/send/audio"
+                # 2. Fallback para media
+                alt_url = f"{EVOLUTION_API_URL}/message/sendMedia/{EVOLUTION_INSTANCE_NAME}"
                 alt_payload = {
                     "number": number,
-                    "audio": f"data:audio/ogg;base64,{b64_audio}",
-                    "delay": 1500
+                    "media": f"data:audio/ogg;base64,{b64_audio}",
+                    "mediatype": "audio",
+                    "delay": 1500,
+                    "options": {
+                        "delay": 1500
+                    }
                 }
                 alt_res = await client.post(alt_url, json=alt_payload, headers=get_headers())
                 if alt_res.status_code == 200:
@@ -178,14 +186,17 @@ async def send_document_message(number: str, document_bytes: bytes, filename: st
 
     b64_doc = base64.b64encode(document_bytes).decode("utf-8")
     
-    url = f"{EVOLUTION_API_URL}/send/media"
+    url = f"{EVOLUTION_API_URL}/message/sendMedia/{EVOLUTION_INSTANCE_NAME}"
     payload = {
         "number": number,
         "media": f"data:text/calendar;base64,{b64_doc}",
         "mediatype": "document",
         "fileName": filename,
         "caption": caption,
-        "delay": 1500
+        "delay": 1500,
+        "options": {
+            "delay": 1500
+        }
     }
     
     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -211,9 +222,10 @@ async def get_base64_from_media(message_id: str, remote_jid: str = "", message_o
     
     # Lista de endpoints suportados por diferentes versões da Evolution / Ghosthub
     endpoints = [
+        f"{EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/{EVOLUTION_INSTANCE_NAME}",
+        f"{EVOLUTION_API_URL}/message/getBase64FromMediaMessage/{EVOLUTION_INSTANCE_NAME}",
         f"{EVOLUTION_API_URL}/chat/getBase64FromMediaMessage",
-        f"{EVOLUTION_API_URL}/message/getBase64FromMediaMessage",
-        f"{EVOLUTION_API_URL}/messages/getBase64"
+        f"{EVOLUTION_API_URL}/message/getBase64FromMediaMessage"
     ]
     
     payloads = [
