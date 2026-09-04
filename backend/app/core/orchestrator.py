@@ -747,6 +747,8 @@ workflow.add_node("handoff_flow", handoff_flow_node)
 workflow.add_node("urgency_flow", urgency_flow_node)
 workflow.add_node("off_topic_flow", off_topic_flow_node)
 workflow.add_node("location_flow", location_flow_node)
+workflow.add_node("cancellation_flow", cancellation_flow_node)
+workflow.add_node("rescheduling_flow", rescheduling_flow_node)
 workflow.add_node("generate_response", generate_response_node)
 workflow.add_node("tools", tool_node)
 workflow.add_node("prune_history", prune_history_node)
@@ -759,6 +761,8 @@ workflow.add_edge("handoff_flow", "prune_history")
 workflow.add_edge("urgency_flow", "prune_history")
 workflow.add_edge("off_topic_flow", "prune_history")
 workflow.add_edge("location_flow", "prune_history")
+workflow.add_edge("cancellation_flow", "generate_response")
+workflow.add_edge("rescheduling_flow", "generate_response")
 
 workflow.add_conditional_edges(
     "generate_response",
