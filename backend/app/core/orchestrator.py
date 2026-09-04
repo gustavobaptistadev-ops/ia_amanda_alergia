@@ -292,14 +292,10 @@ def urgency_flow_node(state: AgentState):
     """Interrompe o fluxo normal e orienta o paciente em urgência."""
     msg = (
         "Identifiquei que você pode estar passando por uma situação de urgência ou necessitando de atenção imediata.\n\n"
-    msg = (
-        "Posso ajudar apenas com informações da Clínica Lifeline One, orientações administrativas "
-        "e agendamento de consultas. Vamos continuar por aqui: você deseja informações sobre a clínica "
-        "ou prefere seguir com o agendamento?"
+        "Recomendamos que você procure o pronto-socorro mais próximo imediatamente.\n\n"
+        "Quando estiver seguro e caso queira seguir com um agendamento regular posteriormente, estarei por aqui."
     )
     return {"messages": [AIMessage(content=msg)]}
-
-
 def location_flow_node(state: AgentState):
     """Entrega a localização após confirmação, sem reabrir o cadastro."""
     return {"messages": [AIMessage(content=(
