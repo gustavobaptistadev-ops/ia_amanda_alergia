@@ -4,10 +4,13 @@ from sqlalchemy import select
 from pydantic import BaseModel
 from typing import List
 import uuid
+import json
 
 from app.database import AsyncSessionLocal
 from app.models.learning import LearningSuggestion, LearningStatus
 from app.core.security import get_api_key
+from langchain_openai import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
 import os
 import datetime
 
@@ -24,6 +27,56 @@ class LearningSuggestionResponse(BaseModel):
     
     class Config:
         orm_mode = True
+
+class ClinicalCaseRequest(BaseModel):
+    raw_case_text: str
+
+@router.post("/ingest-clinical-cases")
+async def ingest_clinical_case(request: ClinicalCaseRequest):
+    """
+    Recebe um relato bruto de caso clínico ou prontuário antigo, 
+    anonimiza os dados via LLM, extrai as regras de triagem 
+    e salva como LearningSuggestion para aprovação médica.
+    """
+    if not request.raw_case_text or len(request.raw_case_text) < 10:
+        raise HTTPException(status_code=400, detail="O texto do caso deve ter pelo menos 10 caracteres.")
+
+    prompt_template = ChatPromptTemplate.from_messages([
+        ("system", "Você é um assistente médico especialista em triagem de alergia. Sua tarefa é ler um relato clínico ou histórico de mensagens e estruturá-lo em um aprendizado para uma IA recepcionista.\n\n"
+                   "REGRAS ESTRITAS:\n"
+                   "1. REMOVA qualquer informação pessoal do paciente (nome, cpf, telefone). Use termos genéricos (ex: Paciente, Mãe, etc).\n"
+                   "2. Estruture sua resposta EXATAMENTE no seguinte formato:\n\n"
+                   "Sintoma Relatado: [Resumo do sintoma]\n"
+                   "Acolhimento Sugerido: [Como a IA deve acolher a dor empatia]\n"
+                   "Perguntas Chave a Fazer: [Quais perguntas a IA deve fazer para a triagem]\n"
+                   "Ação de Triagem: [O que a IA deve sugerir no final, ex: Agendar encaixe urgente, orientar PS, agendar consulta eletiva]\n\n"
+                   "Lembre-se: A IA recepcionista é PROIBIDA de prescrever medicamentos ou diagnosticar. Foque apenas na coleta de dados e encaminhamento."),
+        ("user", "Texto Bruto do Caso:\n{raw_text}")
+    ])
+    
+    try:
+        llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
+        chain = prompt_template | llm
+        
+        response = await chain.ainvoke({"raw_text": request.raw_case_text})
+        extracted_learning = response.content.strip()
+        
+        async with AsyncSessionLocal() as session:
+            new_sug = LearningSuggestion(
+                id=uuid.uuid4(),
+                patient_name="Caso Clínico Importado",
+                patient_phone="",
+                suggestion_text=extracted_learning,
+                context="Ingestão em Lote via API (Anonimizado)",
+                status=LearningStatus.PENDING,
+                created_at=datetime.datetime.utcnow()
+            )
+            session.add(new_sug)
+            await session.commit()
+            
+        return {"status": "ok", "message": "Caso clínico processado, anonimizado e aguardando aprovação no painel."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar o caso via LLM: {str(e)}")
 
 @router.get("/", response_model=List[LearningSuggestionResponse])
 async def list_suggestions():
@@ -56,12 +109,18 @@ async def approve_suggestion(suggestion_id: str):
         await session.commit()
         
         # 1. Append to knowledge base
+        # Modificação: Se for caso clínico importado, salvar na pasta correta
         KNOWLEDGE_DIR = os.path.join(os.path.dirname(__file__), '../../../docs/knowledge_base')
         os.makedirs(KNOWLEDGE_DIR, exist_ok=True)
-        filepath = os.path.join(KNOWLEDGE_DIR, 'aprendizados_da_ia.md')
         
-        with open(filepath, 'a', encoding='utf-8') as f:
-            f.write(f"\n- [Regra Aprendida ({sug.resolved_at.strftime('%d/%m/%Y')})]: {sug.suggestion_text}\n")
+        if sug.context == "Ingestão em Lote via API (Anonimizado)":
+            filepath = os.path.join(KNOWLEDGE_DIR, '06_casos_clinicos_referencia.md')
+            with open(filepath, 'a', encoding='utf-8') as f:
+                f.write(f"\n### Caso Adicionado em {sug.resolved_at.strftime('%d/%m/%Y')}\n{sug.suggestion_text}\n---\n")
+        else:
+            filepath = os.path.join(KNOWLEDGE_DIR, 'aprendizados_da_ia.md')
+            with open(filepath, 'a', encoding='utf-8') as f:
+                f.write(f"\n- [Regra Aprendida ({sug.resolved_at.strftime('%d/%m/%Y')})]: {sug.suggestion_text}\n")
             
         # 2. Trigger RAG re-train asynchronously
         from app.core.rag import get_vectorstore, get_embeddings, collection_name, db_url
