@@ -303,6 +303,10 @@ def location_flow_node(state: AgentState):
         f"{clinic_location_text()}"
     ))]}
 
+async def off_topic_flow_node(state: AgentState):
+    """Lida com mensagens fora do escopo médico/atendimento da clínica."""
+    return {"messages": [AIMessage(content="Peço desculpas, mas como assistente virtual da Clínica Lifeline One, só posso ajudar com assuntos relacionados a agendamentos, dúvidas sobre exames, tratamentos médicos e informações da clínica. Como posso te ajudar com a sua saúde hoje?")]}
+
 async def fetch_context_node(state: AgentState):
     """Consulta a base de conhecimento sem alterar o histórico da conversa."""
     """Nó 2a: Busca o contexto no RAG (para Dúvidas e Corpo Clínico)."""
