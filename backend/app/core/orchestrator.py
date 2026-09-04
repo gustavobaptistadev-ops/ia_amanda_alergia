@@ -440,45 +440,34 @@ async def generate_response_node(state: AgentState):
     if context.startswith("[CACHED_PUBLIC_RESPONSE]\n"):
         return {"messages": [AIMessage(content=context.split("\n", 1)[1])]}
 
+    action_instruction = ""
+    next_action = routing.get("next_action")
+
     if intent == "AGENDAMENTO" and routing.get("next_action") == "COLLECT_COMPLAINT":
         if not booking.get("complaint_collected"):
-            return {
-                "messages": [AIMessage(content=build_complaint_request(messages))]
-            }
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: O paciente quer agendar uma consulta. Pergunte de forma empática e natural o motivo da consulta ou os sintomas que ele está sentindo."
         elif not booking.get("duration_collected"):
-            return {
-                "messages": [AIMessage(content="Sinto muito que você esteja passando por isso. Há quanto tempo você está com esses sintomas?")]
-            }
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: O paciente já informou a queixa. Seja empática e pergunte há quanto tempo ele está com esses sintomas."
         elif not booking.get("medication_collected"):
-            return {
-                "messages": [AIMessage(content="Compreendo. E você tem tomado algum medicamento para aliviar isso ultimamente?")]
-            }
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Entenda o problema do paciente com empatia e pergunte se ele tem tomado algum medicamento para aliviar os sintomas ultimamente."
 
-    next_action = routing.get("next_action")
     if intent == "AGENDAMENTO" and next_action == "AWAIT_SLOT":
-        return {"messages": [AIMessage(content=(
-            "Não encontrei essa escolha entre os horários apresentados. Informe o dia e o horário desejados, por favor."
-        ))]}
+        action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Informe ao paciente que você não encontrou a escolha dele entre os horários apresentados e peça para ele informar o dia e o horário desejados."
     if next_action == "REVIEW_PATIENT_DATA":
-        return {"messages": [AIMessage(content=(
-            "Encontrei uma divergência nos dados do cadastro. Por segurança, confirme novamente o nome completo, CPF e data de nascimento da pessoa que será atendida."
-        ))]}
+        action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Existe uma divergência nos dados. Peça educadamente para o paciente confirmar o nome completo, CPF e data de nascimento por segurança."
+
     if intent == "AGENDAMENTO" and next_action == "CHECK_AVAILABILITY" and "[APENAS_APRESENTAR_HORARIOS]" in context:
         result_match = re.search(r"\[AGENDA_RESULTADO\]\s*(.*?)\s*\[FIM_AGENDA_RESULTADO\]", context, re.DOTALL)
         agenda_result = result_match.group(1).strip() if result_match else ""
         if agenda_result and "erro" not in agenda_result.lower():
-            return {"messages": [AIMessage(content=(
-                "Tenho estes horários disponíveis:\n\n"
-                f"{agenda_result}\n\nQual horário você prefere?"
-            ))]}
-        return {"messages": [AIMessage(content=(
-            "Não consegui consultar os horários agora. Podemos tentar novamente em instantes?"
-        ))]}
+            action_instruction = f"[INSTRUÇÃO OBRIGATÓRIA]: Apresente os seguintes horários disponíveis e pergunte qual ele prefere:\n{agenda_result}"
+        else:
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Informe que você não conseguiu consultar os horários no momento e sugira tentar novamente em instantes."
+
     if intent == "LOCATION_REQUEST":
-        return {"messages": [AIMessage(content=(
-            "Claro. Endereço da Clínica Lifeline One:\n"
-            f"{clinic_location_text()}"
-        ))]}
+        from app.core.clinic_location import clinic_location_text
+        action_instruction = f"[INSTRUÇÃO OBRIGATÓRIA]: Envie o endereço da Clínica Lifeline One:\n{clinic_location_text()}"
+
     if intent == "AGENDAMENTO" and next_action == "CONFIRM_SLOT":
         result_match = re.search(r"Resultado interno da criacao:\s*(.*)", context, re.DOTALL)
         result = result_match.group(1) if result_match else ""
@@ -488,48 +477,28 @@ async def generate_response_node(state: AgentState):
             formatted_date = "/".join(reversed(date_parts)) if len(date_parts) == 3 else slot.get("date", "")
             link_match = re.search(r"https?://\S+", result)
             link = link_match.group(0).rstrip(".,") if link_match else ""
-            link_text = f"\n\nAdicione a consulta na sua agenda: {link}" if link else ""
-            formatted_date = "/".join(reversed(date_parts)) if len(date_parts) == 3 else slot.get("date", "")
-            link_match = re.search(r"https?://\S+", result)
-            link = link_match.group(0).rstrip(".,") if link_match else ""
-            link_text = f"\n\nAdicione a consulta na sua agenda: {link}" if link else ""
+            link_text = f" O link para adicionar na agenda é: {link}" if link else ""
             first_name = (booking.get("patient_name") or "Paciente").split()[0]
-            return {"messages": [AIMessage(content=(
-                f"Prontinho, {first_name}. Sua consulta está confirmada para {formatted_date} às {slot.get('time')}.{link_text}\n\n"
-                "Você já tem o endereço da clínica ou deseja que eu envie a localização?"
-            ))]}
-        return {"messages": [AIMessage(content=(
-            "Não consegui concluir esse horário agora. Vou verificar a disponibilidade novamente para oferecer uma opção válida."
-        ))]}
+            action_instruction = f"[INSTRUÇÃO OBRIGATÓRIA]: Confirme com entusiasmo que a consulta de {first_name} está marcada para {formatted_date} às {slot.get('time')}.{link_text} Em seguida, pergunte se ele deseja receber a localização da clínica."
+        else:
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Informe com educação que não foi possível concluir o agendamento nesse horário e que você vai verificar a disponibilidade novamente."
+
     if intent == "AGENDAMENTO" and next_action in {
         "COLLECT_NAME", "COLLECT_CPF", "COLLECT_BIRTH_DATE", "COLLECT_EMAIL", "COLLECT_PAYMENT_TYPE", "COLLECT_INSURANCE_CARD"
     }:
         third_party = booking.get("patient_type") == "third_party"
-        prompts = {
-            "COLLECT_NAME": (
-                "Entendi. Para abrir o cadastro, informe o nome completo da pessoa que será consultada."
-                if third_party else
-                "Entendi. Para abrir o cadastro, informe seu nome completo, por favor."
-            ),
-            "COLLECT_CPF": (
-                "Agora informe o CPF da pessoa que será consultada, por favor."
-                if third_party else
-                "Agora informe o seu CPF, por favor."
-            ),
-            "COLLECT_BIRTH_DATE": (
-                "Informe também a data de nascimento."
-            ),
-            "COLLECT_EMAIL": (
-                "Precisamos de um e-mail para envio de documentos e recibos. Qual o e-mail do paciente?"
-            ),
-            "COLLECT_PAYMENT_TYPE": (
-                "Para finalizar, você prefere atendimento particular ou utilizar um convênio?"
-            ),
-            "COLLECT_INSURANCE_CARD": (
-                "Por favor, informe o número da carteirinha do convênio ou envie uma foto dela."
-            ),
-        }
-        return {"messages": [AIMessage(content=prompts[next_action])]}
+        if next_action == "COLLECT_NAME":
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Solicite o nome completo da pessoa que será consultada." if third_party else "[INSTRUÇÃO OBRIGATÓRIA]: Solicite o nome completo do próprio paciente."
+        elif next_action == "COLLECT_CPF":
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Peça o CPF da pessoa que será consultada." if third_party else "[INSTRUÇÃO OBRIGATÓRIA]: Peça o CPF do paciente."
+        elif next_action == "COLLECT_BIRTH_DATE":
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Peça a data de nascimento do paciente."
+        elif next_action == "COLLECT_EMAIL":
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Peça um endereço de e-mail do paciente (informe que é para envio de documentos e recibos)."
+        elif next_action == "COLLECT_PAYMENT_TYPE":
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Pergunte se o atendimento será particular ou por convênio."
+        elif next_action == "COLLECT_INSURANCE_CARD":
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Peça o número da carteirinha do convênio (ou uma foto dela)."
 
     patient_profile_str = ""
     if booking.get("patient_type") == "third_party":
@@ -640,6 +609,8 @@ async def generate_response_node(state: AgentState):
     )
 
     enriched_context = temporal_anchor + (contact_status_str if contact_status_str else "") + (patient_profile_str if patient_profile_str else "") + context
+    if action_instruction:
+        enriched_context += f"\n\n{action_instruction}"
 
     from app.core.prompt_master import PersonaBuilder
     
