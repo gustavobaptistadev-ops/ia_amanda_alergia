@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.api.endpoints import webhook, calendar_public, dashboard, evolution, chats, rag, settings, auth, analytics, appointments, logs
+from app.api.endpoints import webhook, calendar_public, dashboard, evolution, chats, rag, settings, auth, analytics, appointments, logs, voice
 from app.core.security import get_api_key
 
 api_router = APIRouter()
@@ -8,6 +8,9 @@ api_router = APIRouter()
 api_router.include_router(webhook.router, prefix="/webhook", tags=["Webhook"])
 api_router.include_router(calendar_public.router, prefix="/calendar", tags=["Calendar Link"])
 api_router.include_router(auth.router, prefix="/auth", tags=["Autenticação & RBAC"])
+
+# Rotas de Voz (Twilio e WebSockets) - públicas para o gateway
+api_router.include_router(voice.router, prefix="/voice", tags=["Voice Agent"])
 
 # Demais rotas protegidas pelo INTERNAL_API_KEY
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"], dependencies=[Depends(get_api_key)])
@@ -19,4 +22,4 @@ api_router.include_router(rag.router, prefix="/rag", tags=["RAG (Base de Conheci
 api_router.include_router(settings.router, prefix="/settings", tags=["Configurações de IA"], dependencies=[Depends(get_api_key)])
 api_router.include_router(logs.router, prefix="/logs", tags=["Auditoria & Monitor de Lotes"], dependencies=[Depends(get_api_key)])
 from app.api.endpoints import learning
-api_router.include_router(learning.router, prefix='/learning', tags=['Aprendizado da IA'], dependencies=[Depends(get_api_key)])
+api_router.include_router(learning.router, prefix='/learning', tags=['Aprendizado da IA'], dependencies=[Depends(get_api_key)])
