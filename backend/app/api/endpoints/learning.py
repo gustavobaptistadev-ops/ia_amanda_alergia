@@ -10,7 +10,7 @@ from app.database import AsyncSessionLocal
 from app.models.learning import LearningSuggestion, LearningStatus
 from app.core.security import get_api_key
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 import os
 import datetime
 
