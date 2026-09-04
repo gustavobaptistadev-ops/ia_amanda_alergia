@@ -86,9 +86,10 @@ async def auto_create_instance():
                 "Content-Type": "application/json"
             }
             payload = {
-                "name": tenant.instance_name,
+                "instanceName": tenant.instance_name,
                 "token": tenant.instance_token,
-                "qrcode": True
+                "qrcode": True,
+                "integration": "WHATSAPP-BAILEYS"
             }
             try:
                 logger.info(f"Verificando/Criando instância '{tenant.instance_name}' via Global Key...")
