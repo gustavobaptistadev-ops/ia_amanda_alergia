@@ -173,7 +173,7 @@ async def process_and_respond(
 
             cfg = load_config()
 
-            voice_enabled = cfg.get("voice_reply_enabled", False)
+            voice_enabled = cfg.get("voice_reply_enabled", True)
 
             if is_audio and voice_enabled:
                 from app.services.evolution_api import send_voice_audio_message
