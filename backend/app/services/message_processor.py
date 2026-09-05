@@ -253,7 +253,7 @@ async def process_message(data: dict):
 
             elif "imageMessage" in message_obj:
                 img_data = message_obj.get("imageMessage", {})
-                msg_id = data.get("id") or data.get("key", {}).get("id") or ""
+                msg_id = message_data.get("key", {}).get("id") or data.get("id") or ""
                 from app.services.media_handler import process_image_message
                 text = await process_image_message(remote_jid, img_data, msg_id)
 
@@ -262,7 +262,7 @@ async def process_message(data: dict):
                 audio_data = (
                     message_obj.get("audioMessage") or message_obj.get("pttMessage") or message_obj
                 )
-                msg_id = data.get("id") or data.get("key", {}).get("id") or ""
+                msg_id = message_data.get("key", {}).get("id") or data.get("id") or ""
                 from app.services.media_handler import process_audio_message
                 text = await process_audio_message(audio_data, data, msg_id, remote_jid)
 
