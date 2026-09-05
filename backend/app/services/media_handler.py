@@ -112,4 +112,4 @@ async def process_audio_message(audio_data, data, msg_id="", remote_jid="") -> s
         return await transcribe_audio_from_base64_or_url(raw_audio)
     
     logger.warning("NÃ£o foi possÃ­vel extrair os bytes do Ã¡udio.")
-    return ""
+    return "ERRO_RAW_AUDIO: bytes_none"

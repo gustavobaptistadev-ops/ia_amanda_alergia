@@ -79,7 +79,7 @@ async def transcribe_audio_from_base64_or_url(
     """
     if not audio_bytes or len(audio_bytes) < 100:
         logger.warning("Bytes de áudio vazios ou insuficientes para transcrição.")
-        return ""
+        return f"ERRO_AUDIO_BYTES: tamanho={len(audio_bytes) if audio_bytes else 0}"
 
     try:
         audio_file = io.BytesIO(audio_bytes)
@@ -96,7 +96,7 @@ async def transcribe_audio_from_base64_or_url(
         return text
     except Exception as e:
         logger.error(f"Erro ao transcrever áudio com Whisper: {e}")
-        return ""
+        return f"ERRO_WHISPER: {str(e)}"
 
 
 async def download_audio_from_url(url: str, headers: dict = None) -> bytes:

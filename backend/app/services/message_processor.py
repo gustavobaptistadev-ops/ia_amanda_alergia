@@ -271,6 +271,9 @@ async def process_message(data: dict):
 
         # Se for Ã¡udio e a transcriÃ§Ã£o falhou (ex: quota Whisper esgotada ou ruÃ­do inaudÃ­vel), acolhe o paciente
 
+        if is_audio and text and text.startswith("ERRO_"):
+            await send_text_message(remote_jid, f"Ops, falha de áudio: {text}")
+            return
         if is_audio and not text:
             fallback_audio_msg = "OlÃ¡! Recebi seu Ã¡udio, mas no momento nÃ£o consegui ouvir com total clareza. VocÃª poderia enviar sua dÃºvida ou solicitaÃ§Ã£o por mensagem de texto, por favor?"
             await send_text_message(remote_jid, fallback_audio_msg)
