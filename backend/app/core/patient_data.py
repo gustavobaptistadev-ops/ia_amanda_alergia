@@ -171,3 +171,69 @@ def extract_clinical_summary(messages: Sequence) -> str:
             summary.append(text.strip())
             
     return " | ".join(summary) if summary else ""
+
+import json
+from typing import Literal, Optional
+from pydantic import BaseModel, Field
+from langchain_openai import ChatOpenAI
+from app.api.endpoints.settings import load_config
+from langchain_core.messages import BaseMessage
+
+class PatientProfile(BaseModel):
+    patient_name: Optional[str] = Field(description="Nome completo do paciente.")
+    cpf: Optional[str] = Field(description="CPF do paciente contendo APENAS números.")
+    birth_date: Optional[str] = Field(description="Data de nascimento do paciente SEMPRE e OBRIGATORIAMENTE convertida no formato YYYY-MM-DD. (ex: se for 04081986, retorne 1986-08-04)")
+    email: Optional[str] = Field(description="Endereço de e-mail do paciente.")
+    payment_type: Optional[Literal["convenio", "particular"]] = Field(description="Tipo de pagamento (convenio ou particular).")
+    insurance_operator: Optional[str] = Field(description="Nome da operadora do convênio de saúde (ex: Bradesco, Unimed).")
+    insurance_card: Optional[str] = Field(description="Número da carteirinha do convênio.")
+    symptoms: Optional[str] = Field(description="Resumo claro e descritivo dos sintomas relatados pelo paciente (ex: 'alergia nas pernas após ir à praia').")
+    symptoms_duration: Optional[str] = Field(description="Duração relatada dos sintomas (ex: '3 dias', 'desde ontem').")
+    medications: list[str] = Field(default_factory=list, description="Remédios que o paciente informou estar tomando (ou pomadas, etc).")
+
+def extract_patient_profile(messages: Sequence[BaseMessage], current_profile: dict) -> dict:
+    """Usa a LLM para ler o histórico e atualizar o perfil do paciente iterativamente."""
+    cfg = load_config()
+    model_name = cfg.get("model", "gpt-4o-mini")
+    # Temperature 0 is ideal for data extraction
+    llm = ChatOpenAI(model=model_name, temperature=0.0).with_structured_output(PatientProfile)
+    
+    transcript = "\n".join(
+        f"{'PACIENTE' if getattr(msg, 'type', '') == 'human' else 'AMANDA'}: {getattr(msg, 'content', '')}"
+        for msg in messages[-10:] if getattr(msg, "content", "")
+    )
+    
+    prompt = f"""Você é um extrator de memória para prontuário médico. Sua missão é mesclar os dados conhecidos do paciente com novas informações reveladas na conversa.
+Seja inteligente: se o paciente jogar dados soltos como "4081986", perceba que é a data de nascimento e converta estritamente para formato YYYY-MM-DD (1986-08-04).
+Se enviar um número parecido com CPF, remova pontuação e guarde no CPF.
+
+PERFIL ATUAL CONHECIDO:
+{json.dumps(current_profile, ensure_ascii=False, indent=2)}
+
+CONVERSA RECENTE:
+{transcript}
+
+Retorne OBRIGATORIAMENTE as informações consolidadas. Se o Perfil Atual já tem o CPF, mantenha o CPF. Apenas atualize ou adicione o que o paciente informou de novo. Se um dado não foi mencionado, ignore.
+"""
+    try:
+        updated_profile = llm.invoke(prompt)
+        # Convert to dict keeping only populated fields
+        new_dict = updated_profile.model_dump(exclude_unset=True, exclude_none=True)
+        # Merge dictionaries explicitly, updating current profile with new extracted data
+        merged = {**current_profile}
+        
+        for k, v in new_dict.items():
+            if isinstance(v, list):
+                # Merge lists
+                merged_list = set(merged.get(k) or [])
+                merged_list.update(v)
+                merged[k] = list(merged_list)
+            elif v is not None and v != "":
+                merged[k] = v
+                
+        return merged
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Erro na extração de PatientProfile: {e}")
+        return current_profile
+

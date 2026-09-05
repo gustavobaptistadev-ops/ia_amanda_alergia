@@ -44,6 +44,7 @@ class AgentState(TypedDict):
     routing: dict
     record_validation: dict
     booking: dict
+    patient_profile: dict
 
 from app.api.endpoints.settings import load_config
 
@@ -136,6 +137,23 @@ def extract_intent_node(state: AgentState):
         messages,
         routing,
     )
+    
+    # Sync with persistent patient_profile
+    profile = state.get("patient_profile", {})
+    if profile:
+        if profile.get("cpf"): booking["cpf"] = profile["cpf"]
+        if profile.get("patient_name"): booking["patient_name"] = profile["patient_name"]
+        if profile.get("birth_date"): booking["birth_date"] = profile["birth_date"]
+        if profile.get("email"): booking["email"] = profile["email"]
+        if profile.get("payment_type"): booking["payment_type"] = profile["payment_type"]
+        if profile.get("insurance_card"): booking["insurance_card"] = profile["insurance_card"]
+        if profile.get("symptoms"): booking["complaint_collected"] = True
+        if profile.get("symptoms_duration"): booking["duration_collected"] = True
+        if profile.get("medications"): booking["medication_collected"] = True
+    
+    from app.core.booking_state import _derive_stage
+    booking["stage"] = _derive_stage(booking)
+
     record_validation = validate_booking_state(booking) if routing.get("intent") == "AGENDAMENTO" else {}
     if record_validation:
         routing["record_validation"] = record_validation
@@ -161,6 +179,16 @@ def extract_intent_node(state: AgentState):
     if extract_cpf_from_text(last_msg):
         logger.info("CPF válido recebido; avançando para coleta da data de nascimento")
         booking = update_booking_state(state.get("booking"), messages[-1].content, messages, routing)
+        profile = state.get("patient_profile", {})
+        if profile:
+            if profile.get("cpf"): booking["cpf"] = profile["cpf"]
+            if profile.get("patient_name"): booking["patient_name"] = profile["patient_name"]
+            if profile.get("birth_date"): booking["birth_date"] = profile["birth_date"]
+            if profile.get("email"): booking["email"] = profile["email"]
+            if profile.get("payment_type"): booking["payment_type"] = profile["payment_type"]
+            if profile.get("insurance_card"): booking["insurance_card"] = profile["insurance_card"]
+        from app.core.booking_state import _derive_stage
+        booking["stage"] = _derive_stage(booking)
         record_validation = validate_booking_state(booking)
         routing["record_validation"] = record_validation
         routing["next_action"] = booking_next_action(booking)
@@ -237,6 +265,16 @@ Classificação:"""
     logger.info(f"Intenção identificada via LLM: {intent}")
     routing["intent"] = intent
     booking = update_booking_state(state.get("booking"), messages[-1].content, messages, routing)
+    profile = state.get("patient_profile", {})
+    if profile:
+        if profile.get("cpf"): booking["cpf"] = profile["cpf"]
+        if profile.get("patient_name"): booking["patient_name"] = profile["patient_name"]
+        if profile.get("birth_date"): booking["birth_date"] = profile["birth_date"]
+        if profile.get("email"): booking["email"] = profile["email"]
+        if profile.get("payment_type"): booking["payment_type"] = profile["payment_type"]
+        if profile.get("insurance_card"): booking["insurance_card"] = profile["insurance_card"]
+    from app.core.booking_state import _derive_stage
+    booking["stage"] = _derive_stage(booking)
     record_validation = validate_booking_state(booking) if intent == "AGENDAMENTO" else {}
     if record_validation:
         routing["record_validation"] = record_validation
@@ -248,7 +286,7 @@ Classificação:"""
         "booking": booking,
     }
 
-def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow", "urgency_flow", "handoff_flow", "cancellation_flow", "rescheduling_flow", "off_topic_flow", "location_flow"]:
+def route_intent(state: AgentState) -> Literal["fetch_context", "clinical_triage", "urgency_flow", "handoff_flow", "cancellation_flow", "rescheduling_flow", "off_topic_flow", "location_flow"]:
     """Direciona o estado para o fluxo especializado correspondente."""
     intent = state.get("intent")
     if intent == "FRUSTRACAO_HANDOFF":
@@ -264,7 +302,7 @@ def route_intent(state: AgentState) -> Literal["fetch_context", "schedule_flow",
     if intent == "REAGENDAMENTO":
         return "rescheduling_flow"
     if intent == "AGENDAMENTO":
-        return "schedule_flow"
+        return "clinical_triage"
     return "fetch_context"
 
 async def cancellation_flow_node(state: AgentState):
@@ -299,6 +337,36 @@ def urgency_flow_node(state: AgentState):
         "Quando estiver seguro e caso queira seguir com um agendamento regular posteriormente, estarei por aqui."
     )
     return {"messages": [AIMessage(content=msg)]}
+
+async def extract_memory_node(state: AgentState):
+    """Nó: Extrai memória de forma contínua em background."""
+    from app.core.patient_data import extract_patient_profile
+    messages = state.get("messages", [])
+    current_profile = state.get("patient_profile") or {}
+    
+    if messages and getattr(messages[-1], "type", "") == "human":
+        # extract_patient_profile was made async? No, it uses llm.invoke which is sync.
+        # But wait, ChatOpenAI invoke works in async environment if wrapped or just executed. It's safe.
+        # Or we can just use run_in_executor if needed, but it should be fine here for now.
+        new_profile = extract_patient_profile(messages, current_profile)
+        return {"patient_profile": new_profile}
+    return {}
+
+async def clinical_triage_node(state: AgentState):
+    """Nó Triage: Avalia sintomas e direciona para perguntas empáticas de anamnese."""
+    patient_profile = state.get("patient_profile", {})
+    symptoms = patient_profile.get("symptoms")
+    symptoms_duration = patient_profile.get("symptoms_duration")
+    medications = patient_profile.get("medications", [])
+    
+    context = ""
+    # Only triage if symptoms were mentioned but duration/medications are missing
+    if symptoms and not symptoms_duration:
+        context = f"[TRIAGEM CLÍNICA] O paciente relatou o seguinte sintoma: '{symptoms}'. Aja como uma recepcionista clínica empática e demonstre compaixão. Antes de falar de agendamento ou horários, pergunte APENAS há quanto tempo o paciente está sentindo isso."
+    elif symptoms and symptoms_duration and not medications:
+        context = f"[TRIAGEM CLÍNICA] O paciente relatou '{symptoms}' há '{symptoms_duration}'. Aja com empatia e pergunte APENAS se ele tem tomado algum medicamento para aliviar isso antes de seguir com os dados de agendamento."
+        
+    return {"context": context}
 def location_flow_node(state: AgentState):
     """Entrega a localização após confirmação, sem reabrir o cadastro."""
     return {"messages": [AIMessage(content=(
@@ -329,6 +397,11 @@ async def schedule_flow_node(state: AgentState):
     intent = state.get("intent", "")
     routing = state.get("routing", {})
     booking = state.get("booking", {})
+    existing_context = state.get("context", "")
+    
+    if "[TRIAGEM CLÍNICA]" in existing_context:
+        return {"context": existing_context}
+        
     record_validation = validate_booking_state(booking) if booking else {}
     if intent == "AGENDAMENTO" and not booking.get("complaint_collected"):
         # Não consulta RAG nem agenda antes de conhecer o motivo da consulta.
@@ -582,6 +655,15 @@ async def generate_response_node(state: AgentState):
     except Exception as err:
         logger.debug(f"Aviso memória de longo prazo: {err}")
 
+    # [MEMÓRIA INTELIGENTE: DADOS EXTRAÍDOS CONTINUAMENTE]
+    patient_profile = state.get("patient_profile", {})
+    if patient_profile:
+        patient_profile_str += "\n[MEMÓRIA DA CONVERSA - DADOS DO PACIENTE]\n"
+        for k, v in patient_profile.items():
+            if v:
+                patient_profile_str += f"- {k}: {v}\n"
+        patient_profile_str += "\n"
+
     # [CONSCIÊNCIA TEMPORAL DINÂMICA & CALENDÁRIO CANÔNICO ANTI-ALUCINAÇÃO]
     now_sp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
     hora = now_sp.hour
@@ -714,8 +796,10 @@ def prune_history_node(state: AgentState):
 workflow = StateGraph(AgentState)
 tool_node = ToolNode(tools)
 
+workflow.add_node("extract_memory", extract_memory_node)
 workflow.add_node("extract_intent", extract_intent_node)
 workflow.add_node("fetch_context", fetch_context_node)
+workflow.add_node("clinical_triage", clinical_triage_node)
 workflow.add_node("schedule_flow", schedule_flow_node)
 workflow.add_node("handoff_flow", handoff_flow_node)
 workflow.add_node("urgency_flow", urgency_flow_node)
@@ -727,9 +811,11 @@ workflow.add_node("generate_response", generate_response_node)
 workflow.add_node("tools", tool_node)
 workflow.add_node("prune_history", prune_history_node)
 
-workflow.add_edge(START, "extract_intent")
+workflow.add_edge(START, "extract_memory")
+workflow.add_edge("extract_memory", "extract_intent")
 workflow.add_conditional_edges("extract_intent", route_intent)
 workflow.add_edge("fetch_context", "generate_response")
+workflow.add_edge("clinical_triage", "schedule_flow")
 workflow.add_edge("schedule_flow", "generate_response")
 workflow.add_edge("handoff_flow", "prune_history")
 workflow.add_edge("urgency_flow", "prune_history")
