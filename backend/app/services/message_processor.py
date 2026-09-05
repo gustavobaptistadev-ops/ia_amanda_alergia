@@ -87,6 +87,21 @@ async def process_and_respond(
 
                 return
 
+            if text.strip().lower() == "/reset":
+                from app.api.deps import get_db
+                from sqlalchemy import delete
+                from app.models.models import Message
+                from app.core.orchestrator import reset_memory
+                
+                async for db in get_db():
+                    await db.execute(delete(Message).where(Message.contact_id == contact.id))
+                    reset_memory(contact.thread_id)
+                    await db.commit()
+                
+                resp = "Sua conversa e memória foram completamente resetadas! Como posso ajudar você agora?"
+                await send_text_message(remote_jid, resp)
+                return
+
             if text.strip().lower() == "ping":
                 resp = "Pong! O sistema IA Amanda esto online e lendo suas mensagens!"
 
