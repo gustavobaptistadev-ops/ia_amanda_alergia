@@ -1,4 +1,4 @@
-import uuid
+﻿import uuid
 from datetime import datetime
 
 from sqlalchemy import (
@@ -25,7 +25,7 @@ class Contact(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     tenant_id = Column(
         String, ForeignKey("tenants.id"), index=True, nullable=True
-    )  # nullable temporariamente para não quebrar dados antigos
+    )  # nullable temporariamente para nÃ£o quebrar dados antigos
     phone_number = Column(String, index=True, nullable=False)  # The JID
     name = Column(String, nullable=True)
     bot_active = Column(Boolean, default=True)  # Se a IA deve responder automaticamente
@@ -34,10 +34,10 @@ class Contact(Base):
     )  # 'novo_contato', 'em_andamento', 'agendado'
     insurance_operator = Column(
         String, nullable=True
-    )  # Ex: Unimed, Bradesco, Amil, SulAmérica
-    insurance_card_number = Column(String, nullable=True)  # Matrícula do plano
+    )  # Ex: Unimed, Bradesco, Amil, SulAmÃ©rica
+    insurance_card_number = Column(String, nullable=True)  # MatrÃ­cula do plano
     insurance_plan_name = Column(String, nullable=True)  # Nome da categoria / plano
-    insurance_coverage = Column(String, nullable=True)  # Abrangência (Nacional, Estadual)
+    insurance_coverage = Column(String, nullable=True)  # AbrangÃªncia (Nacional, Estadual)
     insurance_accommodation = Column(String, nullable=True)  # Apartamento, Enfermaria
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -81,16 +81,20 @@ class Appointment(Base):
     reminder_2h_sent = Column(Boolean, default=False)
     prep_reminder_sent = Column(
         Boolean, default=False
-    )  # Reforço de suspensão de antialérgicos 5 dias antes
-    follow_up_sent = Column(Boolean, default=False)  # Acolhimento 48h pós-consulta
+    )  # ReforÃ§o de suspensÃ£o de antialÃ©rgicos 5 dias antes
+    follow_up_sent = Column(Boolean, default=False)  # Acolhimento 48h pÃ³s-consulta
     reschedule_count = Column(
         Integer, default=0
     )  # Quantas vezes a consulta foi reagendada
     google_event_id = Column(String, nullable=True)  # ID do evento no Google Calendar
+    symptom = Column(String, nullable=True)
+    symptom_duration = Column(String, nullable=True)
+    current_medication = Column(String, nullable=True)
+
     cancellation_reason = Column(
         String, nullable=True
     )  # Motivo do cancelamento (capturado pela Amanda)
-    nps_sent = Column(Boolean, default=False)  # Se o NPS pós-consulta foi enviado
+    nps_sent = Column(Boolean, default=False)  # Se o NPS pÃ³s-consulta foi enviado
     nps_score = Column(Integer, nullable=True)  # Nota de 0-10 do paciente
     created_at = Column(DateTime, default=datetime.utcnow)
 

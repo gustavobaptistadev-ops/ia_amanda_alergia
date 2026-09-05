@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { fetchWithAuth } from '../../lib/api';
 
 import { 
@@ -34,6 +34,9 @@ interface Appointment {
   phone_number: string;
   appointment_time: string;
   status: string;
+  symptom?: string;
+  symptom_duration?: string;
+  current_medication?: string;
   created_at: string;
 }
 
@@ -44,7 +47,7 @@ export default function Agenda() {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   
-  // Modal de Edição / Criação
+  // Modal de EdiÃ§Ã£o / CriaÃ§Ã£o
   const [showModal, setShowModal] = useState(false);
   const [editingAppt, setEditingAppt] = useState<Appointment | null>(null);
   const [patientName, setPatientName] = useState("");
@@ -67,7 +70,7 @@ export default function Agenda() {
       setErrorMsg("");
     } catch (e) {
       console.error("Erro ao buscar agenda:", e);
-      setErrorMsg("Não foi possível carregar a agenda. Verifique a conexão e tente novamente.");
+      setErrorMsg("NÃ£o foi possÃ­vel carregar a agenda. Verifique a conexÃ£o e tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -154,7 +157,7 @@ export default function Agenda() {
         }
       }
     } catch (err) {
-      setErrorMsg("Erro de comunicação com o servidor.");
+      setErrorMsg("Erro de comunicaÃ§Ã£o com o servidor.");
     } finally {
       setSaving(false);
     }
@@ -215,10 +218,10 @@ export default function Agenda() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <h2 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
-            <CalendarIcon className="w-8 h-8 text-blue-600" /> Agenda Médica em Tempo Real
+            <CalendarIcon className="w-8 h-8 text-blue-600" /> Agenda MÃ©dica em Tempo Real
           </h2>
           <p className="text-slate-500 mt-1 text-sm">
-            Visualização e gestão ao vivo de todas as consultas agendadas pela Amanda IA e recepção.
+            VisualizaÃ§Ã£o e gestÃ£o ao vivo de todas as consultas agendadas pela Amanda IA e recepÃ§Ã£o.
           </p>
         </div>
 
@@ -268,7 +271,7 @@ export default function Agenda() {
               onClick={() => setViewMode("calendar")}
               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${viewMode === "calendar" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
             >
-              Calendário
+              CalendÃ¡rio
             </button>
             <button
               onClick={() => setViewMode("list")}
@@ -288,14 +291,14 @@ export default function Agenda() {
               <option value="todos">Todos os Status</option>
               <option value="agendado">Agendados</option>
               <option value="confirmado">Confirmados</option>
-              <option value="concluido">Concluídos</option>
+              <option value="concluido">ConcluÃ­dos</option>
               <option value="cancelado">Cancelados</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Visualização de Consultas */}
+      {/* VisualizaÃ§Ã£o de Consultas */}
       {viewMode === "calendar" ? (
         <CalendarView 
           appointments={filteredAppointments} 
@@ -307,11 +310,11 @@ export default function Agenda() {
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-slate-50 text-slate-700 text-xs uppercase font-semibold border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4">Data & Horário</th>
+                <th className="px-6 py-4">Data & HorÃ¡rio</th>
                 <th className="px-6 py-4">Paciente</th>
                 <th className="px-6 py-4">Telefone (WhatsApp)</th>
                 <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Ações em Tempo Real</th>
+                <th className="px-6 py-4 text-right">AÃ§Ãµes em Tempo Real</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -335,7 +338,15 @@ export default function Agenda() {
                     </td>
 
                     <td className="px-6 py-4 font-semibold text-slate-800">
-                      {appt.patient_name}
+                      <div className="flex flex-col">
+                        <span>{appt.patient_name}</span>
+                        {(appt.symptom || appt.current_medication) && (
+                          <span className="text-xs text-slate-500 font-normal mt-1">
+                            {appt.symptom ? "Sintoma: " + appt.symptom : ""}
+                            {appt.current_medication ? " | Uso: " + appt.current_medication : ""}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="px-6 py-4 font-mono text-xs text-slate-500">
@@ -351,7 +362,7 @@ export default function Agenda() {
                       }`}>
                         {appt.status === 'confirmado' ? 'Confirmado' :
                          appt.status === 'agendado' ? 'Agendado' :
-                         appt.status === 'concluido' ? 'Concluído' : 'Cancelado'}
+                         appt.status === 'concluido' ? 'ConcluÃ­do' : 'Cancelado'}
                       </span>
                     </td>
 
@@ -360,7 +371,7 @@ export default function Agenda() {
                         <button
                           onClick={() => handleOpenEdit(appt)}
                           className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Editar Consulta / Horário"
+                          title="Editar Consulta / HorÃ¡rio"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -394,13 +405,13 @@ export default function Agenda() {
       </div>
       )}
 
-      {/* Modal de Criação / Edição de Consulta */}
+      {/* Modal de CriaÃ§Ã£o / EdiÃ§Ã£o de Consulta */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-slate-100 space-y-6">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <h3 className="text-lg font-bold text-slate-800">
-                {editingAppt ? "Editar Agendamento Médico" : "Novo Agendamento Manual"}
+                {editingAppt ? "Editar Agendamento MÃ©dico" : "Novo Agendamento Manual"}
               </h3>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">
                 <XCircle className="w-5 h-5" />
@@ -454,7 +465,7 @@ export default function Agenda() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Horário</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">HorÃ¡rio</label>
                   <input
                     type="time"
                     required
@@ -474,7 +485,7 @@ export default function Agenda() {
                 >
                   <option value="agendado">Agendado</option>
                   <option value="confirmado">Confirmado</option>
-                  <option value="concluido">Concluído / Atendido</option>
+                  <option value="concluido">ConcluÃ­do / Atendido</option>
                   <option value="cancelado">Cancelado</option>
                 </select>
               </div>
@@ -503,3 +514,4 @@ export default function Agenda() {
     </div>
   );
 }
+

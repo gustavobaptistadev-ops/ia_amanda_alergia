@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -42,7 +42,7 @@ async def list_appointments(
     status: str | None = Query(None),
     date: str | None = Query(None),
 ):
-    """Lista consultas agendadas ordenadas por horário."""
+    """Lista consultas agendadas ordenadas por horÃ¡rio."""
     query = select(Appointment, Contact.phone_number).join(
         Contact, Appointment.contact_id == Contact.id
     )
@@ -63,6 +63,9 @@ async def list_appointments(
                 "phone_number": phone,
                 "appointment_time": appt.appointment_time.isoformat(),
                 "status": appt.status,
+                "symptom": appt.symptom,
+                "symptom_duration": appt.symptom_duration,
+                "current_medication": appt.current_medication,
                 "created_at": appt.created_at.isoformat() if appt.created_at else None,
             }
         )
@@ -120,12 +123,12 @@ async def create_appointment(data: AppointmentCreate, db: AsyncSession = Depends
 async def update_appointment(
     appointment_id: str, data: AppointmentUpdate, db: AsyncSession = Depends(get_db)
 ):
-    """Atualiza dados, horário ou status de uma consulta."""
+    """Atualiza dados, horÃ¡rio ou status de uma consulta."""
     result = await db.execute(select(Appointment).where(Appointment.id == appointment_id))
     appt = result.scalars().first()
 
     if not appt:
-        raise HTTPException(status_code=404, detail="Consulta não encontrada.")
+        raise HTTPException(status_code=404, detail="Consulta nÃ£o encontrada.")
 
     if data.patient_name is not None:
         appt.patient_name = data.patient_name
@@ -145,18 +148,21 @@ async def update_appointment(
             "patient_name": appt.patient_name,
             "appointment_time": appt.appointment_time.isoformat(),
             "status": appt.status,
+                "symptom": appt.symptom,
+                "symptom_duration": appt.symptom_duration,
+                "current_medication": appt.current_medication,
         },
     }
 
 
 @router.delete("/{appointment_id}")
 async def cancel_appointment(appointment_id: str, db: AsyncSession = Depends(get_db)):
-    """Cancela uma consulta médica."""
+    """Cancela uma consulta mÃ©dica."""
     result = await db.execute(select(Appointment).where(Appointment.id == appointment_id))
     appt = result.scalars().first()
 
     if not appt:
-        raise HTTPException(status_code=404, detail="Consulta não encontrada.")
+        raise HTTPException(status_code=404, detail="Consulta nÃ£o encontrada.")
 
     appt.status = "cancelado"
     await db.commit()
