@@ -1,4 +1,4 @@
-"""Ponto de entrada da API e gerenciamento do ciclo de vida do serviço."""
+﻿"""Ponto de entrada da API e gerenciamento do ciclo de vida do serviÃ§o."""
 
 import logging
 from contextlib import asynccontextmanager
@@ -7,7 +7,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.api_router import api_router
-from app.core.limiter import RateLimitExceeded, _rate_limit_exceeded_handler, limiter
+from app.core.limiter import limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 from app.core.live_logger import InMemoryLogHandler
 from app.core.logger_filter import PIIMaskingFilter
 from app.database import Base, engine
@@ -24,7 +26,7 @@ root_logger.addHandler(memory_handler)
 for handler in root_logger.handlers:
     handler.addFilter(PIIMaskingFilter())
 
-# Injeta explicitamente nos loggers do Uvicorn para que os logs de acesso e erros HTTP apareçam no painel
+# Injeta explicitamente nos loggers do Uvicorn para que os logs de acesso e erros HTTP apareÃ§am no painel
 for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
     uvicorn_logger = logging.getLogger(logger_name)
     uvicorn_logger.addHandler(memory_handler)
@@ -36,26 +38,26 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Inicializa recursos, migrações e integrações antes de aceitar tráfego."""
-    logger.info("Iniciando aplicação e sincronizando tabelas/colunas...")
+    """Inicializa recursos, migraÃ§Ãµes e integraÃ§Ãµes antes de aceitar trÃ¡fego."""
+    logger.info("Iniciando aplicaÃ§Ã£o e sincronizando tabelas/colunas...")
 
     # 1. Garante que tabelas novas sejam criadas (usar alembic para colunas)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         logger.info("Tabelas sincronizadas no PostgreSQL com sucesso.")
 
-    # Ingestão de RAG foi movida para o script standalone `backend/scripts/seed_rag.py`
+    # IngestÃ£o de RAG foi movida para o script standalone `backend/scripts/seed_rag.py`
 
     # Auto-create the instance in Evolution GO using the Global Key
     await auto_create_instance()
 
     yield
-    # Cleanup se necessário
+    # Cleanup se necessÃ¡rio
 
 
 app = FastAPI(
-    title="IA Amanda - Recepção Inteligente",
-    description="API do sistema de recepção via WhatsApp",
+    title="IA Amanda - RecepÃ§Ã£o Inteligente",
+    description="API do sistema de recepÃ§Ã£o via WhatsApp",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -68,7 +70,7 @@ cors_origins = [
     if origin.strip()
 ]
 
-# Configuração de CORS para o painel de controle (Next.js)
+# ConfiguraÃ§Ã£o de CORS para o painel de controle (Next.js)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -81,8 +83,8 @@ from starlette.requests import Request
 from starlette.responses import Response
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    """Adiciona cabeçalhos de segurança a cada resposta HTTP."""
-    """Injeta headers de segurança nível bancário/militar em todas as respostas HTTP."""
+    """Adiciona cabeÃ§alhos de seguranÃ§a a cada resposta HTTP."""
+    """Injeta headers de seguranÃ§a nÃ­vel bancÃ¡rio/militar em todas as respostas HTTP."""
     response: Response = await call_next(request)
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -106,13 +108,13 @@ async def add_security_headers(request: Request, call_next):
 
 @app.get("/")
 async def root():
-    return {"message": "Bem-vindo à API da IA Amanda - Sistema de Recepção Inteligente"}
+    return {"message": "Bem-vindo Ã  API da IA Amanda - Sistema de RecepÃ§Ã£o Inteligente"}
 
 
 @app.get("/health")
 async def health_check():
-    """Verifica dependências críticas sem expor segredos ou dados sensíveis."""
-    """Health Check enriquecido — verifica todos os componentes críticos do sistema."""
+    """Verifica dependÃªncias crÃ­ticas sem expor segredos ou dados sensÃ­veis."""
+    """Health Check enriquecido â€” verifica todos os componentes crÃ­ticos do sistema."""
     import httpx
     import redis.asyncio as _redis
     from sqlalchemy import text as _text
@@ -170,5 +172,5 @@ async def health_check():
     return status
 
 
-# Inclusão das rotas da API
+# InclusÃ£o das rotas da API
 app.include_router(api_router, prefix="/api/v1")
