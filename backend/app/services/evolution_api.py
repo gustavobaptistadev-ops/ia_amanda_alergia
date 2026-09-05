@@ -99,7 +99,7 @@ async def auto_create_instance():
                     f"Verificando/Criando instância '{tenant.instance_name}' via Global Key..."
                 )
                 res = await client.post(url, headers=headers, json=payload)
-                if res.status_code == 200:
+                if res.status_code in [200, 201]:
                     logger.info(f"Instância '{tenant.instance_name}' criada com sucesso!")
                 elif res.status_code == 500 and "already exists" in res.text.lower():
                     logger.info(
@@ -272,7 +272,7 @@ async def get_base64_from_media(
             for p in payloads:
                 try:
                     res = await client.post(url, json=p, headers=headers)
-                    if res.status_code == 200:
+                    if res.status_code in [200, 201]:
                         data = res.json()
                         b64_str = (
                             data.get("base64")
@@ -323,7 +323,7 @@ async def get_base64_from_media(
             for p in payloads:
                 try:
                     res = await client.post(url, json=p, headers=headers)
-                    if res.status_code == 200:
+                    if res.status_code in [200, 201]:
                         data = res.json()
                         b64_str = (
                             data.get("base64")
