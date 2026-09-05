@@ -1,4 +1,4 @@
-"""learning suggestions
+﻿"""learning suggestions
 
 Revision ID: 4912ad9b7b2a
 Revises: 97019ffc3ccf
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '4912ad9b7b2a'
-down_revision: Union[str, Sequence[str], None] = '97019ffc3ccf'
+down_revision: Union[str, Sequence[str], None] = 'b1c2d3e4f5g6'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
