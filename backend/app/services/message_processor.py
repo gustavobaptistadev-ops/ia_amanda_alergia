@@ -302,7 +302,7 @@ async def process_message(data: dict):
 
     except Exception as e:
         print(f"Error processing webhook msg: {e}", flush=True)
-        from app.services.evolution_api import send_text_message
+
         if 'remote_jid' in locals() and remote_jid:
             await send_text_message(remote_jid, f"Ops, falha silenciosa no webhook! LOG: {str(e)}")
 
