@@ -89,13 +89,18 @@ async def process_and_respond(
 
             if text.strip().lower() == "/reset":
                 from app.api.deps import get_db
-                from sqlalchemy import delete
-                from app.models.models import Message
-                from app.core.orchestrator import reset_memory
+                from sqlalchemy import delete, text
+                from app.models.chat import Message, Appointment
                 
                 async for db in get_db():
                     await db.execute(delete(Message).where(Message.contact_id == contact.id))
-                    reset_memory(contact.thread_id)
+                    # Limpa a memória LangGraph
+                    try:
+                        await db.execute(text("DELETE FROM checkpoints WHERE thread_id = :tid"), {"tid": contact.thread_id})
+                        await db.execute(text("DELETE FROM checkpoint_blobs WHERE thread_id = :tid"), {"tid": contact.thread_id})
+                        await db.execute(text("DELETE FROM checkpoint_writes WHERE thread_id = :tid"), {"tid": contact.thread_id})
+                    except Exception:
+                        pass
                     await db.commit()
                 
                 resp = "Sua conversa e memória foram completamente resetadas! Como posso ajudar você agora?"
