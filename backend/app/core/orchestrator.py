@@ -1,4 +1,4 @@
-"""Orquestração do atendimento: intenção, contexto, ferramentas e resposta."""
+﻿"""OrquestraÃ§Ã£o do atendimento: intenÃ§Ã£o, contexto, ferramentas e resposta."""
 
 import datetime
 import json
@@ -57,7 +57,7 @@ from app.services.google_calendar import (
 
 logger = logging.getLogger(__name__)
 
-# Checkpointer global para manter a memória enquanto o servidor estiver rodando
+# Checkpointer global para manter a memÃ³ria enquanto o servidor estiver rodando
 memory = MemorySaver()
 
 from langgraph.graph.message import add_messages
@@ -72,10 +72,11 @@ from app.core.graph_nodes.booking_node import schedule_flow_node
 
 
 from app.api.endpoints.settings import load_config
+from app.core.response_quality import assess_response_quality
 
 
 def get_llm():
-    """Inicializa a LLM com a configuração persistida da aplicação."""
+    """Inicializa a LLM com a configuraÃ§Ã£o persistida da aplicaÃ§Ã£o."""
     cfg = load_config()
     model_name = cfg.get("model", "gpt-4o-mini")
     temp = float(cfg.get("temperature", 0.2))
@@ -86,7 +87,7 @@ tools = [check_availability, create_event, cancel_event, reschedule_event, confi
 
 
 def _interpret_initial_messages(messages: Sequence[BaseMessage]) -> dict:
-    """Usa a LLM como intérprete sem delegar a ela o controle do fluxo."""
+    """Usa a LLM como intÃ©rprete sem delegar a ela o controle do fluxo."""
     transcript = "\n".join(
         f"{'PACIENTE' if getattr(message, 'type', '') == 'human' else 'AMANDA'}: "
         f"{getattr(message, 'content', '')}"
@@ -101,21 +102,21 @@ def _interpret_initial_messages(messages: Sequence[BaseMessage]) -> dict:
         return parsed if isinstance(parsed, dict) else {}
     except Exception as exc:
         logger.warning(
-            "Interpretação inicial indisponível; usando roteador local: %s", exc
+            "InterpretaÃ§Ã£o inicial indisponÃ­vel; usando roteador local: %s", exc
         )
         return {}
 
 
 def extract_intent_node(state: AgentState):
-    """Classifica a mensagem e prioriza dados determinísticos de agendamento."""
-    """Nó 1: Classifica a intenção do usuário (Zero-Cost Router NLP/LLM)."""
+    """Classifica a mensagem e prioriza dados determinÃ­sticos de agendamento."""
+    """NÃ³ 1: Classifica a intenÃ§Ã£o do usuÃ¡rio (Zero-Cost Router NLP/LLM)."""
     messages = state["messages"]
     last_msg_content = messages[-1].content
     if not isinstance(last_msg_content, str):
         last_msg_content = str(last_msg_content)
     last_msg = last_msg_content.strip().lower()
 
-    # O router local resolve intenções claras e só deixa mensagens ambíguas para a LLM.
+    # O router local resolve intenÃ§Ãµes claras e sÃ³ deixa mensagens ambÃ­guas para a LLM.
     routing = route_message(messages[-1].content, messages)
     human_turns = sum(
         1 for message in messages if getattr(message, "type", None) == "human"
@@ -209,7 +210,7 @@ def extract_intent_node(state: AgentState):
 
     if routing["confidence"] >= confidence_threshold:
         logger.info(
-            "Roteamento determinístico: intenção=%s confiança=%s estágio=%s próxima_ação=%s terceiro=%s",
+            "Roteamento determinÃ­stico: intenÃ§Ã£o=%s confianÃ§a=%s estÃ¡gio=%s prÃ³xima_aÃ§Ã£o=%s terceiro=%s",
             routing["intent"],
             routing["confidence"],
             booking.get("stage"),
@@ -225,7 +226,7 @@ def extract_intent_node(state: AgentState):
 
     # CPF is a deterministic scheduling signal; preserve leading zeros outside the LLM.
     if extract_cpf_from_text(last_msg):
-        logger.info("CPF válido recebido; avançando para coleta da data de nascimento")
+        logger.info("CPF vÃ¡lido recebido; avanÃ§ando para coleta da data de nascimento")
         booking = update_booking_state(
             state.get("booking"), messages[-1].content, messages, routing
         )
@@ -258,8 +259,8 @@ def extract_intent_node(state: AgentState):
 
 
 
-    # 2. Fallback: Se for ambíguo, invocamos LLM (gpt-4o-mini)
-    logger.info("Intenção ambígua. Invocando LLM Fallback (Zero-Cost Router)...")
+    # 2. Fallback: Se for ambÃ­guo, invocamos LLM (gpt-4o-mini)
+    logger.info("IntenÃ§Ã£o ambÃ­gua. Invocando LLM Fallback (Zero-Cost Router)...")
     prompt = PROMPT_FALLBACK.format(last_msg=last_msg)
 
     llm = get_llm()
@@ -278,7 +279,7 @@ def extract_intent_node(state: AgentState):
     else:
         intent = "DUVIDA"
 
-    logger.info(f"Intenção identificada via LLM: {intent}")
+    logger.info(f"IntenÃ§Ã£o identificada via LLM: {intent}")
     routing["intent"] = intent
     booking = update_booking_state(
         state.get("booking"), messages[-1].content, messages, routing
@@ -344,31 +345,31 @@ def route_intent(
 
 
 async def cancellation_flow_node(state: AgentState):
-    """Nó dedicado ao fluxo de cancelamento."""
+    """NÃ³ dedicado ao fluxo de cancelamento."""
     msg = MSG_CANCELLATION
     return {"context": msg}
 
 
 async def rescheduling_flow_node(state: AgentState):
-    """Nó dedicado ao fluxo de reagendamento."""
+    """NÃ³ dedicado ao fluxo de reagendamento."""
     msg = MSG_RESCHEDULING
     return {"context": msg}
 
 
 def handoff_flow_node(state: AgentState):
-    """Produz a resposta de transferência para a equipe humana."""
+    """Produz a resposta de transferÃªncia para a equipe humana."""
     msg = MSG_HANDOFF
     return {"messages": [AIMessage(content=msg)]}
 
 
 def urgency_flow_node(state: AgentState):
-    """Interrompe o fluxo normal e orienta o paciente em urgência."""
+    """Interrompe o fluxo normal e orienta o paciente em urgÃªncia."""
     msg = MSG_URGENCY
     return {"messages": [AIMessage(content=msg)]}
 
 
 async def extract_memory_node(state: AgentState):
-    """Nó: Extrai memória de forma contínua em background."""
+    """NÃ³: Extrai memÃ³ria de forma contÃ­nua em background."""
     from app.core.patient_data import extract_patient_profile
 
     messages = state.get("messages", [])
@@ -384,12 +385,12 @@ async def extract_memory_node(state: AgentState):
 
 
 def location_flow_node(state: AgentState):
-    """Entrega a localização após confirmação, sem reabrir o cadastro."""
+    """Entrega a localizaÃ§Ã£o apÃ³s confirmaÃ§Ã£o, sem reabrir o cadastro."""
     return {
         "messages": [
             AIMessage(
                 content=(
-                    f"Claro. Endereço da Clínica Lifeline One:\n{clinic_location_text()}"
+                    f"Claro. EndereÃ§o da ClÃ­nica Lifeline One:\n{clinic_location_text()}"
                 )
             )
         ]
@@ -397,13 +398,13 @@ def location_flow_node(state: AgentState):
 
 
 async def off_topic_flow_node(state: AgentState):
-    """Lida com mensagens fora do escopo médico/atendimento da clínica."""
+    """Lida com mensagens fora do escopo mÃ©dico/atendimento da clÃ­nica."""
     return {"messages": [AIMessage(content=MSG_OFF_TOPIC)]}
 
 
 async def generate_response_node(state: AgentState):
     """Monta o prompt final e solicita resposta com as ferramentas permitidas."""
-    """Nó 3: Gera a resposta da Amanda com base no contexto, intenção, perfil do paciente e histórico seguro."""
+    """NÃ³ 3: Gera a resposta da Amanda com base no contexto, intenÃ§Ã£o, perfil do paciente e histÃ³rico seguro."""
     intent = state.get("intent", "duvidas_clinica")
     context = state.get("context", "")
     messages = state["messages"]
@@ -418,16 +419,16 @@ async def generate_response_node(state: AgentState):
 
     if intent == "AGENDAMENTO" and routing.get("next_action") == "COLLECT_COMPLAINT":
         if not booking.get("complaint_collected"):
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: O paciente quer agendar uma consulta. Pergunte de forma empática e natural o motivo da consulta ou os sintomas que ele está sentindo. Se o paciente não quiser responder ou fugir do assunto, não insista e prossiga."
+            action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: O paciente quer agendar uma consulta. Pergunte de forma empÃ¡tica e natural o motivo da consulta ou os sintomas que ele estÃ¡ sentindo. Se o paciente nÃ£o quiser responder ou fugir do assunto, nÃ£o insista e prossiga."
         elif not booking.get("duration_collected"):
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: O paciente já informou a queixa. Seja empática e pergunte há quanto tempo ele está com esses sintomas. Se o paciente ignorar essa pergunta repetidas vezes, não insista, aceite a resposta dada e siga adiante."
+            action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: O paciente jÃ¡ informou a queixa. Seja empÃ¡tica e pergunte hÃ¡ quanto tempo ele estÃ¡ com esses sintomas. Se o paciente ignorar essa pergunta repetidas vezes, nÃ£o insista, aceite a resposta dada e siga adiante."
         elif not booking.get("medication_collected"):
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Entenda o problema do paciente com empatia e pergunte se ele tem tomado algum medicamento para aliviar os sintomas ultimamente. Se o paciente ignorar ou fugir da pergunta, assuma que não tomou nada e pare de perguntar."
+            action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Entenda o problema do paciente com empatia e pergunte se ele tem tomado algum medicamento para aliviar os sintomas ultimamente. Se o paciente ignorar ou fugir da pergunta, assuma que nÃ£o tomou nada e pare de perguntar."
 
     if intent == "AGENDAMENTO" and next_action == "AWAIT_SLOT":
-        action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Informe ao paciente que você não encontrou a escolha dele entre os horários apresentados e peça para ele informar o dia e o horário desejados."
+        action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Informe ao paciente que vocÃª nÃ£o encontrou a escolha dele entre os horÃ¡rios apresentados e peÃ§a para ele informar o dia e o horÃ¡rio desejados."
     if next_action == "REVIEW_PATIENT_DATA":
-        action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Existe uma divergência nos dados. Peça educadamente para o paciente confirmar o nome completo, CPF e data de nascimento por segurança."
+        action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Existe uma divergÃªncia nos dados. PeÃ§a educadamente para o paciente confirmar o nome completo, CPF e data de nascimento por seguranÃ§a."
 
     if (
         intent == "AGENDAMENTO"
@@ -439,14 +440,14 @@ async def generate_response_node(state: AgentState):
         )
         agenda_result = result_match.group(1).strip() if result_match else ""
         if agenda_result and "erro" not in agenda_result.lower():
-            action_instruction = f"[INSTRUÇÃO OBRIGATÓRIA]: Apresente os seguintes horários disponíveis e pergunte qual ele prefere:\n{agenda_result}"
+            action_instruction = f"[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Apresente os seguintes horÃ¡rios disponÃ­veis e pergunte qual ele prefere:\n{agenda_result}"
         else:
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Informe que você não conseguiu consultar os horários no momento e sugira tentar novamente em instantes."
+            action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Informe que vocÃª nÃ£o conseguiu consultar os horÃ¡rios no momento e sugira tentar novamente em instantes."
 
     if intent == "LOCATION_REQUEST":
         from app.core.clinic_location import clinic_location_text
 
-        action_instruction = f"[INSTRUÇÃO OBRIGATÓRIA]: Envie o endereço da Clínica Lifeline One:\n{clinic_location_text()}\nApós o envio, conclua o atendimento cordialmente e não inicie novas perguntas."
+        action_instruction = f"[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Envie o endereÃ§o da ClÃ­nica Lifeline One:\n{clinic_location_text()}\nApÃ³s o envio, conclua o atendimento cordialmente e nÃ£o inicie novas perguntas."
 
     if intent == "AGENDAMENTO" and next_action == "CONFIRM_SLOT":
         result_match = re.search(
@@ -465,11 +466,11 @@ async def generate_response_node(state: AgentState):
             )
             link_match = re.search(r"https?://\S+", result)
             link = link_match.group(0).rstrip(".,") if link_match else ""
-            link_text = f" O link para adicionar na agenda é: {link}" if link else ""
+            link_text = f" O link para adicionar na agenda Ã©: {link}" if link else ""
             first_name = (booking.get("patient_name") or "Paciente").split()[0]
-            action_instruction = f"[INSTRUÇÃO OBRIGATÓRIA]: Confirme com entusiasmo que a consulta de {first_name} está marcada para {formatted_date} às {slot.get('time')}.{link_text} Em seguida, pergunte se ele deseja receber a localização da clínica."
+            action_instruction = f"[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Confirme com entusiasmo que a consulta de {first_name} estÃ¡ marcada para {formatted_date} Ã s {slot.get('time')}.{link_text} Em seguida, pergunte se ele deseja receber a localizaÃ§Ã£o da clÃ­nica."
         else:
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Informe com educação que não foi possível concluir o agendamento nesse horário e que você vai verificar a disponibilidade novamente."
+            action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Informe com educaÃ§Ã£o que nÃ£o foi possÃ­vel concluir o agendamento nesse horÃ¡rio e que vocÃª vai verificar a disponibilidade novamente."
 
     if intent == "AGENDAMENTO" and next_action in {
         "COLLECT_NAME",
@@ -482,59 +483,59 @@ async def generate_response_node(state: AgentState):
         third_party = booking.get("patient_type") == "third_party"
         if next_action == "COLLECT_NAME":
             action_instruction = (
-                "[INSTRUÇÃO OBRIGATÓRIA]: Solicite o nome completo da pessoa que será consultada."
+                "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Solicite o nome completo da pessoa que serÃ¡ consultada."
                 if third_party
-                else "[INSTRUÇÃO OBRIGATÓRIA]: Solicite o nome completo do próprio paciente."
+                else "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Solicite o nome completo do prÃ³prio paciente."
             )
         elif next_action == "COLLECT_CPF":
             action_instruction = (
-                "[INSTRUÇÃO OBRIGATÓRIA]: Peça o CPF da pessoa que será consultada."
+                "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: PeÃ§a o CPF da pessoa que serÃ¡ consultada."
                 if third_party
-                else "[INSTRUÇÃO OBRIGATÓRIA]: Peça o CPF do paciente."
+                else "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: PeÃ§a o CPF do paciente."
             )
         elif next_action == "COLLECT_BIRTH_DATE":
             action_instruction = (
-                "[INSTRUÇÃO OBRIGATÓRIA]: Peça a data de nascimento do paciente."
+                "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: PeÃ§a a data de nascimento do paciente."
             )
         elif next_action == "COLLECT_EMAIL":
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Peça um endereço de e-mail do paciente (informe que é para envio de documentos e recibos)."
+            action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: PeÃ§a um endereÃ§o de e-mail do paciente (informe que Ã© para envio de documentos e recibos)."
         elif next_action == "COLLECT_PAYMENT_TYPE":
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Pergunte se o atendimento será particular ou por convênio."
+            action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: Pergunte se o atendimento serÃ¡ particular ou por convÃªnio."
         elif next_action == "COLLECT_INSURANCE_CARD":
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Peça o número da carteirinha do convênio (ou uma foto dela)."
+            action_instruction = "[INSTRUÃ‡ÃƒO OBRIGATÃ“RIA]: PeÃ§a o nÃºmero da carteirinha do convÃªnio (ou uma foto dela)."
 
     patient_profile_str = ""
     if booking.get("patient_type") == "third_party":
         patient_profile_str += (
-            "ATENDIMENTO PARA TERCEIRO: o contato atual é o responsável pelo paciente. "
-            "Colete e use o nome, CPF e data de nascimento da pessoa que será consultada. "
-            "Não use automaticamente o nome do responsável como nome do paciente. "
-            "Mantenha o telefone do responsável para contato.\n\n"
+            "ATENDIMENTO PARA TERCEIRO: o contato atual Ã© o responsÃ¡vel pelo paciente. "
+            "Colete e use o nome, CPF e data de nascimento da pessoa que serÃ¡ consultada. "
+            "NÃ£o use automaticamente o nome do responsÃ¡vel como nome do paciente. "
+            "Mantenha o telefone do responsÃ¡vel para contato.\n\n"
         )
 
-    # [CONSCIÊNCIA TEMPORAL E CALENDÁRIO ABSOLUTO]
+    # [CONSCIÃŠNCIA TEMPORAL E CALENDÃRIO ABSOLUTO]
     now_sp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
     dias_semana = [
         "Segunda-feira",
-        "Terça-feira",
+        "TerÃ§a-feira",
         "Quarta-feira",
         "Quinta-feira",
         "Sexta-feira",
-        "Sábado",
+        "SÃ¡bado",
         "Domingo",
     ]
     dia_str = dias_semana[now_sp.weekday()]
     data_str = now_sp.strftime("%d/%m/%Y")
     hora_str = now_sp.strftime("%H:%M")
-    relogio_anchor = f"\n[RELÓGIO DO SISTEMA]\nHoje é {dia_str}, {data_str}. A hora atual é {hora_str}. Use esta data como referencial para interpretar amanhã e próxima semana.\n"
+    relogio_anchor = f"\n[RELÃ“GIO DO SISTEMA]\nHoje Ã© {dia_str}, {data_str}. A hora atual Ã© {hora_str}. Use esta data como referencial para interpretar amanhÃ£ e prÃ³xima semana.\n"
 
     # [ESTADO DO PACIENTE: PRIMEIRO CONTATO VS RECORRENTE]
     contact_status_str = ""
     latest_cpf = extract_latest_cpf(messages)
     if latest_cpf:
         patient_profile_str = (
-            "DADO CONFIRMADO PELO PACIENTE: CPF válido recebido nesta conversa "
-            f"({latest_cpf}). Não peça o nome novamente; prossiga solicitando apenas a data de nascimento.\n\n"
+            "DADO CONFIRMADO PELO PACIENTE: CPF vÃ¡lido recebido nesta conversa "
+            f"({latest_cpf}). NÃ£o peÃ§a o nome novamente; prossiga solicitando apenas a data de nascimento.\n\n"
         )
     thread_id = state.get("thread_id", "")
     try:
@@ -550,9 +551,9 @@ async def generate_response_node(state: AgentState):
                 res = await session.execute(stmt)
                 active_contact = res.scalars().first()
 
-            # Checa se é o início absoluto da conversa
+            # Checa se Ã© o inÃ­cio absoluto da conversa
             msg_count = len(messages) if messages else 0
-            # Note: na primeira mensagem o array messages contém apenas 1 item
+            # Note: na primeira mensagem o array messages contÃ©m apenas 1 item
             is_initial_turn = msg_count <= 1
 
             if active_contact:
@@ -566,15 +567,15 @@ async def generate_response_node(state: AgentState):
                     )
                 if active_contact.insurance_operator:
                     profile_parts.append(
-                        f"Convênio: {active_contact.insurance_operator} (Plano: {active_contact.insurance_plan_name or 'Padrão'})"
+                        f"ConvÃªnio: {active_contact.insurance_operator} (Plano: {active_contact.insurance_plan_name or 'PadrÃ£o'})"
                     )
                 if active_contact.insurance_card_number:
                     profile_parts.append(
-                        f"Matrícula do Plano: {active_contact.insurance_card_number}"
+                        f"MatrÃ­cula do Plano: {active_contact.insurance_card_number}"
                     )
                 if active_contact.stage == "agendado":
                     profile_parts.append(
-                        "Status: Já possui agendamento prévio ou histórico na clínica."
+                        "Status: JÃ¡ possui agendamento prÃ©vio ou histÃ³rico na clÃ­nica."
                     )
 
                 if profile_parts and not is_initial_turn:
@@ -584,8 +585,8 @@ async def generate_response_node(state: AgentState):
                         + "\n\n"
                     )
 
-                # O primeiro turno sempre apresenta a assistente e a clínica.
-                # O nome recebido do WhatsApp não comprova histórico de atendimento.
+                # O primeiro turno sempre apresenta a assistente e a clÃ­nica.
+                # O nome recebido do WhatsApp nÃ£o comprova histÃ³rico de atendimento.
                 if is_initial_turn:
                     name_hint = (
                         f" Pode chamar o paciente pelo primeiro nome ({patient_name}), se isso soar natural."
@@ -594,66 +595,66 @@ async def generate_response_node(state: AgentState):
                     )
                     contact_status_str = (
                         "TIPO DE ATENDIMENTO: PRIMEIRO TURNO DESTA CONVERSA / BOAS-VINDAS\n"
-                        "APRESENTAÇÃO OBRIGATÓRIA: Apresente-se como Amanda e cite a Clínica Lifeline One."
-                        f"{name_hint} Não diga que o paciente é recorrente apenas por existir um nome cadastrado.\n\n"
+                        "APRESENTAÃ‡ÃƒO OBRIGATÃ“RIA: Apresente-se como Amanda e cite a ClÃ­nica Lifeline One."
+                        f"{name_hint} NÃ£o diga que o paciente Ã© recorrente apenas por existir um nome cadastrado.\n\n"
                     )
             else:
                 if is_initial_turn:
                     contact_status_str = (
                         "TIPO DE ATENDIMENTO: PRIMEIRO TURNO DESTA CONVERSA / BOAS-VINDAS\n"
-                        "APRESENTAÇÃO OBRIGATÓRIA: Apresente-se como Amanda e cite a Clínica Lifeline One.\n\n"
+                        "APRESENTAÃ‡ÃƒO OBRIGATÃ“RIA: Apresente-se como Amanda e cite a ClÃ­nica Lifeline One.\n\n"
                     )
     except Exception as err:
-        logger.debug(f"Aviso memória de longo prazo: {err}")
+        logger.debug(f"Aviso memÃ³ria de longo prazo: {err}")
 
-    # [MEMÓRIA INTELIGENTE: DADOS EXTRAÍDOS CONTINUAMENTE]
+    # [MEMÃ“RIA INTELIGENTE: DADOS EXTRAÃDOS CONTINUAMENTE]
     patient_profile = state.get("patient_profile", {})
     if patient_profile:
-        patient_profile_str += "\n[MEMÓRIA DA CONVERSA - DADOS DO PACIENTE]\n"
+        patient_profile_str += "\n[MEMÃ“RIA DA CONVERSA - DADOS DO PACIENTE]\n"
         for k, v in patient_profile.items():
             if v:
                 patient_profile_str += f"- {k}: {v}\n"
         patient_profile_str += "\n"
 
-    # [CONSCIÊNCIA TEMPORAL DINÂMICA & CALENDÁRIO CANÔNICO ANTI-ALUCINAÇÃO]
+    # [CONSCIÃŠNCIA TEMPORAL DINÃ‚MICA & CALENDÃRIO CANÃ”NICO ANTI-ALUCINAÃ‡ÃƒO]
     now_sp = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3)))
     hora = now_sp.hour
     weekdays_pt = [
         "Segunda-feira",
-        "Terça-feira",
+        "TerÃ§a-feira",
         "Quarta-feira",
         "Quinta-feira",
         "Sexta-feira",
-        "Sábado",
+        "SÃ¡bado",
         "Domingo",
     ]
     dia_semana_hoje = weekdays_pt[now_sp.weekday()]
 
     if 6 <= hora < 12:
-        saudacao_turno = "MANHÃ (Use 'Bom dia' se for iniciar contato)"
+        saudacao_turno = "MANHÃƒ (Use 'Bom dia' se for iniciar contato)"
     elif 12 <= hora < 18:
         saudacao_turno = "TARDE (Use 'Boa tarde' se for iniciar contato)"
     else:
-        saudacao_turno = "NOITE/MADRUGADA (Use 'Boa noite' se for iniciar contato. Acolha informando que mesmo fora do expediente da recepção, você está à disposição para adiantar o agendamento)"
+        saudacao_turno = "NOITE/MADRUGADA (Use 'Boa noite' se for iniciar contato. Acolha informando que mesmo fora do expediente da recepÃ§Ã£o, vocÃª estÃ¡ Ã  disposiÃ§Ã£o para adiantar o agendamento)"
 
-    # Constrói o mapa cronológico exato dos próximos 7 dias para a IA nunca errar o dia da semana
+    # ConstrÃ³i o mapa cronolÃ³gico exato dos prÃ³ximos 7 dias para a IA nunca errar o dia da semana
     calendario_linhas = [
-        f"• HOJE: {dia_semana_hoje}, {now_sp.strftime('%d/%m/%Y')} (ISO: {now_sp.strftime('%Y-%m-%d')})"
+        f"â€¢ HOJE: {dia_semana_hoje}, {now_sp.strftime('%d/%m/%Y')} (ISO: {now_sp.strftime('%Y-%m-%d')})"
     ]
     for i in range(1, 8):
         d_futuro = now_sp + datetime.timedelta(days=i)
         dia_sem = weekdays_pt[d_futuro.weekday()]
         calendario_linhas.append(
-            f"• Próximo dia (+{i}): {dia_sem}, {d_futuro.strftime('%d/%m/%Y')} (Use '{d_futuro.strftime('%Y-%m-%d')}' nas tools)"
+            f"â€¢ PrÃ³ximo dia (+{i}): {dia_sem}, {d_futuro.strftime('%d/%m/%Y')} (Use '{d_futuro.strftime('%Y-%m-%d')}' nas tools)"
         )
 
     calendario_tabela = "\n".join(calendario_linhas)
 
     temporal_anchor = (
-        f"CALENDÁRIO OFICIAL DA CLÍNICA (RIGOR CRONOLÓGICO ABSOLUTO):\n"
+        f"CALENDÃRIO OFICIAL DA CLÃNICA (RIGOR CRONOLÃ“GICO ABSOLUTO):\n"
         f"{calendario_tabela}\n"
         f"TURNO ATUAL: {saudacao_turno}\n"
-        f"REGRA DE AGENDAMENTO: Ao citar qualquer dia da semana (ex: próxima segunda-feira, amanhã, etc.), consulte OBRIGATORIAMENTE a tabela acima para informar a data correta. NUNCA invente ou calcule de cabeça.\n\n"
+        f"REGRA DE AGENDAMENTO: Ao citar qualquer dia da semana (ex: prÃ³xima segunda-feira, amanhÃ£, etc.), consulte OBRIGATORIAMENTE a tabela acima para informar a data correta. NUNCA invente ou calcule de cabeÃ§a.\n\n"
     )
 
     enriched_context = (
@@ -665,7 +666,7 @@ async def generate_response_node(state: AgentState):
     if action_instruction:
         enriched_context += f"\n\n{action_instruction}"
 
-    # Busca a última mensagem do usuário para heurísticas do Builder
+    # Busca a Ãºltima mensagem do usuÃ¡rio para heurÃ­sticas do Builder
     user_msg_text = ""
     for m in reversed(messages):
         if m.type == "human":
@@ -675,10 +676,10 @@ async def generate_response_node(state: AgentState):
     system_prompt = PersonaBuilder.build_dynamic_prompt(
         intent=intent,
         rag_context=enriched_context,
-        chat_history="O LangGraph gerencia este histórico de forma persistente.",
+        chat_history="O LangGraph gerencia este histÃ³rico de forma persistente.",
         user_message=f"[Mensagem atual do paciente:]\n{user_msg_text}",
     )
-    # Filtra mensagens problemáticas (órfãs, dicts, RemoveMessage) para evitar erro 400 da OpenAI
+    # Filtra mensagens problemÃ¡ticas (Ã³rfÃ£s, dicts, RemoveMessage) para evitar erro 400 da OpenAI
     sanitized = []
     for m in messages:
         if not hasattr(m, "content"):  # Ignora dicts corrompidos ou tipos desconhecidos
@@ -697,11 +698,11 @@ async def generate_response_node(state: AgentState):
             ) or isinstance(prev, ToolMessage):
                 sanitized.append(m)
             else:
-                continue  # Descarta ToolMessage órfã
+                continue  # Descarta ToolMessage Ã³rfÃ£
         else:
             sanitized.append(m)
 
-    # Segundo passe: remove tool_calls de AIMessages se não forem seguidos por um ToolMessage
+    # Segundo passe: remove tool_calls de AIMessages se nÃ£o forem seguidos por um ToolMessage
     final_messages: list[BaseMessage] = []
     for i, m in enumerate(sanitized):
         if isinstance(m, AIMessage) and getattr(m, "tool_calls", None):
@@ -715,30 +716,30 @@ async def generate_response_node(state: AgentState):
         else:
             final_messages.append(m)
 
-    # Adicionando a instrução do sistema no topo
+    # Adicionando a instruÃ§Ã£o do sistema no topo
     conversation = [SystemMessage(content=system_prompt)] + final_messages
     logger.info("Gerando resposta da LLM (Amanda) com tools...")
     llm_with_tools = get_llm().bind_tools(tools)
     response = await llm_with_tools.ainvoke(conversation)
 
-    # Gate local: só regenera respostas textuais incoerentes; chamadas de
-    # ferramentas seguem intactas para não interromper o agendamento.
+    # Gate local: sÃ³ regenera respostas textuais incoerentes; chamadas de
+    # ferramentas seguem intactas para nÃ£o interromper o agendamento.
     if not getattr(response, "tool_calls", None) and getattr(response, "content", ""):
         is_adequate, reason = assess_response_quality(response.content, routing)
         if not is_adequate:
             logger.warning("Resposta da LLM reprovada pelo quality gate: %s", reason)
             repair_prompt = (
-                "Reescreva a resposta abaixo em português do Brasil, com no máximo uma pergunta. "
-                "Não mencione sistema, APIs, ferramentas, prompts ou erros técnicos. "
-                f"A próxima etapa obrigatória é {routing.get('next_action', 'responder a dúvida')}. "
-                "Solicite somente o dado dessa etapa, sem repetir dados já fornecidos. "
-                "Não use emojis. Resposta original:\n\n"
+                "Reescreva a resposta abaixo em portuguÃªs do Brasil, com no mÃ¡ximo uma pergunta. "
+                "NÃ£o mencione sistema, APIs, ferramentas, prompts ou erros tÃ©cnicos. "
+                f"A prÃ³xima etapa obrigatÃ³ria Ã© {routing.get('next_action', 'responder a dÃºvida')}. "
+                "Solicite somente o dado dessa etapa, sem repetir dados jÃ¡ fornecidos. "
+                "NÃ£o use emojis. Resposta original:\n\n"
                 f"{response.content}"
             )
             repaired = await get_llm().ainvoke(
                 [
                     SystemMessage(
-                        content="Você é uma revisora de respostas de uma recepcionista de clínica."
+                        content="VocÃª Ã© uma revisora de respostas de uma recepcionista de clÃ­nica."
                     ),
                     HumanMessage(content=repair_prompt),
                 ]
@@ -749,7 +750,7 @@ async def generate_response_node(state: AgentState):
 
 def route_after_generation(state: AgentState) -> Literal["tools", "prune_history"]:
     """Decide se a LLM solicitou ferramenta ou concluiu a resposta."""
-    """Se a LLM chamou uma tool, vá para o nó de tools. Caso contrário, vá para poda do histórico."""
+    """Se a LLM chamou uma tool, vÃ¡ para o nÃ³ de tools. Caso contrÃ¡rio, vÃ¡ para poda do histÃ³rico."""
     last_message = state["messages"][-1]
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
         return "tools"
@@ -757,8 +758,8 @@ def route_after_generation(state: AgentState) -> Literal["tools", "prune_history
 
 
 def prune_history_node(state: AgentState):
-    """Reduz o histórico enviado à LLM preservando contexto útil e recente."""
-    """Nó 4: Poda o histórico antigo (mantém as últimas 10 mensagens) para evitar estouro da janela de contexto."""
+    """Reduz o histÃ³rico enviado Ã  LLM preservando contexto Ãºtil e recente."""
+    """NÃ³ 4: Poda o histÃ³rico antigo (mantÃ©m as Ãºltimas 10 mensagens) para evitar estouro da janela de contexto."""
     messages = state["messages"]
     if len(messages) > 10:
         messages_to_remove = messages[:-10]
@@ -770,7 +771,7 @@ def prune_history_node(state: AgentState):
     return {}
 
 
-# Montagem do Grafo Avançado
+# Montagem do Grafo AvanÃ§ado
 workflow = StateGraph(AgentState)
 tool_node = ToolNode(tools)
 
@@ -817,13 +818,13 @@ db_url = os.getenv(
 if "+asyncpg" in db_url:
     db_url = db_url.replace("+asyncpg", "")
 
-# Configura o Checkpointer do Postgres (Será inicializado na primeira chamada)
+# Configura o Checkpointer do Postgres (SerÃ¡ inicializado na primeira chamada)
 _checkpointer = None
 app_graph = None
 
 
 async def init_checkpointer():
-    """Inicializa o checkpoint persistente que mantém continuidade das conversas."""
+    """Inicializa o checkpoint persistente que mantÃ©m continuidade das conversas."""
     global _checkpointer, app_graph
     if _checkpointer is None:
         import psycopg
@@ -842,17 +843,17 @@ async def init_checkpointer():
 
 async def process_user_message(thread_id: str, message: str) -> str:
     """Executa o grafo completo para uma mensagem e retorna o texto final."""
-    # Garante que o checkpointer e o grafo estão inicializados
+    # Garante que o checkpointer e o grafo estÃ£o inicializados
     if app_graph is None:
         await init_checkpointer()
 
-    # [CAMADA 1: INPUT SHIELD] Interceptação de ataques adversariais / jailbreak
+    # [CAMADA 1: INPUT SHIELD] InterceptaÃ§Ã£o de ataques adversariais / jailbreak
 
     if await detect_adversarial_attempt(message):
         logger.warning(
             f"[SECURITY SHIELD] Prompt injection interceptado para thread {thread_id}"
         )
-        return "Olá! Sou a Amanda, assistente da clínica. Como posso ajudar com suas dúvidas ou agendamento de consultas?"
+        return "OlÃ¡! Sou a Amanda, assistente da clÃ­nica. Como posso ajudar com suas dÃºvidas ou agendamento de consultas?"
 
     config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
 
@@ -869,7 +870,7 @@ async def process_user_message(thread_id: str, message: str) -> str:
             )
             config["callbacks"] = [langfuse_handler]
         except Exception as e:
-            logger.warning(f"Não foi possível inicializar Langfuse: {e}")
+            logger.warning(f"NÃ£o foi possÃ­vel inicializar Langfuse: {e}")
 
     # Envelopa o input com delimitadores seguros para proteger o modelo contra quebras de contexto
     wrapped_message = sanitize_and_wrap_user_input(message)
