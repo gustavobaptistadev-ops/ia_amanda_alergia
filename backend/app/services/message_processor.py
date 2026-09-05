@@ -89,7 +89,7 @@ async def process_and_respond(
 
             if text.strip().lower() == "/reset":
                 try:
-                    from app.api.deps import get_db
+                    from app.database import get_db
                     from sqlalchemy import delete, text
                     from app.models.chat import Message, Appointment
                     
