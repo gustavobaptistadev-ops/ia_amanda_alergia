@@ -23,8 +23,8 @@ Se FOR uma Carteirinha de Convênio, extraia minuciosamente os seguintes dados e
 9. ans_code: Registro do produto na ANS (se visível)
 10. summary_for_chat: Um resumo curto e elegante em 1 parágrafo dos dados encontrados para a Amanda confirmar com o paciente.
 
-Se a imagem NÃO for uma carteirinha de plano de saúde (ex: foto aleatória, meme, documento não médico):
-Retorne is_health_card: false e preencha summary_for_chat informando o que parece ser a imagem.
+Se a imagem NÃO for uma carteirinha (ex: Pedido Médico, Guia de Exame, Resultado de Laboratório, Foto de Lesão na Pele, etc.):
+Retorne is_health_card: false e preencha summary_for_chat de forma CLÍNICA E DETALHADA. Extraia: médicos solicitantes, códigos CID, nomes de exames (ex: Hemograma, IgE específico) ou descreva a lesão visualmente. Faça um resumo rico em dados de saúde para que a Recepcionista (IA) possa entender o contexto do paciente.
 
 IMPORTANTE: Responda estritamente em formato JSON válido conforme as chaves acima.
 """

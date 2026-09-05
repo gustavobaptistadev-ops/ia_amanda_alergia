@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import base64
 from app.services.audio_service import decrypt_whatsapp_media, download_audio_from_url, transcribe_audio_from_base64_or_url
 from app.services.vision_service import process_health_card_document
@@ -40,7 +40,7 @@ async def process_document_message(remote_jid, doc_obj) -> str:
 
 
 
-async def process_image_message(remote_jid, img_data, msg_id="") -> str:
+async def process_image_message(remote_jid, img_data, msg_id="", data=None) -> str:
     caption = img_data.get("caption", "")
     logger.info("Processando imagem enviada...")
     
@@ -62,7 +62,11 @@ async def process_image_message(remote_jid, img_data, msg_id="") -> str:
 
     if not raw_img and msg_id:
         from app.services.evolution_api import get_base64_from_media
-        raw_img = await get_base64_from_media(msg_id, remote_jid)
+        try:
+            message_obj = data.get("data", {}) if data else {}
+            raw_img = await get_base64_from_media(msg_id, remote_jid, message_obj=message_obj)
+        except Exception as e:
+            logger.error(f"Falha no download da imagem: {e}")
 
     if raw_img:
         card_data = await process_health_card_document(raw_img)

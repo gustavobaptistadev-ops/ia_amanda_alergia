@@ -132,6 +132,23 @@ async def process_and_respond(
             presence_state = "recording" if is_audio else "composing"
             asyncio.create_task(send_presence(remote_jid, presence_state))
 
+            # --- Módulo de Escalonamento Preditivo ---
+            from app.services.sentiment_analyzer import detect_frustration
+            is_frustrated = await detect_frustration(text)
+            
+            if is_frustrated:
+                from app.database import get_db
+                async for db in get_db():
+                    contact.bot_active = False
+                    db.add(contact)
+                    await db.commit()
+                
+                fallback_msg = "Compreendo perfeitamente. Para resolver isso da melhor forma, estou transferindo nosso atendimento para a equipe da clínica agora mesmo. Um momento, por favor."
+                await send_text_message(remote_jid, fallback_msg)
+                await save_message(remote_jid, fallback_msg, sender="ia")
+                return
+            # ----------------------------------------
+
             try:
                 ai_response = await process_user_message(
                     thread_id=remote_jid, message=text
@@ -281,10 +298,10 @@ async def process_message(data: dict):
                 text = await process_document_message(remote_jid, doc_obj)
 
             elif "imageMessage" in message_obj:
-                img_data = message_obj.get("imageMessage", {})
+                img_data = message_obj["imageMessage"]
                 msg_id = message_data.get("key", {}).get("id") or data.get("id") or ""
                 from app.services.media_handler import process_image_message
-                text = await process_image_message(remote_jid, img_data, msg_id)
+                text = await process_image_message(remote_jid, img_data, msg_id, data)
 
             elif "audioMessage" in message_obj or "pttMessage" in message_obj:
                 is_audio = True
