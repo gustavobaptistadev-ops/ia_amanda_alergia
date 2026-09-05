@@ -126,6 +126,11 @@ async def process_and_respond(
                 await send_text_message(remote_jid, ai_response)
                 await save_message(remote_jid, ai_response, sender="ia")
                 return
+            from app.services.evolution_api import send_presence
+            import asyncio
+            
+            presence_state = "recording" if is_audio else "composing"
+            asyncio.create_task(send_presence(remote_jid, presence_state))
 
             try:
                 ai_response = await process_user_message(

@@ -141,6 +141,24 @@ async def send_text_message(number: str, text: str):
             return None
 
 
+async def send_presence(number: str, state: str = "composing"):
+    """Envia estado de presen??a para o WhatsApp (composing ou recording)."""
+    url = f"{EVOLUTION_API_URL}/chat/sendPresence/{EVOLUTION_INSTANCE_NAME}"
+    payload = {
+        "number": number,
+        "delay": 15000,
+        "presence": state
+    }
+    
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        try:
+            response = await client.post(url, json=payload, headers=get_headers())
+            if response.status_code not in [200, 201]:
+                logger.warning(f"Aviso ao enviar presence: {response.status_code} - {response.text}")
+        except Exception as e:
+            logger.warning(f"Erro silencioso ao enviar presence (ignorado): {e}")
+
+
 async def send_voice_audio_message(number: str, audio_bytes: bytes):
     """Envia uma mensagem de áudio (formato de nota de voz WhatsApp) via EvolutionAPI."""
     import base64
