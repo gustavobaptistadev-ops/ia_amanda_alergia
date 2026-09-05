@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 
 from app.core.guardrails import validar_resposta
 from app.core.limiter import check_phone_rate_limit
@@ -22,9 +22,9 @@ from app.core.input_shield import detect_emergency, EMERGENCY_RESPONSE, detect_a
 async def process_and_respond(
     remote_jid: str, text: str, push_name: str, is_audio: bool = False
 ):
-    """Executa a logica pesada de IA e envia a resposta de forma estritamente sequencial (lock distribuído via Redis)."""
+    """Executa a logica pesada de IA e envia a resposta de forma estritamente sequencial (lock distribuÃ­do via Redis)."""
 
-    # [SEGURANÇA 1.1] Rate Limit por número de telefone — protege contra DDoS semântico
+    # [SEGURANÃ‡A 1.1] Rate Limit por nÃºmero de telefone â€” protege contra DDoS semÃ¢ntico
 
     is_rate_limited = await check_phone_rate_limit(remote_jid, max_per_minute=20)
 
@@ -39,11 +39,11 @@ async def process_and_respond(
         )
         return
 
-    # [SEGURANÇA 2.3] Triagem de Emergência — detecta urgência real ANTES do processamento da IA
+    # [SEGURANÃ‡A 2.3] Triagem de EmergÃªncia â€” detecta urgÃªncia real ANTES do processamento da IA
 
     if detect_emergency(text):
         logger.warning(
-            f"TRIAGEM DE EMERGÊNCIA acionada para {remote_jid[:6]}****. Enviando resposta de segurança imediata."
+            f"TRIAGEM DE EMERGÃŠNCIA acionada para {remote_jid[:6]}****. Enviando resposta de seguranÃ§a imediata."
         )
 
         await send_text_message(remote_jid, EMERGENCY_RESPONSE)
@@ -59,7 +59,7 @@ async def process_and_respond(
                 SystemLog(
                     category="triagem_emergencia",
                     level="ALERTA",
-                    title=f"Emergência detectada: {push_name or remote_jid[:6]}****",
+                    title=f"EmergÃªncia detectada: {push_name or remote_jid[:6]}****",
                     detail=f"Gatilho: '{text[:80]}' | JID: {remote_jid[:6]}****",
                 )
             )
@@ -68,7 +68,7 @@ async def process_and_respond(
 
         return
 
-    # Lock distribuído (timeout: liberta a trava se o worker morrer; blocking_timeout: aguarda até 2 mins por outra msg terminar)
+    # Lock distribuÃ­do (timeout: liberta a trava se o worker morrer; blocking_timeout: aguarda atÃ© 2 mins por outra msg terminar)
 
     async with redis_client.lock(
         f"lock:patient:{remote_jid}", timeout=180, blocking_timeout=120
@@ -98,7 +98,7 @@ async def process_and_respond(
 
             if await detect_adversarial_attempt(text):
                 logger.warning(f"Interceptado pelo Input Shield: {remote_jid}")
-                ai_response = "Por diretrizes de segurança da clínica, não posso responder a esta solicitação. Como posso ajudar com sua saúde ou agendamento?"
+                ai_response = "Por diretrizes de seguranÃ§a da clÃ­nica, nÃ£o posso responder a esta solicitaÃ§Ã£o. Como posso ajudar com sua saÃºde ou agendamento?"
                 await send_text_message(remote_jid, ai_response)
                 await save_message(remote_jid, ai_response, sender="ia")
                 return
@@ -108,17 +108,17 @@ async def process_and_respond(
                     thread_id=remote_jid, message=text
                 )
 
-            except Exception:
+            except Exception as e:
                 logger.exception("Erro ao processar mensagem para %s", remote_jid[:6])
-                ai_response = "Nosso sistema está passando por uma instabilidade momentânea. Um de nossos atendentes humanos já foi notificado e falará com você em breve."
+                ai_response = f"Nosso sistema está passando por uma instabilidade momentânea. (DEBUG LOG: {str(e)})"
 
             # Normaliza respostas antigas antes do filtro final e do envio ao WhatsApp.
             ai_response = repair_mojibake(remove_emojis(ai_response))
             is_safe = validar_resposta(ai_response)
 
             if not is_safe:
-                # Se for bloqueio real de segurança (prescrição ou jailbreak), responde com prudência médica
-                ai_response = "Por diretrizes do Conselho de Medicina e segurança clínica, prescrições de remédios e orientações de posologia são realizadas exclusivamente pelo médico durante a sua consulta. Posso te ajudar a agendar um horário com nossos especialistas?"
+                # Se for bloqueio real de seguranÃ§a (prescriÃ§Ã£o ou jailbreak), responde com prudÃªncia mÃ©dica
+                ai_response = "Por diretrizes do Conselho de Medicina e seguranÃ§a clÃ­nica, prescriÃ§Ãµes de remÃ©dios e orientaÃ§Ãµes de posologia sÃ£o realizadas exclusivamente pelo mÃ©dico durante a sua consulta. Posso te ajudar a agendar um horÃ¡rio com nossos especialistas?"
 
             if is_safe:
                 from app.services.semantic_cache import set_cached_response
@@ -126,7 +126,7 @@ async def process_and_respond(
                 await set_cached_response(text, ai_response)
 
             if (
-                "Identifiquei que você pode estar passando por uma situação de urgência"
+                "Identifiquei que vocÃª pode estar passando por uma situaÃ§Ã£o de urgÃªncia"
                 in ai_response
                 or "[TRANSFERIR_HUMANO]" in ai_response
             ):
@@ -143,7 +143,7 @@ async def process_and_respond(
 
                 await manager.broadcast(f"urgency:{remote_jid}")
 
-            # [MULTIMODAL] Se o paciente mandou áudio e a opção de voz estiver ligada, responder com áudio TTS
+            # [MULTIMODAL] Se o paciente mandou Ã¡udio e a opÃ§Ã£o de voz estiver ligada, responder com Ã¡udio TTS
 
             from app.api.endpoints.settings import load_config
 
@@ -170,7 +170,7 @@ async def process_and_respond(
 
             await save_message(remote_jid, ai_response, sender="ia")
 
-            # [NPS 2.1] Capturar resposta numérica de NPS se o paciente respondeu com nota de 0-10
+            # [NPS 2.1] Capturar resposta numÃ©rica de NPS se o paciente respondeu com nota de 0-10
 
             import re as _re
 
@@ -269,10 +269,10 @@ async def process_message(data: dict):
         if from_me:
             return
 
-        # Se for áudio e a transcrição falhou (ex: quota Whisper esgotada ou ruído inaudível), acolhe o paciente
+        # Se for Ã¡udio e a transcriÃ§Ã£o falhou (ex: quota Whisper esgotada ou ruÃ­do inaudÃ­vel), acolhe o paciente
 
         if is_audio and not text:
-            fallback_audio_msg = "Olá! Recebi seu áudio, mas no momento não consegui ouvir com total clareza. Você poderia enviar sua dúvida ou solicitação por mensagem de texto, por favor?"
+            fallback_audio_msg = "OlÃ¡! Recebi seu Ã¡udio, mas no momento nÃ£o consegui ouvir com total clareza. VocÃª poderia enviar sua dÃºvida ou solicitaÃ§Ã£o por mensagem de texto, por favor?"
             await send_text_message(remote_jid, fallback_audio_msg)
 
             await save_message(remote_jid, fallback_audio_msg, sender="ia")
@@ -285,11 +285,11 @@ async def process_message(data: dict):
         if "status@broadcast" in remote_jid:
             return
 
-        # [SEGURANÇA] Trava estrita contra DDoS Semântico e Token Flooding (Max 1.500 caracteres)
+        # [SEGURANÃ‡A] Trava estrita contra DDoS SemÃ¢ntico e Token Flooding (Max 1.500 caracteres)
 
         if len(text) > 1500:
             logger.warning(
-                f"Mensagem de {remote_jid} excedeu 1.500 caracteres ({len(text)}). Truncando com segurança."
+                f"Mensagem de {remote_jid} excedeu 1.500 caracteres ({len(text)}). Truncando com seguranÃ§a."
             )
 
             text = text[:1500]
@@ -302,3 +302,5 @@ async def process_message(data: dict):
 
     except Exception as e:
         print(f"Error processing webhook msg: {e}", flush=True)
+
+
