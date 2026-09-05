@@ -79,7 +79,7 @@ def get_llm():
     """Inicializa a LLM com a configuração persistida da aplicação."""
     cfg = load_config()
     model_name = cfg.get("model", "gpt-4o-mini")
-    temp = float(cfg.get("temperature", 0.2))
+    temp = float(cfg.get("temperature", 0.65))
     return ChatOpenAI(model=model_name, temperature=temp)
 
 
