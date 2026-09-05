@@ -86,7 +86,10 @@ def extract_intent_node(state: AgentState):
     """Classifica a mensagem e prioriza dados determinísticos de agendamento."""
     """Nó 1: Classifica a intenção do usuário (Zero-Cost Router NLP/LLM)."""
     messages = state['messages']
-    last_msg = messages[-1].content.strip().lower()
+    last_msg_content = messages[-1].content
+    if not isinstance(last_msg_content, str):
+        last_msg_content = str(last_msg_content)
+    last_msg = last_msg_content.strip().lower()
 
     # O router local resolve intenções claras e só deixa mensagens ambíguas para a LLM.
     routing = route_message(messages[-1].content, messages)
@@ -650,7 +653,7 @@ async def generate_response_node(state: AgentState):
             sanitized.append(m)
 
     # Segundo passe: remove tool_calls de AIMessages se não forem seguidos por um ToolMessage
-    final_messages = []
+    final_messages: list[BaseMessage] = []
     for i, m in enumerate(sanitized):
         if isinstance(m, AIMessage) and getattr(m, 'tool_calls', None):
             has_tool_result = (i + 1 < len(sanitized) and isinstance(sanitized[i+1], ToolMessage))
@@ -785,7 +788,8 @@ async def process_user_message(thread_id: str, message: str) -> str:
         logger.warning(f"[SECURITY SHIELD] Prompt injection interceptado para thread {thread_id}")
         return "Olá! Sou a Amanda, assistente da clínica. Como posso ajudar com suas dúvidas ou agendamento de consultas?"
         
-    config = {"configurable": {"thread_id": thread_id}}
+    from typing import Any
+    config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}
     
     # [OBSERVABILIDADE] Adiciona Langfuse Callback Handler se configurado via ENV
     if os.getenv("LANGFUSE_PUBLIC_KEY") and os.getenv("LANGFUSE_SECRET_KEY"):
@@ -810,6 +814,7 @@ async def process_user_message(thread_id: str, message: str) -> str:
     
     logger.info(f"LangGraph processando thread {thread_id} com AsyncPostgresSaver.")
     
+    assert app_graph is not None
     final_state = await app_graph.ainvoke(input_state, config=config)
     ai_content = final_state['messages'][-1].content
     
