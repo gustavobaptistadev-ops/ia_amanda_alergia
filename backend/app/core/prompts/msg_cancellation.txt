@@ -1,0 +1,1 @@
+[CANCELAMENTO] Simulei a busca de uma consulta ativa para o paciente. Não execute ferramentas reais ainda. Peça para o paciente confirmar que deseja realmente cancelar sua consulta e avise que a equipe foi notificada.

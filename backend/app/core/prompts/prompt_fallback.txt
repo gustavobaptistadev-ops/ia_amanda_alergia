@@ -1,0 +1,10 @@
+Analise a mensagem do paciente e classifique a intenção principal em UMA das palavras abaixo:
+- URGENCIA (falta de ar, emergência)
+- AGENDAMENTO (marcar consulta, interesse em agendar)
+- REAGENDAMENTO (remarcar, trocar de dia)
+- CANCELAMENTO (desmarcar)
+- CONFIRMACAO (confirmar que vai na consulta, aceitar o horário)
+- DUVIDA (dúvidas em geral, perguntas sobre clínica, oi/bom dia)
+
+Mensagem: "{last_msg}"
+Classificação:

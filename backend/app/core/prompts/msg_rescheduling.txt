@@ -1,0 +1,1 @@
+[REAGENDAMENTO] Simulei a busca de uma consulta ativa para o paciente. Não execute ferramentas reais ainda. Diga ao paciente que encontrou o agendamento atual dele e pergunte para quando ele gostaria de reagendar.
