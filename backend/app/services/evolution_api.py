@@ -253,13 +253,19 @@ async def get_base64_from_media(
         f"{EVOLUTION_API_URL}/message/getBase64FromMediaMessage",
     ]
 
-    payloads = [
+    payloads = []
+    if message_obj:
+        payloads.append({
+            "message": message_obj,
+            "convertToMp4": False,
+        })
+    payloads.extend([
         {
             "message": {"key": {"id": message_id, "remoteJid": remote_jid}},
             "convertToMp4": False,
         },
         {"id": message_id, "remoteJid": remote_jid},
-    ]
+    ])
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         for url in endpoints:
