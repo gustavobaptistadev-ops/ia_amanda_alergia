@@ -1,13 +1,13 @@
-import logging
+﻿import logging
 import base64
 from app.services.audio_service import decrypt_whatsapp_media, download_audio_from_url, transcribe_audio_from_base64_or_url
 from app.services.vision_service import process_health_card_document
 from app.services.db_service import update_contact_insurance_info
-from langfuse.decorators import observe
+
 
 logger = logging.getLogger(__name__)
 
-@observe(as_type="generation")
+
 async def process_document_message(remote_jid, doc_obj) -> str:
     caption = doc_obj.get("caption", "")
     filename = doc_obj.get("fileName") or doc_obj.get("filename") or "documento.pdf"
@@ -33,13 +33,13 @@ async def process_document_message(remote_jid, doc_obj) -> str:
         card_data = await process_health_card_document(raw_doc, filename=filename)
         if card_data.get("is_health_card"):
             await update_contact_insurance_info(remote_jid, card_data)
-            return f"[O paciente enviou o PDF/comprovante da sua carteirinha de convênio ({card_data.get('operator')}). DADOS EXTRAÍDOS PELA VISÃO COMPUTACIONAL: Operadora: {card_data.get('operator')}, Matrícula: {card_data.get('card_number')}, Plano: {card_data.get('plan_name')}, Acomodação: {card_data.get('accommodation')}, Abrangência: {card_data.get('coverage_area')}, Titular: {card_data.get('patient_name')}]. {caption}"
-        return f"[O paciente enviou um documento PDF ({filename}). Resumo do conteúdo: {card_data.get('summary_for_chat')}]. {caption}"
+            return f"[O paciente enviou o PDF/comprovante da sua carteirinha de convÃªnio ({card_data.get('operator')}). DADOS EXTRAÃDOS PELA VISÃƒO COMPUTACIONAL: Operadora: {card_data.get('operator')}, MatrÃ­cula: {card_data.get('card_number')}, Plano: {card_data.get('plan_name')}, AcomodaÃ§Ã£o: {card_data.get('accommodation')}, AbrangÃªncia: {card_data.get('coverage_area')}, Titular: {card_data.get('patient_name')}]. {caption}"
+        return f"[O paciente enviou um documento PDF ({filename}). Resumo do conteÃºdo: {card_data.get('summary_for_chat')}]. {caption}"
     
     return caption or f"[Documento PDF {filename} enviado pelo paciente]"
 
 
-@observe(as_type="generation")
+
 async def process_image_message(remote_jid, img_data, msg_id="") -> str:
     caption = img_data.get("caption", "")
     logger.info("Processando imagem enviada...")
@@ -68,15 +68,15 @@ async def process_image_message(remote_jid, img_data, msg_id="") -> str:
         card_data = await process_health_card_document(raw_img)
         if card_data.get("is_health_card"):
             await update_contact_insurance_info(remote_jid, card_data)
-            return f"[O paciente enviou a foto da sua carteirinha de convênio. DADOS EXTRAÍDOS PELA VISÃO COMPUTACIONAL: Operadora: {card_data.get('operator')}, Matrícula: {card_data.get('card_number')}, Plano: {card_data.get('plan_name')}, Acomodação: {card_data.get('accommodation')}, Abrangência: {card_data.get('coverage_area')}, Titular: {card_data.get('patient_name')}]. {caption}"
+            return f"[O paciente enviou a foto da sua carteirinha de convÃªnio. DADOS EXTRAÃDOS PELA VISÃƒO COMPUTACIONAL: Operadora: {card_data.get('operator')}, MatrÃ­cula: {card_data.get('card_number')}, Plano: {card_data.get('plan_name')}, AcomodaÃ§Ã£o: {card_data.get('accommodation')}, AbrangÃªncia: {card_data.get('coverage_area')}, Titular: {card_data.get('patient_name')}]. {caption}"
         return f"[O paciente enviou uma imagem/documento. Resumo visual: {card_data.get('summary_for_chat')}]. {caption}"
     
     return caption or "[Foto enviada pelo paciente]"
 
 
-@observe(as_type="generation")
+
 async def process_audio_message(audio_data, data, msg_id="", remote_jid="") -> str:
-    logger.info("Processando áudio (Whisper)...")
+    logger.info("Processando Ã¡udio (Whisper)...")
     raw_audio = None
 
     if isinstance(audio_data, dict):
@@ -111,5 +111,5 @@ async def process_audio_message(audio_data, data, msg_id="", remote_jid="") -> s
     if raw_audio:
         return await transcribe_audio_from_base64_or_url(raw_audio)
     
-    logger.warning("Não foi possível extrair os bytes do áudio.")
+    logger.warning("NÃ£o foi possÃ­vel extrair os bytes do Ã¡udio.")
     return ""
