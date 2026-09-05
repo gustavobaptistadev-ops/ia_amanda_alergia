@@ -591,21 +591,20 @@ async def process_message(data: dict):
                 
 
                 if isinstance(audio_data, dict):
-
-                    b64_val = audio_data.get("base64") or audio_data.get("Base64") or audio_data.get("media") or ""
-
+                    # Em Evolution v2 o base64 geralmente vem no nível data["data"]["base64"] ou data["base64"]
+                    b64_val = (
+                        message_data.get("base64") or
+                        data.get("base64") or
+                        audio_data.get("base64") or 
+                        audio_data.get("Base64") or 
+                        audio_data.get("media") or ""
+                    )
                     media_key = audio_data.get("mediaKey")
-
                     media_url = audio_data.get("url") or audio_data.get("URL") or ""
 
-
-
                     if b64_val:
-
                         if "," in b64_val:
-
                             b64_val = b64_val.split(",")[1]
-
                         raw_audio = base64.b64decode(b64_val)
 
                     elif media_url and media_key:

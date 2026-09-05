@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from app.core.validators import validate_cpf
 
 CPF_CANDIDATE_PATTERN = re.compile(r"(?<!\d)(?:\d[ .-]?){10}\d(?!\d)")
-DATE_PATTERN = re.compile(r"(?<!\d)(?:\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})(?!\d)")
+DATE_PATTERN = re.compile(r"(?<!\d)(?:\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2}|\d{8})(?!\d)")
 COMPLAINT_TERMS = (
     "alergia", "coceira", "coçar", "mancha", "vermelhidão", "vermelhidao",
     "rinite", "sinusite", "asma", "tosse", "espirro", "falta de ar",
@@ -68,7 +68,10 @@ def extract_latest_date(messages: Sequence) -> str | None:
             continue
         match = DATE_PATTERN.search(getattr(message, "content", "") or "")
         if match:
-            return match.group(0)
+            val = match.group(0)
+            if len(val) == 8 and val.isdigit():
+                return f"{val[:2]}/{val[2:4]}/{val[4:]}"
+            return val
     return None
 
 EMAIL_PATTERN = re.compile(r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)")

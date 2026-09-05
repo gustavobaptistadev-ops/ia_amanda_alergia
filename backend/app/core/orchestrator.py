@@ -445,11 +445,11 @@ async def generate_response_node(state: AgentState):
 
     if intent == "AGENDAMENTO" and routing.get("next_action") == "COLLECT_COMPLAINT":
         if not booking.get("complaint_collected"):
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: O paciente quer agendar uma consulta. Pergunte de forma empática e natural o motivo da consulta ou os sintomas que ele está sentindo."
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: O paciente quer agendar uma consulta. Pergunte de forma empática e natural o motivo da consulta ou os sintomas que ele está sentindo. Se o paciente não quiser responder ou fugir do assunto, não insista e prossiga."
         elif not booking.get("duration_collected"):
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: O paciente já informou a queixa. Seja empática e pergunte há quanto tempo ele está com esses sintomas."
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: O paciente já informou a queixa. Seja empática e pergunte há quanto tempo ele está com esses sintomas. Se o paciente ignorar essa pergunta repetidas vezes, não insista, aceite a resposta dada e siga adiante."
         elif not booking.get("medication_collected"):
-            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Entenda o problema do paciente com empatia e pergunte se ele tem tomado algum medicamento para aliviar os sintomas ultimamente."
+            action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Entenda o problema do paciente com empatia e pergunte se ele tem tomado algum medicamento para aliviar os sintomas ultimamente. Se o paciente ignorar ou fugir da pergunta, assuma que não tomou nada e pare de perguntar."
 
     if intent == "AGENDAMENTO" and next_action == "AWAIT_SLOT":
         action_instruction = "[INSTRUÇÃO OBRIGATÓRIA]: Informe ao paciente que você não encontrou a escolha dele entre os horários apresentados e peça para ele informar o dia e o horário desejados."
@@ -466,7 +466,7 @@ async def generate_response_node(state: AgentState):
 
     if intent == "LOCATION_REQUEST":
         from app.core.clinic_location import clinic_location_text
-        action_instruction = f"[INSTRUÇÃO OBRIGATÓRIA]: Envie o endereço da Clínica Lifeline One:\n{clinic_location_text()}"
+        action_instruction = f"[INSTRUÇÃO OBRIGATÓRIA]: Envie o endereço da Clínica Lifeline One:\n{clinic_location_text()}\nApós o envio, conclua o atendimento cordialmente e não inicie novas perguntas."
 
     if intent == "AGENDAMENTO" and next_action == "CONFIRM_SLOT":
         result_match = re.search(r"Resultado interno da criacao:\s*(.*)", context, re.DOTALL)

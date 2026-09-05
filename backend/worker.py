@@ -25,6 +25,24 @@ except ImportError:
 # Função que será processada em background
 async def process_message_job(ctx, data: dict):
     logger.info(f"Worker recebeu job de webhook. Iniciando processamento...")
+    event_type = data.get("event")
+    
+    msg_id = None
+    if event_type == "messages.upsert":
+        try:
+            msg_id = data["data"]["message"]["key"]["id"]
+        except (KeyError, TypeError):
+            pass
+            
+    if msg_id:
+        redis = ctx['redis']
+        lock_key = f"webhook_lock:{msg_id}"
+        # Set if not exists, expiration 300s (5 min)
+        acquired = await redis.set(lock_key, "1", ex=300, nx=True)
+        if not acquired:
+            logger.info(f"Mensagem {msg_id} já foi processada ou está em andamento. Ignorando.")
+            return
+
     # Importar aqui para evitar circular imports e garantir que carrega pós-fork
     from app.services.message_processor import process_message
     await process_message(data)
