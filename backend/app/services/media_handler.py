@@ -106,7 +106,10 @@ async def process_audio_message(audio_data, data, msg_id="", remote_jid="") -> s
 
     if not raw_audio and msg_id and remote_jid:
         from app.services.evolution_api import get_base64_from_media
-        raw_audio = await get_base64_from_media(msg_id, remote_jid, message_obj=data.get("data", {}))
+        try:
+            raw_audio = await get_base64_from_media(msg_id, remote_jid, message_obj=data.get("data", {}))
+        except Exception as e:
+            return f"ERRO_RAW_AUDIO: {str(e)}"
 
     if raw_audio:
         return await transcribe_audio_from_base64_or_url(raw_audio)

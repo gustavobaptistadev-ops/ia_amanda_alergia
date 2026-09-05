@@ -241,7 +241,58 @@ async def get_base64_from_media(
     import base64
 
     if not message_id and not message_obj:
-        return None
+        raise Exception("Nenhum message_id ou message_obj fornecido")
+
+    headers = get_headers()
+
+    endpoints = [
+        f"{EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/{EVOLUTION_INSTANCE_NAME}",
+        f"{EVOLUTION_API_URL}/message/getBase64FromMediaMessage/{EVOLUTION_INSTANCE_NAME}",
+        f"{EVOLUTION_API_URL}/chat/getBase64FromMediaMessage",
+        f"{EVOLUTION_API_URL}/message/getBase64FromMediaMessage",
+    ]
+
+    payloads = []
+    if message_obj:
+        payloads.append({
+            "message": message_obj,
+            "convertToMp4": False,
+        })
+    payloads.extend([
+        {
+            "message": {"key": {"id": message_id, "remoteJid": remote_jid}},
+            "convertToMp4": False,
+        },
+        {"id": message_id, "remoteJid": remote_jid},
+    ])
+
+    errors = []
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        for url in endpoints:
+            for p in payloads:
+                try:
+                    res = await client.post(url, json=p, headers=headers)
+                    if res.status_code == 200:
+                        data = res.json()
+                        b64_str = (
+                            data.get("base64")
+                            or data.get("media")
+                            or data.get("data")
+                            or ""
+                        )
+                        if b64_str:
+                            if "," in b64_str:
+                                b64_str = b64_str.split(",")[1]
+                            return base64.b64decode(b64_str)
+                        else:
+                            errors.append(f"{url} [200 OK] mas base64/media/data ausente no JSON.")
+                    else:
+                        errors.append(f"{url} [{res.status_code}] {res.text[:100]}")
+                except Exception as e:
+                    errors.append(f"{url} Erro de requisição: {str(e)}")
+
+    raise Exception(" | ".join(errors))
+
 
     headers = get_headers()
 
