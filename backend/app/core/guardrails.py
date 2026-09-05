@@ -3,10 +3,10 @@
 import logging
 import re
 
-from app.services.evolution_api import remove_emojis
-
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
+
+from app.services.evolution_api import remove_emojis
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,9 @@ def validar_resposta(ai_response: str) -> bool:
             return False
 
         messages = [
-            SystemMessage(content="Você é um auditor de conformidade estrito. Responda apenas APROVADO ou REPROVADO."),
+            SystemMessage(
+                content="Você é um auditor de conformidade estrito. Responda apenas APROVADO ou REPROVADO."
+            ),
             HumanMessage(content=VALIDADOR_PROMPT.format(ai_response=ai_response[:6000])),
         ]
         result = validator.invoke(messages).content.strip().upper()

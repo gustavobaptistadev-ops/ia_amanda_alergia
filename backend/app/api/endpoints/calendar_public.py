@@ -16,12 +16,20 @@ router = APIRouter()
 
 
 @router.get("/p/{appointment_id}")
-async def redirect_to_personal_calendar(appointment_id: str, db: AsyncSession = Depends(get_db)):
+async def redirect_to_personal_calendar(
+    appointment_id: str, db: AsyncSession = Depends(get_db)
+):
     result = await db.execute(select(Appointment).where(Appointment.id == appointment_id))
     appointment = result.scalars().first()
     now = datetime.datetime.utcnow()
-    if not appointment or appointment.status in {"cancelado", "concluido"} or appointment.appointment_time < now - datetime.timedelta(days=1):
-        logger.warning("Tentativa de uso de link de agenda inválido, cancelado ou expirado")
+    if (
+        not appointment
+        or appointment.status in {"cancelado", "concluido"}
+        or appointment.appointment_time < now - datetime.timedelta(days=1)
+    ):
+        logger.warning(
+            "Tentativa de uso de link de agenda inválido, cancelado ou expirado"
+        )
         raise HTTPException(status_code=404, detail="Link de agenda inválido ou expirado")
 
     url = build_google_calendar_url(

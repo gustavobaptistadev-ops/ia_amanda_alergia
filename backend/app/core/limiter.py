@@ -1,17 +1,17 @@
 import os
-import redis.asyncio as redis_lib
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 
-redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+import redis.asyncio as redis_lib
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from app.core.config import settings
+
+redis_url = settings.REDIS_URL
 
 # Limiter centralizado para rotas HTTP (por IP)
 limiter = Limiter(
-    key_func=get_remote_address, 
-    default_limits=["120/minute"],
-    storage_uri=redis_url
+    key_func=get_remote_address, default_limits=["120/minute"], storage_uri=redis_url
 )
+
 
 async def check_phone_rate_limit(phone: str, max_per_minute: int = 20) -> bool:
     """
@@ -30,4 +30,3 @@ async def check_phone_rate_limit(phone: str, max_per_minute: int = 20) -> bool:
             return count > max_per_minute
     except Exception:
         return False  # fail-open: em caso de falha do Redis, não bloquear
-

@@ -1,10 +1,10 @@
-import pytest
+﻿import pytest
 
 from app.services import evolution_api
-
+from app.core.config import settings
 
 def test_headers_falham_de_forma_segura_sem_token(monkeypatch):
-    monkeypatch.delenv("EVOLUTION_API_KEY", raising=False)
+    monkeypatch.setattr(settings, "EVOLUTION_API_KEY", "")
     monkeypatch.setattr(evolution_api, "EVOLUTION_API_KEY", "")
 
     with pytest.raises(RuntimeError, match="EVOLUTION_API_KEY"):
@@ -12,7 +12,7 @@ def test_headers_falham_de_forma_segura_sem_token(monkeypatch):
 
 
 def test_headers_usam_somente_token_do_ambiente(monkeypatch):
-    monkeypatch.setenv("EVOLUTION_API_KEY", "token-configurado-no-ambiente")
+    monkeypatch.setattr(settings, "EVOLUTION_API_KEY", "token-configurado-no-ambiente")
 
     headers = evolution_api.get_headers()
 

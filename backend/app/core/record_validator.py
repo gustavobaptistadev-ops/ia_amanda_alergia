@@ -13,13 +13,31 @@ from typing import Any
 from app.core.patient_data import extract_payment_type
 from app.core.validators import validate_cpf
 
-
 _DATE_PATTERN = re.compile(r"(?<!\d)(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})(?!\d)")
 _CPF_PATTERN = re.compile(r"(?<!\d)(?:\d[ .-]?){10}\d(?!\d)")
 _NAME_BLOCKLIST = {
-    "eu", "meu", "minha", "nome", "cpf", "nascimento", "consulta", "agendar",
-    "marcar", "alergia", "coceira", "dor", "estou", "sinto", "quero",
-    "plano", "bradesco", "amil", "unimed", "particular", "convenio", "saude",
+    "eu",
+    "meu",
+    "minha",
+    "nome",
+    "cpf",
+    "nascimento",
+    "consulta",
+    "agendar",
+    "marcar",
+    "alergia",
+    "coceira",
+    "dor",
+    "estou",
+    "sinto",
+    "quero",
+    "plano",
+    "bradesco",
+    "amil",
+    "unimed",
+    "particular",
+    "convenio",
+    "saude",
 }
 
 
@@ -94,7 +112,9 @@ def _extract_name(messages: Sequence[Any], entities: dict[str, Any]) -> str | No
             return _normalize_name(match.group(1))
 
         previous = message_list[index - 1] if index else None
-        previous_text = _remove_accents(str(getattr(previous, "content", "") or "")).lower()
+        previous_text = _remove_accents(
+            str(getattr(previous, "content", "") or "")
+        ).lower()
         if "nome completo" in previous_text and _looks_like_name(text):
             return _normalize_name(text)
 
@@ -143,20 +163,20 @@ def validate_patient_record(
     birth_date = dates[-1] if dates else None
     parsed_birth_date = _parse_date(birth_date) if birth_date else None
     today = dt.date.today()
-    if birth_date and parsed_birth_date is None:
-        invalid_fields.append("birth_date")
-    elif parsed_birth_date and (parsed_birth_date > today or parsed_birth_date < today.replace(year=today.year - 120)):
+    if (birth_date and parsed_birth_date is None) or (
+        parsed_birth_date
+        and (
+            parsed_birth_date > today
+            or parsed_birth_date < today.replace(year=today.year - 120)
+        )
+    ):
         invalid_fields.append("birth_date")
 
     if not name:
         missing_fields = ["name"]
-    elif "cpf" in invalid_fields:
+    elif "cpf" in invalid_fields or not cpf:
         missing_fields = ["cpf"]
-    elif not cpf:
-        missing_fields = ["cpf"]
-    elif "birth_date" in invalid_fields:
-        missing_fields = ["birth_date"]
-    elif not birth_date:
+    elif "birth_date" in invalid_fields or not birth_date:
         missing_fields = ["birth_date"]
     elif not payment_type:
         missing_fields = ["payment_type"]
@@ -173,7 +193,11 @@ def validate_patient_record(
             "payment_type": "COLLECT_PAYMENT_TYPE",
         }[missing_fields[0]]
     else:
-        next_action = routing.get("next_action") if routing.get("next_action") == "CONFIRM_SLOT" else "CHECK_AVAILABILITY"
+        next_action = (
+            routing.get("next_action")
+            if routing.get("next_action") == "CONFIRM_SLOT"
+            else "CHECK_AVAILABILITY"
+        )
 
     valid = not conflicts and not invalid_fields and not missing_fields
     return {
@@ -181,12 +205,14 @@ def validate_patient_record(
         "confidence": 1.0 if valid or conflicts or invalid_fields else 0.98,
         "patient_type": "third_party" if third_party else "self",
         "fields_confirmed": [
-            field for field, value in {
+            field
+            for field, value in {
                 "name": name,
                 "cpf": cpf,
                 "birth_date": parsed_birth_date,
                 "payment_type": payment_type,
-            }.items() if value and field not in invalid_fields
+            }.items()
+            if value and field not in invalid_fields
         ],
         "missing_fields": missing_fields,
         "invalid_fields": invalid_fields,

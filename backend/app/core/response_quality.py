@@ -3,7 +3,6 @@
 import re
 from typing import Any
 
-
 INTERNAL_LEAK_PATTERNS = (
     r"\bsystem prompt\b",
     r"\binstru[cç][oõ]es internas\b",
@@ -12,7 +11,14 @@ INTERNAL_LEAK_PATTERNS = (
 )
 
 EXPECTED_TERMS = {
-    "COLLECT_COMPLAINT": ("motivo", "sentindo", "sente", "queixa", "avaliação", "avaliacao"),
+    "COLLECT_COMPLAINT": (
+        "motivo",
+        "sentindo",
+        "sente",
+        "queixa",
+        "avaliação",
+        "avaliacao",
+    ),
     "COLLECT_NAME": ("nome completo", "nome da pessoa"),
     "COLLECT_CPF": ("cpf",),
     "COLLECT_BIRTH_DATE": ("nascimento", "data de nascimento"),
@@ -20,7 +26,9 @@ EXPECTED_TERMS = {
 }
 
 
-def assess_response_quality(response: str, routing: dict[str, Any] | None = None) -> tuple[bool, str]:
+def assess_response_quality(
+    response: str, routing: dict[str, Any] | None = None
+) -> tuple[bool, str]:
     """Verifica se a resposta está coerente com o estado sem consumir LLM."""
     text = str(response or "").strip()
     if not text:

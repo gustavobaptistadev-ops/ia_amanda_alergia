@@ -1,0 +1,51 @@
+patient_name;message;intent;expected_bot_action
+Mariana Souza;Meu bb ta com o corpo todo xeio de bolinhas vermelhas e chora mto oq eu fasso socorooo 😰;urgencia;Alertar sobre pronto-socorro
+Carlos Eduardo;Doutora, meu filho de 3 anos começou a tossir mto seco e ta com a respiração estranha, oq pode ser?;urgencia;Alertar sobre pronto-socorro
+Juliana Lima;Socorro a pele do meu menino empelotou inteira dps q ele comeu camarao, ta roxo??;urgencia;Alertar sobre pronto-socorro
+Fernanda Dias;Oi boa noite minha filha ta com uns calombos q coçam dms na perna, parece alergia a picada, oq passar?;duvida_clinica;Iniciar anamnese de alergia
+Roberto Carlos;MEU DEUS meu bebe n para de espirrar e ta com o rosto inchado dps q deu mel pra ele, me ajuda;urgencia;Alertar sobre pronto-socorro
+Camila Rocha;Doutora minha bb ta com a garganta fechando, ela ta tossindo mto estranho, *som de tosse abafada* uhm uhm;urgencia;Alertar sobre pronto-socorro
+Patricia Mendes;Meu filho acordou cheio de placas vermelhas no tronco e ta mto agoniado, sera q foi o remedio?;urgencia;Alertar sobre pronto-socorro
+Beatriz Santos;Boa tarde, o bracinho do meu pequenininho ta com uma mancha escamosa q n some nunca, oq pode ser? ;duvida_clinica;Iniciar anamnese de alergia
+Lucas Ribeiro;A mancha no rosto da minha filha ta espalhando rapidao e ela ta chorando dizendo q arde, socorro;urgencia;Alertar sobre pronto-socorro
+Vanessa Costa;Gente meu bebe ta com falta de ar leve e a boca meio pálida depois q comeu amendoim, oq eu faço??;urgencia;Alertar sobre pronto-socorro
+Ana Paula;Socorro dr meu filho ta com o olho super inchado e vermelho, parece conjuntivite ou alergia grave;urgencia;Alertar sobre pronto-socorro
+Marcos Vinicius;Minha filha ta com tosse seca persistente toda noite, ja nao sei mais oq fazer, tem horario com a dra amanda?;duvida_clinica;Iniciar anamnese de alergia
+Renata Souza;Opa, meu guri comeu morango e pipocou inteiro, ta coçando demais, posso dar antialergico?;duvida_clinica;Iniciar anamnese de alergia
+Aline Martins;URGENTE meu bebe ta com muita dificuldade pra respirar e chiando no peito dps de ir no parque;urgencia;Alertar sobre pronto-socorro
+Bruno Henrique;Dra meu filho ta com umas bolhas na mao parecendo queimadura mas foi so contato com uma planta, me ajuda;urgencia;Alertar sobre pronto-socorro
+Joao Victor;Bom dia! Quero marcar uma consulta com a Dra Amanda, voces atendem pelo convenio Unimed?;agendamento;Informar sobre convênios
+Carla Dias;Ola, quanto custa a consulta particular e quais planos de saude vcs aceitam? Bradesco tem cobertura?;financeiro;Informar sobre convênios
+Gabriel Alves;Oii, gostaria de saber se a dra atende SulAmérica e qual o valor da consulta de rotina para rinite?;agendamento;Informar sobre convênios
+Larissa Manoela;Boa tarde, voces aceitam Amil? Quero fazer teste de alergia respiratoria;agendamento;Informar sobre convênios
+Mateus Silva;Quero agendar proxima semana, tem horario demanha? Aceita Bradesco saude?;agendamento;Informar sobre convênios
+Jessica Alba;Olá, quanto fica a consulta particular? E aceita plano Hapvida?;financeiro;Informar sobre convênios
+Rodrigo Santoro;Bom dia, preciso marcar uma avaliacao de alergia alimentar, qual o valor e formas de pagamento?;agendamento;Informar sobre convênios
+Amanda Nunes;Boa tarde! Quero saber se vcs aceitam convenio Porto Seguro para teste alérgico;agendamento;Informar sobre convênios
+Paulo Gustavo;Ola, tem vaga mes que vem para consulta com a dra amanda? Quanto custa particular?;agendamento;Informar sobre convênios
+Natalia Dill;Boa noite, gostaria de infos sobre precos e se aceitam convênio Cassi;financeiro;Informar sobre convênios
+Thiago Lacerda;Oi bom dia, qual o valor da consulta e se voces aceiam o plano da Petrobras AMS?;financeiro;Informar sobre convênios
+Bianca Andrade;Olaa, quero marcar uma consulta de rotina pra investigar rinite cronica, qual o valor particular?;agendamento;Informar sobre convênios
+Eduardo Costa;Bom dia, voces trabalham com reembolso de convenio (SulAmerica)? Como funciona?;financeiro;Informar sobre convênios
+Leticia Sabatella;Boa tarde, preciso marcar teste cutaneo, quais convênios sao aceitos e qual o valor sem convenio?;agendamento;Informar sobre convênios
+Fabio Assuncao;Ola, gostaria de agendar uma consulta para alergia a medicamentos, aceita Unimed federação?;agendamento;Informar sobre convênios
+Mariana Silva;Oi;agendamento;Enviar menu principal
+Carlos Alberto;Bom dia;agendamento;Enviar menu principal
+Ana Beatriz;Quero marcar;agendamento;Enviar menu principal
+Jose Roberto;Ola tudo bem?;duvida_clinica;Enviar menu principal
+Marcia Regina;Boa tarde;agendamento;Enviar menu principal
+Pedro Henrique;Opa;agendamento;Enviar menu principal
+Claudia Raia;Oi boa tarde;duvida_clinica;Enviar menu principal
+Sergio Reis;Ola, boa noite;agendamento;Enviar menu principal
+Debora Secco;Quero saber valores;financeiro;Enviar menu principal
+Fabio Jr;Alo?;agendamento;Enviar menu principal
+Juliana Paes;SOCORRO meu marido ta com a garganta fechando e roxo depois de tomar dipirona, oq faco??;urgencia;Alertar sobre pronto-socorro
+Ricardo Silva;URGENTE! Minha boca ta enorme, lengua inchada e falta de ar extrema dps de comer camarao!!;urgencia;Alertar sobre pronto-socorro
+Tatiana Mascarenhas;MEU DEUS ME AJUDA estou tendo choque anafilatico dps da picada de abelha, falta de ar total;urgencia;Alertar sobre pronto-socorro
+Marcos Frota;Socorro socorro, nao consigo respirar direito, peito fechado e tontura forte apos remedio novo!;urgencia;Alertar sobre pronto-socorro
+Sandra Annenberg;URGENTE o paciente esta desmaiando com falta de ar severa e corpo todo vermelho;urgencia;Alertar sobre pronto-socorro
+Rogerio Flausino;Oi dra, olha a foto do meu braço como ficou dps da pomada que a sra passou: [foto_braco.jpg];duvida_clinica;Analisar foto do exame
+Ivete Sangalo;Boa tarde, sou paciente antiga, preciso remarcar minha consulta de retorno da semana q vem;agendamento;Encaminhar para atendimento humano
+Claudia Leitte;Ola, mandando aqui o resultado do meu exame de sangue de IgE q a dra pediu, da uma olhada pfv;duvida_clinica;Analisar foto do exame
+Carlinhos Brown;Oi tudo bem? Quero mudar o horario da minha consulta de amanha pq tive um imprevisto;agendamento;Encaminhar para atendimento humano
+Lulu Santos;Olha como ficou meu rosto com akela mancha nova q apareceu hoje, posso mandar foto?;duvida_clinica;Analisar foto do exame

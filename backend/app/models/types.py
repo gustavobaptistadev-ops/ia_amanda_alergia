@@ -1,11 +1,14 @@
-﻿from sqlalchemy.types import TypeDecorator, Text
-from app.core.crypto import encrypt_text, decrypt_text
+from sqlalchemy.types import Text, TypeDecorator
+
+from app.core.crypto import decrypt_text, encrypt_text
+
 
 class EncryptedText(TypeDecorator):
     """
     Tipo de dado SQLAlchemy que encripta antes de salvar no banco
     e decripta automaticamente ao ler da tabela.
     """
+
     impl = Text
     cache_ok = True
 
@@ -17,4 +20,4 @@ class EncryptedText(TypeDecorator):
     def process_result_value(self, value, dialect):
         if value is not None:
             return decrypt_text(value)
-        return value
+        return value

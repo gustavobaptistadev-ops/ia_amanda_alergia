@@ -7,31 +7,100 @@ from app.core.validators import validate_cpf
 CPF_CANDIDATE_PATTERN = re.compile(r"(?<!\d)(?:\d[ .-]?){10}\d(?!\d)")
 DATE_PATTERN = re.compile(r"(?<!\d)(?:\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2}|\d{8})(?!\d)")
 COMPLAINT_TERMS = (
-    "alergia", "coceira", "coçar", "mancha", "vermelhidão", "vermelhidao",
-    "rinite", "sinusite", "asma", "tosse", "espirro", "falta de ar",
-    "pele", "urticária", "urticaria", "inchaço", "inchaco", "reação",
-    "reacao", "sintoma", "sintomas", "dor", "queixa", "problema de saúde",
-    "problema de saude", "estou com", "estou sentindo", "sinto",
+    "alergia",
+    "coceira",
+    "coçar",
+    "mancha",
+    "vermelhidão",
+    "vermelhidao",
+    "rinite",
+    "sinusite",
+    "asma",
+    "tosse",
+    "espirro",
+    "falta de ar",
+    "pele",
+    "urticária",
+    "urticaria",
+    "inchaço",
+    "inchaco",
+    "reação",
+    "reacao",
+    "sintoma",
+    "sintomas",
+    "dor",
+    "queixa",
+    "problema de saúde",
+    "problema de saude",
+    "estou com",
+    "estou sentindo",
+    "sinto",
 )
 
 INSURANCE_OPERATORS = (
-    "amil", "unimed", "bradesco", "sulamerica", "sul america", "assefaz",
-    "ipsemg", "geap", "cassi", "notredame", "hapvida", "amil",
+    "amil",
+    "unimed",
+    "bradesco",
+    "sulamerica",
+    "sul america",
+    "assefaz",
+    "ipsemg",
+    "geap",
+    "cassi",
+    "notredame",
+    "hapvida",
+    "amil",
 )
 
 MEDICATION_TERMS = (
-    "antialergico", "antialérgico", "corticoide", "corticóide", "alegra", "allegra",
-    "polaramine", "loratadina", "desloratadina", "fexofenadina", "cetirizina",
-    "prednisona", "prednisolona", "dexametasona", "betametasona", "remedio", "remédio",
-    "pomada", "creme", "xarope", "bombinha", "aerolin", "clenil", "flixotide",
-    "seretide", "alenia", "symbicort", "foster",
+    "antialergico",
+    "antialérgico",
+    "corticoide",
+    "corticóide",
+    "alegra",
+    "allegra",
+    "polaramine",
+    "loratadina",
+    "desloratadina",
+    "fexofenadina",
+    "cetirizina",
+    "prednisona",
+    "prednisolona",
+    "dexametasona",
+    "betametasona",
+    "remedio",
+    "remédio",
+    "pomada",
+    "creme",
+    "xarope",
+    "bombinha",
+    "aerolin",
+    "clenil",
+    "flixotide",
+    "seretide",
+    "alenia",
+    "symbicort",
+    "foster",
 )
 
 DURATION_TERMS = (
-    "dia", "dias", "semana", "semanas", "mes", "meses", "mês", "ano", "anos",
-    "desde", "tempo", "hoje", "ontem", "anteontem", "agora", "horas"
+    "dia",
+    "dias",
+    "semana",
+    "semanas",
+    "mes",
+    "meses",
+    "mês",
+    "ano",
+    "anos",
+    "desde",
+    "tempo",
+    "hoje",
+    "ontem",
+    "anteontem",
+    "agora",
+    "horas",
 )
-
 
 
 def extract_cpf_from_text(text: str) -> str | None:
@@ -74,7 +143,9 @@ def extract_latest_date(messages: Sequence) -> str | None:
             return val
     return None
 
+
 EMAIL_PATTERN = re.compile(r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)")
+
 
 def extract_email(text: str) -> str | None:
     if not text:
@@ -94,11 +165,16 @@ def extract_payment_type(messages: Sequence) -> str | None:
         text = unicodedata.normalize("NFKD", raw_text)
         text = "".join(char for char in text if not unicodedata.combining(char))
         text = re.sub(r"\s+", " ", text).strip()
-        if re.search(r"\b(particular|vou pagar particular|sem convenio|sem plano)\b", text):
+        if re.search(
+            r"\b(particular|vou pagar particular|sem convenio|sem plano)\b", text
+        ):
             return "particular"
         if any(operator in text for operator in INSURANCE_OPERATORS):
             return "convenio"
-        if re.search(r"\b(meu convenio|tenho convenio|pelo convenio|por convenio|meu plano|plano de saude)\b", text):
+        if re.search(
+            r"\b(meu convenio|tenho convenio|pelo convenio|por convenio|meu plano|plano de saude)\b",
+            text,
+        ):
             return "convenio"
     return None
 
@@ -123,11 +199,15 @@ def extract_medications(messages: Sequence) -> list[str]:
             continue
         text = getattr(message, "content", "") or ""
         normalized = unicodedata.normalize("NFKD", text.lower())
-        normalized = "".join(char for char in normalized if not unicodedata.combining(char))
-        
+        normalized = "".join(
+            char for char in normalized if not unicodedata.combining(char)
+        )
+
         for term in MEDICATION_TERMS:
             norm_term = unicodedata.normalize("NFKD", term.lower())
-            norm_term = "".join(char for char in norm_term if not unicodedata.combining(char))
+            norm_term = "".join(
+                char for char in norm_term if not unicodedata.combining(char)
+            )
             if re.search(r"\b" + re.escape(norm_term) + r"\b", normalized):
                 meds.add(term)
     return list(meds)
@@ -140,14 +220,19 @@ def has_symptom_duration(messages: Sequence) -> bool:
             continue
         text = getattr(message, "content", "") or ""
         normalized = unicodedata.normalize("NFKD", text.lower())
-        normalized = "".join(char for char in normalized if not unicodedata.combining(char))
-        
+        normalized = "".join(
+            char for char in normalized if not unicodedata.combining(char)
+        )
+
         for term in DURATION_TERMS:
             norm_term = unicodedata.normalize("NFKD", term.lower())
-            norm_term = "".join(char for char in norm_term if not unicodedata.combining(char))
+            norm_term = "".join(
+                char for char in norm_term if not unicodedata.combining(char)
+            )
             if re.search(r"\b" + re.escape(norm_term) + r"\b", normalized):
                 return True
     return False
+
 
 def extract_clinical_summary(messages: Sequence) -> str:
     """Return a concatenated string of the patient's messages that contain medical terms."""
@@ -157,52 +242,79 @@ def extract_clinical_summary(messages: Sequence) -> str:
             continue
         text = getattr(message, "content", "") or ""
         normalized = unicodedata.normalize("NFKD", text.lower())
-        normalized = "".join(char for char in normalized if not unicodedata.combining(char))
-        
+        normalized = "".join(
+            char for char in normalized if not unicodedata.combining(char)
+        )
+
         has_term = False
         for term in COMPLAINT_TERMS + DURATION_TERMS + MEDICATION_TERMS:
             norm_term = unicodedata.normalize("NFKD", term.lower())
-            norm_term = "".join(char for char in norm_term if not unicodedata.combining(char))
+            norm_term = "".join(
+                char for char in norm_term if not unicodedata.combining(char)
+            )
             if re.search(r"\b" + re.escape(norm_term) + r"\b", normalized):
                 has_term = True
                 break
-        
+
         if has_term:
             summary.append(text.strip())
-            
+
     return " | ".join(summary) if summary else ""
 
+
 import json
-from typing import Literal, Optional
-from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
-from app.api.endpoints.settings import load_config
+from typing import Literal
+
 from langchain_core.messages import BaseMessage
+from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
+
+from app.api.endpoints.settings import load_config
+
 
 class PatientProfile(BaseModel):
-    patient_name: Optional[str] = Field(description="Nome completo do paciente.")
-    cpf: Optional[str] = Field(description="CPF do paciente contendo APENAS números.")
-    birth_date: Optional[str] = Field(description="Data de nascimento do paciente SEMPRE e OBRIGATORIAMENTE convertida no formato YYYY-MM-DD. (ex: se for 04081986, retorne 1986-08-04)")
-    email: Optional[str] = Field(description="Endereço de e-mail do paciente.")
-    payment_type: Optional[Literal["convenio", "particular"]] = Field(description="Tipo de pagamento (convenio ou particular).")
-    insurance_operator: Optional[str] = Field(description="Nome da operadora do convênio de saúde (ex: Bradesco, Unimed).")
-    insurance_card: Optional[str] = Field(description="Número da carteirinha do convênio.")
-    symptoms: Optional[str] = Field(description="Resumo claro e descritivo dos sintomas relatados pelo paciente (ex: 'alergia nas pernas após ir à praia').")
-    symptoms_duration: Optional[str] = Field(description="Duração relatada dos sintomas (ex: '3 dias', 'desde ontem').")
-    medications: list[str] = Field(default_factory=list, description="Remédios que o paciente informou estar tomando (ou pomadas, etc).")
+    patient_name: str | None = Field(description="Nome completo do paciente.")
+    cpf: str | None = Field(description="CPF do paciente contendo APENAS números.")
+    birth_date: str | None = Field(
+        description="Data de nascimento do paciente SEMPRE e OBRIGATORIAMENTE convertida no formato YYYY-MM-DD. (ex: se for 04081986, retorne 1986-08-04)"
+    )
+    email: str | None = Field(description="Endereço de e-mail do paciente.")
+    payment_type: Literal["convenio", "particular"] | None = Field(
+        description="Tipo de pagamento (convenio ou particular)."
+    )
+    insurance_operator: str | None = Field(
+        description="Nome da operadora do convênio de saúde (ex: Bradesco, Unimed)."
+    )
+    insurance_card: str | None = Field(description="Número da carteirinha do convênio.")
+    symptoms: str | None = Field(
+        description="Resumo claro e descritivo dos sintomas relatados pelo paciente (ex: 'alergia nas pernas após ir à praia')."
+    )
+    symptoms_duration: str | None = Field(
+        description="Duração relatada dos sintomas (ex: '3 dias', 'desde ontem')."
+    )
+    medications: list[str] = Field(
+        default_factory=list,
+        description="Remédios que o paciente informou estar tomando (ou pomadas, etc).",
+    )
 
-def extract_patient_profile(messages: Sequence[BaseMessage], current_profile: dict) -> dict:
+
+def extract_patient_profile(
+    messages: Sequence[BaseMessage], current_profile: dict
+) -> dict:
     """Usa a LLM para ler o histórico e atualizar o perfil do paciente iterativamente."""
     cfg = load_config()
     model_name = cfg.get("model", "gpt-4o-mini")
     # Temperature 0 is ideal for data extraction
-    llm = ChatOpenAI(model=model_name, temperature=0.0).with_structured_output(PatientProfile)
-    
+    llm = ChatOpenAI(model=model_name, temperature=0.0).with_structured_output(
+        PatientProfile
+    )
+
     transcript = "\n".join(
         f"{'PACIENTE' if getattr(msg, 'type', '') == 'human' else 'AMANDA'}: {getattr(msg, 'content', '')}"
-        for msg in messages[-10:] if getattr(msg, "content", "")
+        for msg in messages[-10:]
+        if getattr(msg, "content", "")
     )
-    
+
     prompt = f"""Você é um extrator de memória para prontuário médico. Sua missão é mesclar os dados conhecidos do paciente com novas informações reveladas na conversa.
 Seja inteligente: se o paciente jogar dados soltos como "4081986", perceba que é a data de nascimento e converta estritamente para formato YYYY-MM-DD (1986-08-04).
 Se enviar um número parecido com CPF, remova pontuação e guarde no CPF.
@@ -221,7 +333,7 @@ Retorne OBRIGATORIAMENTE as informações consolidadas. Se o Perfil Atual já te
         new_dict = updated_profile.model_dump(exclude_unset=True, exclude_none=True)
         # Merge dictionaries explicitly, updating current profile with new extracted data
         merged = {**current_profile}
-        
+
         for k, v in new_dict.items():
             if isinstance(v, list):
                 # Merge lists
@@ -230,10 +342,10 @@ Retorne OBRIGATORIAMENTE as informações consolidadas. Se o Perfil Atual já te
                 merged[k] = list(merged_list)
             elif v is not None and v != "":
                 merged[k] = v
-                
+
         return merged
     except Exception as e:
         import logging
+
         logging.getLogger(__name__).error(f"Erro na extração de PatientProfile: {e}")
         return current_profile
-

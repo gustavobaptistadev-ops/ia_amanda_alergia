@@ -1,10 +1,13 @@
 import logging
+
 from fastapi import WebSocket
+
 # Mocks temporários até integrarmos Deepgram e ElevenLabs
 # from app.services.voice.stt_service import STTService
 # from app.services.voice.tts_service import TTSService
 
 logger = logging.getLogger(__name__)
+
 
 class StreamManager:
     def __init__(self, websocket: WebSocket):
@@ -35,7 +38,7 @@ class StreamManager:
         """
         pass
         # await self.stt.send_audio(payload_base64)
-        
+
         # Simulação temporária:
         # Quando tivermos a transcrição real, passaremos para o LLM
         # e a resposta do LLM irá para o TTS.
@@ -46,12 +49,10 @@ class StreamManager:
         """
         if not self.stream_sid or not self.is_running:
             return
-            
+
         message = {
             "event": "media",
             "streamSid": self.stream_sid,
-            "media": {
-                "payload": audio_payload_base64
-            }
+            "media": {"payload": audio_payload_base64},
         }
         await self.websocket.send_json(message)

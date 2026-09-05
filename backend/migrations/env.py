@@ -10,6 +10,9 @@ from alembic import context
 # Add backend directory to sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 # Import our models
 from app.database import Base
 from app.models.chat import Contact, Message
@@ -19,9 +22,6 @@ from app.models.chat import Contact, Message
 # access to the values within the .ini file in use.
 config = context.config
 
-# Import DATABASE_URL from .env
-from dotenv import load_dotenv
-load_dotenv()
 db_url = os.getenv("DATABASE_URL")
 if db_url and db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)

@@ -4,6 +4,7 @@ import secrets
 from fastapi import HTTPException, Request, WebSocket, status
 from fastapi.security import APIKeyHeader
 from jose import JWTError, jwt
+from app.core.config import settings
 
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
@@ -11,9 +12,11 @@ COOKIE_AUTH_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 def require_secret(name: str, minimum_length: int = 32) -> str:
-    value = os.getenv(name, "").strip()
+    value = getattr(settings, name, "").strip()
     if len(value) < minimum_length:
-        raise RuntimeError(f"{name} must be configured with at least {minimum_length} characters")
+        raise RuntimeError(
+            f"{name} must be configured with at least {minimum_length} characters"
+        )
     return value
 
 
@@ -52,12 +55,11 @@ async def _validate_jwt(token: str | None) -> str | None:
 
 
 def _allowed_browser_origins() -> set[str]:
-    frontend_url = os.getenv(
-        "NEXT_PUBLIC_FRONTEND_URL",
-        "https://ia-amanda-frontend.up.railway.app",
-    )
-    configured = os.getenv("CORS_ORIGINS", frontend_url)
-    return {origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()}
+    frontend_url = settings.FRONTEND_URL
+    configured = settings.CORS_ORIGINS or frontend_url
+    return {
+        origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()
+    }
 
 
 def validate_cookie_origin(conn) -> None:
@@ -66,13 +68,17 @@ def validate_cookie_origin(conn) -> None:
     is_websocket = conn.scope.get("type") == "websocket"
     is_mutation = getattr(conn, "method", "GET").upper() in COOKIE_AUTH_METHODS
     if (is_websocket or is_mutation) and origin not in _allowed_browser_origins():
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Origem não permitida")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Origem não permitida"
+        )
 
 
 async def get_api_key(request: Request = None, websocket: WebSocket = None):
     conn = request or websocket
     if not conn:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Autenticação obrigatória")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Autenticação obrigatória"
+        )
 
     key = conn.headers.get(API_KEY_NAME) or conn.headers.get(API_KEY_NAME.lower())
     if key and secrets.compare_digest(key, INTERNAL_API_KEY):
@@ -96,4 +102,7 @@ async def get_api_key(request: Request = None, websocket: WebSocket = None):
         await conn.close(code=1008, reason="Authentication required")
         raise RuntimeError("WebSocket authentication failed")
 
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas ou sessão expirada.")
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Credenciais inválidas ou sessão expirada.",
+    )

@@ -8,17 +8,16 @@ from typing import Any
 from app.core.conversation_router import extract_requested_date, normalize_text
 from app.core.patient_data import (
     contains_date,
+    extract_clinical_summary,
     extract_cpf_from_text,
+    extract_email,
     extract_latest_cpf,
     extract_latest_date,
+    extract_medications,
     extract_payment_type,
     has_patient_complaint,
-    extract_medications,
     has_symptom_duration,
-    extract_email,
-    extract_clinical_summary,
 )
-
 
 ACTIVE_STAGES = {
     "AWAITING_COMPLAINT",
@@ -78,7 +77,7 @@ def new_booking_state() -> dict[str, Any]:
 def _clean_text(text: str) -> str:
     cleaned = str(text or "").strip()
     if cleaned.startswith("<user_message>") and cleaned.endswith("</user_message>"):
-        cleaned = cleaned[len("<user_message>"):-len("</user_message>")]
+        cleaned = cleaned[len("<user_message>") : -len("</user_message>")]
     return cleaned.strip()
 
 
@@ -94,7 +93,11 @@ def _normalize_birth_date(value: str | None) -> str | None:
     if not value:
         return None
     try:
-        parsed = dt.datetime.strptime(value, "%d/%m/%Y").date() if "/" in value else dt.date.fromisoformat(value)
+        parsed = (
+            dt.datetime.strptime(value, "%d/%m/%Y").date()
+            if "/" in value
+            else dt.date.fromisoformat(value)
+        )
     except ValueError:
         return None
     today = dt.date.today()
@@ -112,7 +115,15 @@ def _extract_name(text: str, routing: dict[str, Any], expected: bool) -> str | N
     candidate = _clean_text(text).strip(" .,!?\n\r\t")
     words = candidate.split()
     if 2 <= len(words) <= 8 and not any(char.isdigit() for char in candidate):
-        blocked = ("consulta", "alergia", "cpf", "nascimento", "plano", "particular", "convenio")
+        blocked = (
+            "consulta",
+            "alergia",
+            "cpf",
+            "nascimento",
+            "plano",
+            "particular",
+            "convenio",
+        )
         if not any(term in normalize_text(candidate) for term in blocked):
             return re.sub(r"\s+", " ", candidate)
     return None
@@ -136,9 +147,13 @@ def _insurance_operator(text: str, payment_type: str | None) -> str | None:
     return next((label for term, label in operators.items() if term in normalized), None)
 
 
-def _select_offered_slot(text: str, slots: Sequence[dict[str, str]]) -> dict[str, str] | None:
+def _select_offered_slot(
+    text: str, slots: Sequence[dict[str, str]]
+) -> dict[str, str] | None:
     normalized = normalize_text(text)
-    time_match = re.search(r"\b(?:as|a|pelas?)\s*(\d{1,2})(?::(\d{2}))?\s*h?\b", normalized)
+    time_match = re.search(
+        r"\b(?:as|a|pelas?)\s*(\d{1,2})(?::(\d{2}))?\s*h?\b", normalized
+    )
     if not time_match:
         return None
     selected_time = f"{int(time_match.group(1)):02d}:{time_match.group(2) or '00'}"
@@ -163,7 +178,10 @@ def _select_offered_slot(text: str, slots: Sequence[dict[str, str]]) -> dict[str
         weekday_matches = []
         for slot in candidates:
             try:
-                if dt.date.fromisoformat(slot.get("date", "")).weekday() == requested_weekday:
+                if (
+                    dt.date.fromisoformat(slot.get("date", "")).weekday()
+                    == requested_weekday
+                ):
                     weekday_matches.append(slot)
             except ValueError:
                 continue
@@ -181,7 +199,11 @@ def _derive_stage(booking: dict[str, Any]) -> str:
         return "BOOKED"
     if booking.get("conflicts"):
         return "HUMAN_REVIEW"
-    if not booking.get("complaint_collected") or not booking.get("duration_collected") or not booking.get("medication_collected"):
+    if (
+        not booking.get("complaint_collected")
+        or not booking.get("duration_collected")
+        or not booking.get("medication_collected")
+    ):
         return "AWAITING_COMPLAINT"
     if not booking.get("patient_name"):
         return "AWAITING_PATIENT_NAME"
@@ -217,7 +239,11 @@ def update_booking_state(
         return booking
 
     entities = routing.get("entities", {})
-    booking["patient_type"] = "third_party" if entities.get("third_party") else booking.get("patient_type", "self")
+    booking["patient_type"] = (
+        "third_party"
+        if entities.get("third_party")
+        else booking.get("patient_type", "self")
+    )
     booking["complaint_collected"] = bool(
         booking.get("complaint_collected")
         or entities.get("complaint_detected")
@@ -245,12 +271,22 @@ def update_booking_state(
     if not new_cpf and not booking.get("cpf"):
         new_cpf = extract_latest_cpf(messages)
     if new_cpf:
-        if booking.get("cpf") and booking["cpf"] != new_cpf and not _is_correction(clean_text):
-            booking["conflicts"] = sorted(set(booking.get("conflicts", []) + ["cpf_conflict"]))
+        if (
+            booking.get("cpf")
+            and booking["cpf"] != new_cpf
+            and not _is_correction(clean_text)
+        ):
+            booking["conflicts"] = sorted(
+                set(booking.get("conflicts", []) + ["cpf_conflict"])
+            )
         else:
             booking["cpf"] = new_cpf
             if _is_correction(clean_text):
-                booking["conflicts"] = [item for item in booking.get("conflicts", []) if item != "cpf_conflict"]
+                booking["conflicts"] = [
+                    item
+                    for item in booking.get("conflicts", [])
+                    if item != "cpf_conflict"
+                ]
 
     new_birth_date = None
     if contains_date(clean_text) and (
@@ -258,36 +294,63 @@ def update_booking_state(
         or "nascimento" in normalize_text(clean_text)
     ):
         date_match = re.search(r"\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2}", clean_text)
-        new_birth_date = _normalize_birth_date(date_match.group(0) if date_match else None)
+        new_birth_date = _normalize_birth_date(
+            date_match.group(0) if date_match else None
+        )
     if not new_birth_date and not booking.get("birth_date"):
         new_birth_date = _normalize_birth_date(extract_latest_date(messages))
     if new_birth_date:
-        if booking.get("birth_date") and booking["birth_date"] != new_birth_date and not _is_correction(clean_text):
-            booking["conflicts"] = sorted(set(booking.get("conflicts", []) + ["birth_date_conflict"]))
+        if (
+            booking.get("birth_date")
+            and booking["birth_date"] != new_birth_date
+            and not _is_correction(clean_text)
+        ):
+            booking["conflicts"] = sorted(
+                set(booking.get("conflicts", []) + ["birth_date_conflict"])
+            )
         else:
             booking["birth_date"] = new_birth_date
             if _is_correction(clean_text):
-                booking["conflicts"] = [item for item in booking.get("conflicts", []) if item != "birth_date_conflict"]
+                booking["conflicts"] = [
+                    item
+                    for item in booking.get("conflicts", [])
+                    if item != "birth_date_conflict"
+                ]
 
-    if booking.get("complaint_collected") and booking.get("duration_collected") and booking.get("medication_collected") and not booking.get("clinical_summary"):
+    if (
+        booking.get("complaint_collected")
+        and booking.get("duration_collected")
+        and booking.get("medication_collected")
+        and not booking.get("clinical_summary")
+    ):
         booking["clinical_summary"] = extract_clinical_summary(messages)
 
     new_email = extract_email(clean_text)
     if new_email:
-        if booking.get("email") and booking["email"] != new_email and not _is_correction(clean_text):
-            booking["conflicts"] = sorted(set(booking.get("conflicts", []) + ["email_conflict"]))
+        if (
+            booking.get("email")
+            and booking["email"] != new_email
+            and not _is_correction(clean_text)
+        ):
+            booking["conflicts"] = sorted(
+                set(booking.get("conflicts", []) + ["email_conflict"])
+            )
         else:
             booking["email"] = new_email
             if _is_correction(clean_text):
-                booking["conflicts"] = [item for item in booking.get("conflicts", []) if item != "email_conflict"]
+                booking["conflicts"] = [
+                    item
+                    for item in booking.get("conflicts", [])
+                    if item != "email_conflict"
+                ]
 
     payment_type = extract_payment_type([_HumanMessage(clean_text)])
     if payment_type:
         booking["payment_type"] = payment_type
         booking["insurance_operator"] = _insurance_operator(clean_text, payment_type)
-        
+
     if booking.get("stage") == "AWAITING_INSURANCE_CARD":
-        if len(clean_text) >= 5: # basic validation for card number
+        if len(clean_text) >= 5:  # basic validation for card number
             booking["insurance_card"] = clean_text
 
     selected_slot = _select_offered_slot(clean_text, booking.get("offered_slots", []))
@@ -305,7 +368,9 @@ def update_booking_state(
     return booking
 
 
-def set_offered_slots(booking: dict[str, Any], slots: Sequence[dict[str, str]]) -> dict[str, Any]:
+def set_offered_slots(
+    booking: dict[str, Any], slots: Sequence[dict[str, str]]
+) -> dict[str, Any]:
     updated = {**booking}
     updated["offered_slots"] = [dict(slot) for slot in slots]
     updated["selected_slot"] = None
@@ -314,7 +379,9 @@ def set_offered_slots(booking: dict[str, Any], slots: Sequence[dict[str, str]]) 
     return updated
 
 
-def mark_booking_created(booking: dict[str, Any], appointment_id: str | None = None) -> dict[str, Any]:
+def mark_booking_created(
+    booking: dict[str, Any], appointment_id: str | None = None
+) -> dict[str, Any]:
     updated = {**booking}
     updated["booking_status"] = "booked"
     updated["appointment_id"] = appointment_id
@@ -333,12 +400,18 @@ def booking_is_active(booking: dict[str, Any] | None) -> bool:
 def validate_booking_state(booking: dict[str, Any]) -> dict[str, Any]:
     required = ["patient_name", "cpf", "birth_date", "email", "payment_type"]
     missing = [field for field in required if not booking.get(field)]
-    
+
     if booking.get("payment_type") == "convenio" and not booking.get("insurance_card"):
         missing.append("insurance_card")
-        
+
     return {
-        "valid": bool(booking.get("complaint_collected") and booking.get("duration_collected") and booking.get("medication_collected")) and not missing and not booking.get("conflicts"),
+        "valid": bool(
+            booking.get("complaint_collected")
+            and booking.get("duration_collected")
+            and booking.get("medication_collected")
+        )
+        and not missing
+        and not booking.get("conflicts"),
         "patient_type": booking.get("patient_type", "self"),
         "missing_fields": missing,
         "conflicts": list(booking.get("conflicts", [])),

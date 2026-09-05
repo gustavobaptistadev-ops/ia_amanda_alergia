@@ -1,14 +1,17 @@
 import logging
 from datetime import datetime, timedelta
+
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+
+from app.core.clinic_location import CLINIC_ADDRESS, CLINIC_WAZE_URL
 from app.database import AsyncSessionLocal
-from app.models.chat import Appointment, Contact, SystemLog
+from app.models.chat import Appointment, SystemLog
 from app.services.evolution_api import send_text_message
 from app.services.message_processor import save_message
-from app.core.clinic_location import CLINIC_ADDRESS, CLINIC_WAZE_URL
 
 logger = logging.getLogger(__name__)
+
 
 async def check_and_send_reminders():
     """
@@ -20,7 +23,7 @@ async def check_and_send_reminders():
     """
     logger.info("Iniciando rotina de checagem de lembretes e follow-up clínico...")
     now = datetime.utcnow()
-    
+
     # 1. Range para Preparo de Exames (5 dias antes -> entre 118h e 122h no futuro)
     window_prep_start = now + timedelta(days=4, hours=22)
     window_prep_end = now + timedelta(days=5, hours=2)
@@ -55,7 +58,7 @@ async def check_and_send_reminders():
                     Appointment.status.in_(["agendado", "confirmado"]),
                     Appointment.prep_reminder_sent == False,
                     Appointment.appointment_time >= window_prep_start,
-                    Appointment.appointment_time <= window_prep_end
+                    Appointment.appointment_time <= window_prep_end,
                 )
             )
             res_prep = await session.execute(stmt_prep)
@@ -72,15 +75,17 @@ async def check_and_send_reminders():
                         "Se tiver qualquer dúvida sobre sua medicação, pode me chamar por aqui!"
                     )
                     await send_text_message(appt.contact.phone_number, msg)
-                    await save_message(appt.contact.phone_number, msg, sender='ia')
+                    await save_message(appt.contact.phone_number, msg, sender="ia")
                     appt.prep_reminder_sent = True
                     total_sent += 1
-                    session.add(SystemLog(
-                        category="cron_lembretes",
-                        level="INFO",
-                        title=f"Preparo de Exames enviado: {appt.patient_name}",
-                        detail=f"Orientação de suspensão de antialérgicos para {appt.contact.phone_number[:6]}****"
-                    ))
+                    session.add(
+                        SystemLog(
+                            category="cron_lembretes",
+                            level="INFO",
+                            title=f"Preparo de Exames enviado: {appt.patient_name}",
+                            detail=f"Orientação de suspensão de antialérgicos para {appt.contact.phone_number[:6]}****",
+                        )
+                    )
 
             # ----------------------------------------------------
             # ETAPA 2: LEMBRETE DE 24 HORAS ANTES
@@ -92,7 +97,7 @@ async def check_and_send_reminders():
                     Appointment.status == "agendado",
                     Appointment.reminder_24h_sent == False,
                     Appointment.appointment_time >= window_24h_start,
-                    Appointment.appointment_time <= window_24h_end
+                    Appointment.appointment_time <= window_24h_end,
                 )
             )
             res_24h = await session.execute(stmt_24h)
@@ -107,15 +112,17 @@ async def check_and_send_reminders():
                         "Podemos confirmar a sua presença? Basta me responder com um 'Sim, confirmo' ou me avisar caso precise de outro horário!"
                     )
                     await send_text_message(appt.contact.phone_number, msg)
-                    await save_message(appt.contact.phone_number, msg, sender='ia')
+                    await save_message(appt.contact.phone_number, msg, sender="ia")
                     appt.reminder_24h_sent = True
                     total_sent += 1
-                    session.add(SystemLog(
-                        category="cron_lembretes",
-                        level="INFO",
-                        title=f"Lembrete 24h enviado: {appt.patient_name}",
-                        detail=f"Disparo via WhatsApp para {appt.contact.phone_number[:6]}****"
-                    ))
+                    session.add(
+                        SystemLog(
+                            category="cron_lembretes",
+                            level="INFO",
+                            title=f"Lembrete 24h enviado: {appt.patient_name}",
+                            detail=f"Disparo via WhatsApp para {appt.contact.phone_number[:6]}****",
+                        )
+                    )
 
             # ----------------------------------------------------
             # ETAPA 3: LEMBRETE DE 2 HORAS (ROTA & MANOBRISTA)
@@ -127,7 +134,7 @@ async def check_and_send_reminders():
                     Appointment.status.in_(["agendado", "confirmado"]),
                     Appointment.reminder_2h_sent == False,
                     Appointment.appointment_time >= window_2h_start,
-                    Appointment.appointment_time <= window_2h_end
+                    Appointment.appointment_time <= window_2h_end,
                 )
             )
             res_2h = await session.execute(stmt_2h)
@@ -144,15 +151,17 @@ async def check_and_send_reminders():
                         "Nossa equipe já está te esperando com um café quentinho. Tenha uma excelente vinda!"
                     )
                     await send_text_message(appt.contact.phone_number, msg)
-                    await save_message(appt.contact.phone_number, msg, sender='ia')
+                    await save_message(appt.contact.phone_number, msg, sender="ia")
                     appt.reminder_2h_sent = True
                     total_sent += 1
-                    session.add(SystemLog(
-                        category="cron_lembretes",
-                        level="INFO",
-                        title=f"Lembrete 2h enviado: {appt.patient_name}",
-                        detail=f"Disparo com rota e manobrista para {appt.contact.phone_number[:6]}****"
-                    ))
+                    session.add(
+                        SystemLog(
+                            category="cron_lembretes",
+                            level="INFO",
+                            title=f"Lembrete 2h enviado: {appt.patient_name}",
+                            detail=f"Disparo com rota e manobrista para {appt.contact.phone_number[:6]}****",
+                        )
+                    )
 
             # ----------------------------------------------------
             # ETAPA 4: FOLLOW-UP CLÍNICO PÓS-CONSULTA (48 HORAS)
@@ -164,7 +173,7 @@ async def check_and_send_reminders():
                     Appointment.status.in_(["confirmado", "concluido", "agendado"]),
                     Appointment.follow_up_sent == False,
                     Appointment.appointment_time >= window_followup_start,
-                    Appointment.appointment_time <= window_followup_end
+                    Appointment.appointment_time <= window_followup_end,
                 )
             )
             res_followup = await session.execute(stmt_followup)
@@ -178,15 +187,17 @@ async def check_and_send_reminders():
                         "Ficou com alguma dúvida sobre seu plano de tratamento ou receitas? Nossa equipe médica está à disposição para cuidar de você."
                     )
                     await send_text_message(appt.contact.phone_number, msg)
-                    await save_message(appt.contact.phone_number, msg, sender='ia')
+                    await save_message(appt.contact.phone_number, msg, sender="ia")
                     appt.follow_up_sent = True
                     total_sent += 1
-                    session.add(SystemLog(
-                        category="cron_lembretes",
-                        level="SUCCESS",
-                        title=f"Follow-up 48h enviado: {appt.patient_name}",
-                        detail=f"Acolhimento pós-consulta enviado para {appt.contact.phone_number[:6]}****"
-                    ))
+                    session.add(
+                        SystemLog(
+                            category="cron_lembretes",
+                            level="SUCCESS",
+                            title=f"Follow-up 48h enviado: {appt.patient_name}",
+                            detail=f"Acolhimento pós-consulta enviado para {appt.contact.phone_number[:6]}****",
+                        )
+                    )
 
             # ----------------------------------------------------
             # ETAPA 5: NPS AUTOMÁTICO 72H PÓS-CONSULTA
@@ -198,7 +209,7 @@ async def check_and_send_reminders():
                     Appointment.status.in_(["confirmado", "concluido", "agendado"]),
                     Appointment.nps_sent == False,
                     Appointment.appointment_time >= window_nps_start,
-                    Appointment.appointment_time <= window_nps_end
+                    Appointment.appointment_time <= window_nps_end,
                 )
             )
             res_nps = await session.execute(stmt_nps)
@@ -213,33 +224,41 @@ async def check_and_send_reminders():
                         "(_Basta responder com o número!_)"
                     )
                     await send_text_message(appt.contact.phone_number, msg)
-                    await save_message(appt.contact.phone_number, msg, sender='ia')
+                    await save_message(appt.contact.phone_number, msg, sender="ia")
                     appt.nps_sent = True
                     total_sent += 1
-                    session.add(SystemLog(
-                        category="cron_lembretes",
-                        level="INFO",
-                        title=f"NPS 72h enviado: {appt.patient_name}",
-                        detail=f"Pesquisa de satisfação enviada para {appt.contact.phone_number[:6]}****"
-                    ))
+                    session.add(
+                        SystemLog(
+                            category="cron_lembretes",
+                            level="INFO",
+                            title=f"NPS 72h enviado: {appt.patient_name}",
+                            detail=f"Pesquisa de satisfação enviada para {appt.contact.phone_number[:6]}****",
+                        )
+                    )
 
-            session.add(SystemLog(
-                category="cron_lembretes",
-                level="SUCCESS",
-                title="Varredura de Lembretes & Follow-up Concluída",
-                detail=f"Lote verificado com sucesso. Total de disparos realizados: {total_sent}."
-            ))
+            session.add(
+                SystemLog(
+                    category="cron_lembretes",
+                    level="SUCCESS",
+                    title="Varredura de Lembretes & Follow-up Concluída",
+                    detail=f"Lote verificado com sucesso. Total de disparos realizados: {total_sent}.",
+                )
+            )
             await session.commit()
-            logger.info(f"Rotina de lembretes finalizada com sucesso. Total de disparos: {total_sent}")
+            logger.info(
+                f"Rotina de lembretes finalizada com sucesso. Total de disparos: {total_sent}"
+            )
         except Exception as e:
             logger.error(f"Erro ao processar lembretes: {e}")
             try:
-                session.add(SystemLog(
-                    category="cron_lembretes",
-                    level="ERROR",
-                    title="Erro na Execução do Lote",
-                    detail=str(e)
-                ))
+                session.add(
+                    SystemLog(
+                        category="cron_lembretes",
+                        level="ERROR",
+                        title="Erro na Execução do Lote",
+                        detail=str(e),
+                    )
+                )
                 await session.commit()
             except:
-                pass
+                pass

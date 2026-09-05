@@ -1,5 +1,6 @@
 import re
 
+
 def validate_cpf(cpf_raw: str) -> bool:
     """
     Valida um CPF utilizando o algoritmo oficial de dígitos verificadores da Receita Federal.
@@ -38,6 +39,7 @@ def validate_cpf(cpf_raw: str) -> bool:
 
     return int(digits[10]) == digito2
 
+
 def sanitize_text(text: str, max_length: int = 120) -> str:
     """Sanitiza strings de entrada para evitar Calendar Injection e truncamentos."""
     if not text:
@@ -46,13 +48,16 @@ def sanitize_text(text: str, max_length: int = 120) -> str:
     clean = re.sub(r"[\r\n\t]", " ", str(text)).strip()
     return clean[:max_length]
 
+
 import html
+
 
 def sanitize_html(text: str) -> str:
     """Escapa tags HTML contra ataques de XSS em mensagens do painel."""
     if not text:
         return ""
     return html.escape(str(text))
+
 
 def mask_phone_for_logs(phone: str) -> str:
     """Mascara o número de telefone para logs em conformidade com a LGPD (ex: 5561****2495)."""
@@ -63,6 +68,7 @@ def mask_phone_for_logs(phone: str) -> str:
         return f"{clean[:4]}****{clean[-4:]}"
     return f"{clean[:2]}****"
 
+
 def mask_cpf_for_logs(cpf: str) -> str:
     """Mascara o CPF para logs em conformidade com a LGPD (ex: ***.***.123-**)."""
     if not cpf:
@@ -70,4 +76,4 @@ def mask_cpf_for_logs(cpf: str) -> str:
     digits = re.sub(r"\D", "", str(cpf))
     if len(digits) == 11:
         return f"***.***.{digits[6:9]}-**"
-    return "***"
+    return "***"

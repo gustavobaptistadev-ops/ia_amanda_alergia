@@ -1,8 +1,8 @@
 """Roteamento determinístico de conversas antes da atuação da LLM."""
 
+import datetime
 import re
 import unicodedata
-import datetime
 from collections.abc import Sequence
 from typing import Any
 
@@ -23,7 +23,9 @@ def normalize_text(text: str) -> str:
 
 def build_complaint_request(messages: Sequence[Any]) -> str:
     """Solicita a queixa sem repetir a apresentação após o primeiro turno."""
-    human_turns = sum(1 for message in messages if getattr(message, "type", None) == "human")
+    human_turns = sum(
+        1 for message in messages if getattr(message, "type", None) == "human"
+    )
     if human_turns <= 1:
         return (
             "Olá! Sou Amanda, recepcionista da Clínica Lifeline One. "
@@ -37,28 +39,96 @@ def build_complaint_request(messages: Sequence[Any]) -> str:
 
 
 THIRD_PARTY_TERMS = (
-    "meu filho", "minha filha", "meu pai", "minha mae", "minha mãe",
-    "meu marido", "minha esposa", "meu esposo", "minha irma", "meu irmao",
-    "minha irmã", "meu irmão", "meu avo", "minha avo", "meu avô", "minha avó",
-    "meu dependente", "minha dependente", "outra pessoa", "para ele", "para ela",
-    "para meu", "para minha", "responsavel pelo paciente", "responsável pelo paciente",
+    "meu filho",
+    "minha filha",
+    "meu pai",
+    "minha mae",
+    "minha mãe",
+    "meu marido",
+    "minha esposa",
+    "meu esposo",
+    "minha irma",
+    "meu irmao",
+    "minha irmã",
+    "meu irmão",
+    "meu avo",
+    "minha avo",
+    "meu avô",
+    "minha avó",
+    "meu dependente",
+    "minha dependente",
+    "outra pessoa",
+    "para ele",
+    "para ela",
+    "para meu",
+    "para minha",
+    "responsavel pelo paciente",
+    "responsável pelo paciente",
 )
 
 INTENT_TERMS = {
-    "FRUSTRACAO_HANDOFF": ("humano", "atendente", "pessoa", "falar com alguém", "falar com alguem"),
-    "URGENCIA": ("urgencia", "emergencia", "falta de ar", "falta de ar severa", "sufocando", "anafilaxia", "garganta fechando", "pronto socorro", "choque anafilatico", "choque anafilático"),
-    "REAGENDAMENTO": ("remarcar", "reagendar", "mudar o dia", "mudar a hora", "mudar a data"),
+    "FRUSTRACAO_HANDOFF": (
+        "humano",
+        "atendente",
+        "pessoa",
+        "falar com alguém",
+        "falar com alguem",
+        "falar com pessoa",
+        "tá difícil",
+        "ta dificil",
+        "não entende",
+        "nao entende",
+        "péssimo",
+        "pessimo",
+        "horrível",
+        "horrivel",
+        "burra",
+        "burro",
+        "robo",
+        "robô",
+    ),
+    "URGENCIA": (
+        "urgencia",
+        "urgência",
+        "emergencia",
+        "emergência",
+        "falta de ar",
+        "falta de ar severa",
+        "sufocando",
+        "anafilaxia",
+        "garganta fechando",
+        "pronto socorro",
+        "choque anafilatico",
+        "choque anafilático",
+        "glote",
+        "grave",
+    ),
+    "REAGENDAMENTO": (
+        "remarcar",
+        "reagendar",
+        "mudar o dia",
+        "mudar a hora",
+        "mudar horario",
+        "mudar a data",
+    ),
     "CANCELAMENTO": ("cancelar", "desmarcar"),
-    "AGENDAMENTO": ("agendar", "marcar consulta", "marcar horario", "vaga", "consulta"),
+    "AGENDAMENTO": ("agendar", "marcar", "marcar consulta", "marcar horario", "vaga", "consulta", "horário", "horario", "quero ir"),
 }
 
 WEEKDAYS = {
-    "segunda": 0, "terca": 1, "quarta": 2, "quinta": 3,
-    "sexta": 4, "sabado": 5, "domingo": 6,
+    "segunda": 0,
+    "terca": 1,
+    "quarta": 2,
+    "quinta": 3,
+    "sexta": 4,
+    "sabado": 5,
+    "domingo": 6,
 }
 
 
-def extract_requested_date(text: str, reference_date: datetime.date | None = None) -> str | None:
+def extract_requested_date(
+    text: str, reference_date: datetime.date | None = None
+) -> str | None:
     """Converte uma data ou dia da semana pedido pelo paciente para ISO."""
     normalized = normalize_text(text)
     reference_date = reference_date or datetime.date.today()
@@ -66,17 +136,22 @@ def extract_requested_date(text: str, reference_date: datetime.date | None = Non
     if explicit:
         year = int(explicit.group(3) or reference_date.year)
         try:
-            return datetime.date(year, int(explicit.group(2)), int(explicit.group(1))).isoformat()
+            return datetime.date(
+                year, int(explicit.group(2)), int(explicit.group(1))
+            ).isoformat()
         except ValueError:
             return None
 
-    weekday = next((day for day in WEEKDAYS if re.search(rf"\b{day}(?:-feira)?\b", normalized)), None)
+    weekday = next(
+        (day for day in WEEKDAYS if re.search(rf"\b{day}(?:-feira)?\b", normalized)), None
+    )
     if weekday is None:
         return None
     days_ahead = (WEEKDAYS[weekday] - reference_date.weekday()) % 7
     if days_ahead == 0:
         days_ahead = 7
     return (reference_date + datetime.timedelta(days=days_ahead)).isoformat()
+
 
 OFF_TOPIC_PATTERNS = (
     r"\b(?:codigo|script|programa|algoritmo)\s+(?:em\s+)?(?:python|javascript|java|sql|html)\b",
@@ -126,19 +201,30 @@ def route_message(
     else:
         for intent, terms in INTENT_TERMS.items():
             if any(term in normalized for term in terms):
-                confidence = 0.97 if intent in {"URGENCIA", "CANCELAMENTO", "REAGENDAMENTO"} else 0.94
+                confidence = (
+                    0.97
+                    if intent in {"URGENCIA", "CANCELAMENTO", "REAGENDAMENTO"}
+                    else 0.94
+                )
                 break
         else:
-        # Respostas curtas continuam no agendamento quando o histórico mostra
-        # que a Amanda estava coletando dados cadastrais.
+            # Respostas curtas continuam no agendamento quando o histórico mostra
+            # que a Amanda estava coletando dados cadastrais.
             registration_context = _has_registration_context(history)
             availability_context = _has_availability_context(history)
-            intent = "AGENDAMENTO" if registration_context or availability_context else "DUVIDA"
+            intent = (
+                "AGENDAMENTO"
+                if registration_context or availability_context
+                else "DUVIDA"
+            )
             confidence = 0.93 if registration_context or availability_context else 0.45
 
     if intent == "AGENDAMENTO":
         missing_fields = []
-        complaint_detected = has_patient_complaint(history + [_Message(text)]) or semantic_complaint is True
+        complaint_detected = (
+            has_patient_complaint(history + [_Message(text)])
+            or semantic_complaint is True
+        )
         if not complaint_detected:
             next_action = "COLLECT_COMPLAINT"
             confidence = min(confidence, 0.92)
@@ -147,17 +233,27 @@ def route_message(
                 missing_fields.append("name")
             if not extract_latest_cpf(history + [_Message(text)]):
                 missing_fields.append("cpf")
-            if not any(contains_date(getattr(message, "content", "")) for message in history + [_Message(text)] if getattr(message, "type", None) == "human"):
+            if not any(
+                contains_date(getattr(message, "content", ""))
+                for message in history + [_Message(text)]
+                if getattr(message, "type", None) == "human"
+            ):
                 missing_fields.append("birth_date")
             if not extract_payment_type(history + [_Message(text)]):
                 missing_fields.append("payment_type")
-            next_action = {
-                "name": "COLLECT_NAME",
-                "cpf": "COLLECT_CPF",
-                "birth_date": "COLLECT_BIRTH_DATE",
-                "payment_type": "COLLECT_PAYMENT_TYPE",
-            }.get(missing_fields[0], "CHECK_AVAILABILITY") if missing_fields else (
-                "CONFIRM_SLOT" if _extract_preferred_slot(text, history) else "CHECK_AVAILABILITY"
+            next_action = (
+                {
+                    "name": "COLLECT_NAME",
+                    "cpf": "COLLECT_CPF",
+                    "birth_date": "COLLECT_BIRTH_DATE",
+                    "payment_type": "COLLECT_PAYMENT_TYPE",
+                }.get(missing_fields[0], "CHECK_AVAILABILITY")
+                if missing_fields
+                else (
+                    "CONFIRM_SLOT"
+                    if _extract_preferred_slot(text, history)
+                    else "CHECK_AVAILABILITY"
+                )
             )
     elif intent in {"CANCELAMENTO", "REAGENDAMENTO"}:
         missing_fields = ["appointment"]
@@ -180,7 +276,9 @@ def route_message(
             "cpf": extract_latest_cpf([_Message(text)]),
             "birth_date": text if contains_date(text) else None,
             "third_party": is_third_party,
-            "complaint_detected": complaint_detected if intent == "AGENDAMENTO" else False,
+            "complaint_detected": complaint_detected
+            if intent == "AGENDAMENTO"
+            else False,
             "payment_type": extract_payment_type(history + [_Message(text)]),
             "preferred_slot": _extract_preferred_slot(text, history),
         },
@@ -200,19 +298,23 @@ def _is_location_followup(text: str, messages: Sequence[Any]) -> bool:
     ]
     if not recent_ai or not any(term in recent_ai[0] for term in location_terms):
         return False
-    return any(re.search(rf"\b{re.escape(term)}\b", text) for term in confirmation_terms) or any(
-        term in text for term in location_terms
-    )
+    return any(
+        re.search(rf"\b{re.escape(term)}\b", text) for term in confirmation_terms
+    ) or any(term in text for term in location_terms)
 
 
 def _extract_preferred_slot(text: str, messages: Sequence[Any]) -> dict[str, str] | None:
     """Extract a day/time choice only after availability was presented."""
     normalized = normalize_text(text)
-    time_match = re.search(r"\b(?:as|a|pelas?)\s*(\d{1,2})(?::(\d{2}))?\s*h?\b", normalized)
+    time_match = re.search(
+        r"\b(?:as|a|pelas?)\s*(\d{1,2})(?::(\d{2}))?\s*h?\b", normalized
+    )
     if not time_match:
         return None
 
-    weekday = next((day for day in WEEKDAYS if re.search(rf"\b{day}(?:-feira)?\b", normalized)), None)
+    weekday = next(
+        (day for day in WEEKDAYS if re.search(rf"\b{day}(?:-feira)?\b", normalized)), None
+    )
     availability_message = next(
         (
             normalize_text(getattr(message, "content", ""))
@@ -223,22 +325,31 @@ def _extract_preferred_slot(text: str, messages: Sequence[Any]) -> dict[str, str
         "",
     )
     offered_text = availability_message
-    if not any(marker in offered_text for marker in ("horarios disponiveis", "horarios livres", "horarios")):
+    if not any(
+        marker in offered_text
+        for marker in ("horarios disponiveis", "horarios livres", "horarios")
+    ):
         return None
 
     if not weekday:
         # Quando existe apenas uma data na lista, "às 16" é uma escolha válida.
-        offered_dates = re.findall(r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2})\b", offered_text)
+        offered_dates = re.findall(
+            r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2})\b", offered_text
+        )
         if len(set(offered_dates)) != 1:
             return None
         offered_match = None
     else:
-        offered_match = re.search(rf"{weekday}(?:-feira)?[^\d]{{0,30}}(\d{{1,2}})/(\d{{1,2}})", offered_text)
+        offered_match = re.search(
+            rf"{weekday}(?:-feira)?[^\d]{{0,30}}(\d{{1,2}})/(\d{{1,2}})", offered_text
+        )
     if offered_match:
         year = datetime.date.today().year
         date_str = f"{year:04d}-{int(offered_match.group(2)):02d}-{int(offered_match.group(1)):02d}"
     elif not weekday:
-        offered_date = re.findall(r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2})\b", offered_text)[0]
+        offered_date = re.findall(
+            r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2})\b", offered_text
+        )[0]
         if "-" in offered_date:
             date_str = offered_date
         else:
@@ -269,13 +380,14 @@ def _extract_name_from_history(messages: Sequence[Any]) -> str | None:
             if name:
                 return name
             previous_message = message_list[index - 1] if index > 0 else None
-            asked_for_name = (
-                getattr(previous_message, "type", None) == "ai"
-                and "nome completo" in normalize_text(
-                    getattr(previous_message, "content", "")
-                )
+            asked_for_name = getattr(
+                previous_message, "type", None
+            ) == "ai" and "nome completo" in normalize_text(
+                getattr(previous_message, "content", "")
             )
-            if (index == len(message_list) - 1 or asked_for_name) and _looks_like_standalone_name(content):
+            if (
+                index == len(message_list) - 1 or asked_for_name
+            ) and _looks_like_standalone_name(content):
                 return content.strip(" .,!?")
     return None
 
@@ -284,7 +396,7 @@ def _clean_patient_text(text: str) -> str:
     """Remove o envelope interno antes de aplicar regras de linguagem."""
     cleaned = str(text or "").strip()
     if cleaned.startswith("<user_message>") and cleaned.endswith("</user_message>"):
-        cleaned = cleaned[len("<user_message>"):-len("</user_message>")]
+        cleaned = cleaned[len("<user_message>") : -len("</user_message>")]
     return cleaned.strip()
 
 
@@ -294,7 +406,25 @@ def _looks_like_standalone_name(text: str) -> bool:
     words = normalized.split()
     if not 2 <= len(words) <= 6 or any(char.isdigit() for char in normalized):
         return False
-    blocked_terms = set("eu meu minha nome cpf nascimento consulta agendar marcar alergia coceira dor estou sinto quero".split())
+    blocked_terms = set(
+        [
+            "eu",
+            "meu",
+            "minha",
+            "nome",
+            "cpf",
+            "nascimento",
+            "consulta",
+            "agendar",
+            "marcar",
+            "alergia",
+            "coceira",
+            "dor",
+            "estou",
+            "sinto",
+            "quero",
+        ]
+    )
     return not any(word in blocked_terms for word in words)
 
 
@@ -305,11 +435,23 @@ def _has_registration_context(messages: Sequence[Any]) -> bool:
         if getattr(message, "type", None) == "ai":
             if any(
                 marker in content
-                for marker in ("nome completo", "numero do cpf", "data de nascimento", "motivo da consulta")
+                for marker in (
+                    "nome completo",
+                    "numero do cpf",
+                    "data de nascimento",
+                    "motivo da consulta",
+                )
             ):
                 return True
         if getattr(message, "type", None) == "human" and any(
-            term in content for term in ("agendar", "marcar consulta", "marcar uma consulta", "preciso marcar", "quero consulta")
+            term in content
+            for term in (
+                "agendar",
+                "marcar consulta",
+                "marcar uma consulta",
+                "preciso marcar",
+                "quero consulta",
+            )
         ):
             return True
     return False

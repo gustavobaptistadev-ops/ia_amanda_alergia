@@ -10,6 +10,7 @@ from fastapi.security import APIKeyQuery
 
 from app.core.limiter import limiter
 from app.core.security import WEBHOOK_SECRET
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -30,7 +31,7 @@ _redis_pool = None
 async def get_redis_pool():
     global _redis_pool
     if _redis_pool is None:
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        redis_url = settings.REDIS_URL
         parsed = urllib.parse.urlparse(redis_url)
         database = int(parsed.path.strip("/") or 0)
         _redis_pool = await create_pool(
@@ -46,7 +47,9 @@ async def get_redis_pool():
 
 @router.post("/evolution")
 @limiter.limit("60/minute")
-async def evolution_webhook(request: Request, token: str = Security(verify_webhook_token)):
+async def evolution_webhook(
+    request: Request, token: str = Security(verify_webhook_token)
+):
     """Receives Evolution API events without exposing payloads or internal errors."""
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > MAX_WEBHOOK_BYTES:
@@ -66,4 +69,6 @@ async def evolution_webhook(request: Request, token: str = Security(verify_webho
         raise HTTPException(status_code=400, detail="Invalid webhook payload")
     except Exception:
         logger.exception("Falha ao processar webhook de forma segura")
-        raise HTTPException(status_code=503, detail="Webhook temporariamente indisponível")
+        raise HTTPException(
+            status_code=503, detail="Webhook temporariamente indisponível"
+        )

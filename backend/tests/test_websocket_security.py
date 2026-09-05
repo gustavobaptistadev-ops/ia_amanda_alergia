@@ -1,10 +1,10 @@
-from types import SimpleNamespace
+﻿from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 
 from app.core.security import validate_cookie_origin
-
+from app.core.config import settings
 
 def _connection(origin: str, connection_type: str = "websocket", method: str = "GET"):
     return SimpleNamespace(
@@ -15,13 +15,13 @@ def _connection(origin: str, connection_type: str = "websocket", method: str = "
 
 
 def test_websocket_aceita_origem_do_frontend(monkeypatch):
-    monkeypatch.setenv("CORS_ORIGINS", "https://painel.example.com")
+    monkeypatch.setattr(settings, "CORS_ORIGINS", "https://painel.example.com")
 
     validate_cookie_origin(_connection("https://painel.example.com"))
 
 
 def test_websocket_rejeita_origem_externa(monkeypatch):
-    monkeypatch.setenv("CORS_ORIGINS", "https://painel.example.com")
+    monkeypatch.setattr(settings, "CORS_ORIGINS", "https://painel.example.com")
 
     with pytest.raises(HTTPException) as error:
         validate_cookie_origin(_connection("https://site-malicioso.example"))
@@ -30,7 +30,7 @@ def test_websocket_rejeita_origem_externa(monkeypatch):
 
 
 def test_requisicao_mutavel_por_cookie_exige_origem_permitida(monkeypatch):
-    monkeypatch.setenv("CORS_ORIGINS", "https://painel.example.com")
+    monkeypatch.setattr(settings, "CORS_ORIGINS", "https://painel.example.com")
 
     with pytest.raises(HTTPException) as error:
         validate_cookie_origin(

@@ -1,10 +1,10 @@
 import base64
 import json
 import logging
-from typing import Optional, Dict, Any
-from langchain_openai import ChatOpenAI
+from typing import Any
+
 from langchain_core.messages import HumanMessage, SystemMessage
-from pydantic import BaseModel, Field
+from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -30,34 +30,47 @@ IMPORTANTE: Responda estritamente em formato JSON válido conforme as chaves aci
 """
 
 import io
-import pypdf
 import re
 from datetime import datetime
+
+import pypdf
+
 
 def check_expiration(data: dict):
     """Verifica se a carteirinha está vencida baseada na string expiration_date e injeta o alerta."""
     exp_date_str = data.get("expiration_date")
     if exp_date_str and str(exp_date_str).strip().lower() not in ["null", "none", ""]:
-        nums = re.findall(r'\d+', str(exp_date_str))
+        nums = re.findall(r"\d+", str(exp_date_str))
         try:
             now = datetime.now()
             is_expired = False
             if len(nums) == 3:
                 d, m, y = map(int, nums)
-                if y < 100: y += 2000
-                if datetime(y, m, d) < now: is_expired = True
+                if y < 100:
+                    y += 2000
+                if datetime(y, m, d) < now:
+                    is_expired = True
             elif len(nums) == 2:
                 m, y = map(int, nums)
-                if y < 100: y += 2000
-                if m == 12: next_m, next_y = 1, y+1
-                else: next_m, next_y = m+1, y
-                if datetime(next_y, next_m, 1) <= now: is_expired = True
-            
+                if y < 100:
+                    y += 2000
+                if m == 12:
+                    next_m, next_y = 1, y + 1
+                else:
+                    next_m, next_y = m + 1, y
+                if datetime(next_y, next_m, 1) <= now:
+                    is_expired = True
+
             if is_expired:
                 data["is_expired"] = True
-                data["summary_for_chat"] = f"{data.get('summary_for_chat', '')} [ALERTA SISTEMA: A validade impressa ({exp_date_str}) indica que a carteirinha está vencida. Comunique o paciente com empatia.]"
+                data["summary_for_chat"] = (
+                    f"{data.get('summary_for_chat', '')} [ALERTA SISTEMA: A validade impressa ({exp_date_str}) indica que a carteirinha está vencida. Comunique o paciente com empatia.]"
+                )
         except Exception as d_err:
-            logger.warning(f"[VISION OCR] Falha ao fazer parse da validade {exp_date_str}: {d_err}")
+            logger.warning(
+                f"[VISION OCR] Falha ao fazer parse da validade {exp_date_str}: {d_err}"
+            )
+
 
 PDF_TEXT_PROMPT = """Você é um especialista sênior em faturamento médico e credenciamento hospitalar da Clínica Lifeline One.
 Sua missão é analisar o texto extraído de um documento PDF enviado por um paciente no WhatsApp e identificar se é uma Carteirinha de Plano de Saúde / Convênio Médico ou documento de saúde.
@@ -83,7 +96,10 @@ Retorne is_health_card: false e preencha summary_for_chat.
 Responda estritamente em formato JSON válido com as chaves acima.
 """
 
-async def process_health_card_document(file_bytes: bytes, filename: str = "") -> Dict[str, Any]:
+
+async def process_health_card_document(
+    file_bytes: bytes, filename: str = ""
+) -> dict[str, Any]:
     """
     Processa documentos PDF ou imagens de carteirinhas de convênio (Assefaz, Unimed, Bradesco, etc.).
     """
@@ -97,13 +113,17 @@ async def process_health_card_document(file_bytes: bytes, filename: str = "") ->
                 t = page.extract_text()
                 if t:
                     pdf_text += t + "\n"
-            
+
             if len(pdf_text.strip()) > 30:
-                logger.info(f"[DOC OCR] Texto extraído com sucesso do PDF ({len(pdf_text)} caracteres). Analisando com LLM...")
+                logger.info(
+                    f"[DOC OCR] Texto extraído com sucesso do PDF ({len(pdf_text)} caracteres). Analisando com LLM..."
+                )
                 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.0)
                 messages = [
-                    SystemMessage(content="Você extrai dados de saúde e responde apenas em JSON."),
-                    HumanMessage(content=PDF_TEXT_PROMPT.format(extracted_text=pdf_text))
+                    SystemMessage(
+                        content="Você extrai dados de saúde e responde apenas em JSON."
+                    ),
+                    HumanMessage(content=PDF_TEXT_PROMPT.format(extracted_text=pdf_text)),
                 ]
                 resp = await llm.ainvoke(messages)
                 content = resp.content.strip()
@@ -114,65 +134,73 @@ async def process_health_card_document(file_bytes: bytes, filename: str = "") ->
                 data = json.loads(content)
                 if data.get("is_health_card"):
                     check_expiration(data)
-                    logger.info(f"[PDF SUCCESS] Carteirinha lida: Operadora={data.get('operator')}, Titular={data.get('patient_name')}, Matrícula={data.get('card_number')}")
+                    logger.info(
+                        f"[PDF SUCCESS] Carteirinha lida: Operadora={data.get('operator')}, Titular={data.get('patient_name')}, Matrícula={data.get('card_number')}"
+                    )
                     return data
         except Exception as pdf_err:
-            logger.warning(f"[DOC OCR] Falha ao extrair texto do PDF via pypdf: {pdf_err}")
+            logger.warning(
+                f"[DOC OCR] Falha ao extrair texto do PDF via pypdf: {pdf_err}"
+            )
 
     # 2. Se for imagem ou se o PDF precisar de visão computacional
     return await process_health_card_image(file_bytes)
 
-async def process_health_card_image(image_bytes: bytes) -> Dict[str, Any]:
+
+async def process_health_card_image(image_bytes: bytes) -> dict[str, Any]:
     """
     Processa os bytes de uma imagem usando GPT-4o Vision e retorna os dados estruturados da carteirinha.
     """
     try:
         b64_image = base64.b64encode(image_bytes).decode("utf-8")
-        
-        llm_vision = ChatOpenAI(
-            model="gpt-4o-mini",
-            temperature=0.0,
-            max_tokens=1000
-        )
-        
+
+        llm_vision = ChatOpenAI(model="gpt-4o-mini", temperature=0.0, max_tokens=1000)
+
         messages = [
             SystemMessage(content=VISION_PROMPT),
             HumanMessage(
                 content=[
-                    {"type": "text", "text": "Analise esta imagem/carteirinha enviada pelo paciente e extraia os dados médicos com precisão."},
+                    {
+                        "type": "text",
+                        "text": "Analise esta imagem/carteirinha enviada pelo paciente e extraia os dados médicos com precisão.",
+                    },
                     {
                         "type": "image_url",
                         "image_url": {
                             "url": f"data:image/jpeg;base64,{b64_image}",
-                            "detail": "high"
-                        }
-                    }
+                            "detail": "high",
+                        },
+                    },
                 ]
-            )
+            ),
         ]
-        
-        logger.info("[VISION OCR] Enviando imagem de carteirinha para análise com GPT-4o Vision...")
+
+        logger.info(
+            "[VISION OCR] Enviando imagem de carteirinha para análise com GPT-4o Vision..."
+        )
         response = await llm_vision.ainvoke(messages)
         content = response.content.strip()
-        
+
         # Limpeza de markdown se a LLM responder com ```json ... ```
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
             content = content.split("```")[1].split("```")[0].strip()
-            
+
         data = json.loads(content)
-        
+
         # Validação CTO: Checa vencimento da carteirinha
         check_expiration(data)
-                
-        logger.info(f"[VISION OCR SUCCESS] Carteirinha processada: Operadora={data.get('operator')}, Matrícula={data.get('card_number')}, Titular={data.get('patient_name')}")
+
+        logger.info(
+            f"[VISION OCR SUCCESS] Carteirinha processada: Operadora={data.get('operator')}, Matrícula={data.get('card_number')}, Titular={data.get('patient_name')}"
+        )
         return data
-        
+
     except Exception as e:
         logger.error(f"[VISION OCR ERROR] Falha ao analisar carteirinha com Vision: {e}")
         return {
             "is_health_card": False,
             "error": str(e),
-            "summary_for_chat": "Recebi seu documento/carteirinha, mas não consegui ler os dados com nitidez. Poderia me confirmar o nome do seu plano e o número da carteirinha por texto?"
+            "summary_for_chat": "Recebi seu documento/carteirinha, mas não consegui ler os dados com nitidez. Poderia me confirmar o nome do seu plano e o número da carteirinha por texto?",
         }

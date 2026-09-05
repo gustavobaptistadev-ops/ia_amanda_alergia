@@ -1,6 +1,6 @@
-﻿import os
 import base64
 import logging
+
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -22,6 +22,7 @@ kdf = PBKDF2HMAC(
 _fernet_key = base64.urlsafe_b64encode(kdf.derive(RAW_SECRET.encode()))
 _cipher = Fernet(_fernet_key)
 
+
 def encrypt_text(plain_text: str) -> str:
     """Encripta uma string em texto plano para formato seguro codificado em base64."""
     if not plain_text:
@@ -32,6 +33,7 @@ def encrypt_text(plain_text: str) -> str:
     except Exception as e:
         logger.error(f"Erro ao encriptar texto: {e}")
         return plain_text
+
 
 def decrypt_text(cipher_text: str) -> str:
     """Decripta uma string encriptada. Se não estiver encriptada, retorna o texto original."""
@@ -45,4 +47,4 @@ def decrypt_text(cipher_text: str) -> str:
         return decrypted_bytes.decode("utf-8")
     except Exception as e:
         logger.error(f"Erro ao decriptar texto: {e}")
-        return cipher_text
+        return cipher_text
