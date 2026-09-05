@@ -88,23 +88,27 @@ async def process_and_respond(
                 return
 
             if text.strip().lower() == "/reset":
-                from app.api.deps import get_db
-                from sqlalchemy import delete, text
-                from app.models.chat import Message, Appointment
-                
-                async for db in get_db():
-                    await db.execute(delete(Message).where(Message.contact_id == contact.id))
-                    # Limpa a memória LangGraph
-                    try:
-                        await db.execute(text("DELETE FROM checkpoints WHERE thread_id = :tid"), {"tid": contact.thread_id})
-                        await db.execute(text("DELETE FROM checkpoint_blobs WHERE thread_id = :tid"), {"tid": contact.thread_id})
-                        await db.execute(text("DELETE FROM checkpoint_writes WHERE thread_id = :tid"), {"tid": contact.thread_id})
-                    except Exception:
-                        pass
-                    await db.commit()
-                
-                resp = "Sua conversa e memória foram completamente resetadas! Como posso ajudar você agora?"
-                await send_text_message(remote_jid, resp)
+                try:
+                    from app.api.deps import get_db
+                    from sqlalchemy import delete, text
+                    from app.models.chat import Message, Appointment
+                    
+                    async for db in get_db():
+                        await db.execute(delete(Message).where(Message.contact_id == contact.id))
+                        await db.execute(delete(Appointment).where(Appointment.contact_id == contact.id))
+                        contact.stage = "novo_contato"
+                        try:
+                            await db.execute(text("DELETE FROM checkpoints WHERE thread_id = :tid"), {"tid": contact.thread_id})
+                            await db.execute(text("DELETE FROM checkpoint_blobs WHERE thread_id = :tid"), {"tid": contact.thread_id})
+                            await db.execute(text("DELETE FROM checkpoint_writes WHERE thread_id = :tid"), {"tid": contact.thread_id})
+                        except Exception:
+                            pass
+                        await db.commit()
+                        
+                    resp = "Sua conversa e memória foram completamente resetadas! Como posso ajudar você agora?"
+                    await send_text_message(remote_jid, resp)
+                except Exception as e:
+                    await send_text_message(remote_jid, f"Ops, erro no /reset: {str(e)}")
                 return
 
             if text.strip().lower() == "ping":
